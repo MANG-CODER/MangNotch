@@ -1,0 +1,2 @@
+﻿013ce2b138de03045c113a1aaf22376abb2e00c4a1a913b1992aa34772ed7cd6  MangNotch_1.0.0_x64-setup.exe
+a872554931b8e296c7c316c882735c9d8e4fa6aa760bd454653c8faa65fa1ce6  MangNotch_1.0.0_x64_en-US.msi

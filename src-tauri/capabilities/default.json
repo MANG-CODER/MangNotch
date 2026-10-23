@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Capability for notch and control windows",
+  "windows": ["notch", "control"],
+  "permissions": ["core:default", "core:event:default", "core:window:default"]
+}
