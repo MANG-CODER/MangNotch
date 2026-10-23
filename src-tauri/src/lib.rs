@@ -743,6 +743,7 @@ pub fn run() {
 
             let app_handle = app.handle().clone();
             let raw_hwnd = notch_hwnd.0 as isize;
+            let dpi_scale = notch_win.scale_factor().unwrap_or(1.0);
 
             thread::spawn(move || {
                 let hwnd = HWND(raw_hwnd as *mut _);
@@ -903,12 +904,21 @@ pub fn run() {
                             let is_expanded = cfg.active_height >= 100;
                             let is_minimal = is_obstructed || cfg.active_height <= 12;
 
+                            let scale_px = |value: i32| {
+                                (value as f64 * dpi_scale).round() as i32
+                            };
                             let (half_w, hit_bottom) = if !is_hovered && is_minimal {
-                                (60, win_rect.top + 4)
+                                (scale_px(60), win_rect.top + scale_px(4))
                             } else if is_expanded {
-                                (cfg.active_width / 2 + 12, win_rect.top + cfg.active_height + 10)
+                                (
+                                    scale_px(cfg.active_width / 2 + 12),
+                                    win_rect.top + scale_px(cfg.active_height + 10),
+                                )
                             } else {
-                                (cfg.active_width / 2, win_rect.top + cfg.active_height)
+                                (
+                                    scale_px(cfg.active_width / 2),
+                                    win_rect.top + scale_px(cfg.active_height),
+                                )
                             };
 
                             let hit_left = notch_center_x - half_w;
