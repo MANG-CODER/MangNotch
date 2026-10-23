@@ -285,7 +285,26 @@ fn position_notch_window(notch_hwnd: HWND, cfg: &AppConfig) {
     };
 
     if let Some(mon) = target {
-        let x = mon.x + (mon.width - WINDOW_WIDTH) / 2;
+        let window_width = {
+            let mut rect = RECT::default();
+
+            unsafe {
+                if GetWindowRect(notch_hwnd, &mut rect).is_ok() {
+                    let measured_width = rect.right - rect.left;
+
+                    if measured_width > 0 {
+                        measured_width
+                    } else {
+                        WINDOW_WIDTH
+                    }
+                } else {
+                    WINDOW_WIDTH
+                }
+            }
+        };
+
+        let x = mon.x + (mon.width - window_width) / 2;
+
         let y = mon.y;
         unsafe {
             let _ = ShowWindow(notch_hwnd, SW_SHOWNOACTIVATE);
