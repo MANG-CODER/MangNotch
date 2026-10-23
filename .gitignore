@@ -10,12 +10,38 @@ src-tauri/target/
 src-tauri/WixTools/
 src-tauri/gen/schemas/
 **/*.rs.bk
-Cargo.lock
+
+# Keep Cargo.lock tracked for reproducible application builds
+# Cargo.lock
 
 # Distribution / Frontend build outputs
 dist/
 dist-ssr/
 *.local
+
+# Tauri / Windows packaging outputs
+dist-msix/
+store-assets/
+*.msix
+*.msixbundle
+*.appx
+*.appxbundle
+*.msi
+*.exe
+*.wixpdb
+*.wxs
+*.wixobj
+*.appinstaller
+AppPackages/
+BundleArtifacts/
+Packaging/
+
+# Signing certificates and private keys
+*.pfx
+*.p12
+*.key
+*.cer
+devcert.pfx
 
 # Environment variables
 .env
@@ -36,3 +62,30 @@ dist-ssr/
 .DS_Store
 Thumbs.db
 Desktop.ini
+
+# Logs and temporary files
+*.log
+*.tmp
+*.temp
+*.bak
+*.old
+
+# Rust / native debugging files
+core
+core.*
+
+# Test and coverage outputs
+coverage/
+.nyc_output/
+
+# TypeScript / bundler caches
+.turbo/
+.next/
+.cache/
+.parcel-cache/
+*.tsbuildinfo
+
+# Development-only local configuration
+.env.development.local
+.env.test.local
+.env.production.local
