@@ -1,6 +1,6 @@
 {
-  "latest_version": "1.1.0",
-  "min_supported_version": "1.1.0",
+  "latest_version": "1.1.1",
+  "min_supported_version": "1.1.1",
   "release_notes": "Update v1.1.0: Mode Klik/Hover Notch, To-Do List Horizontal, Slider Volume, dan System Peeks baru.",
   "github_download_url": "https://github.com/MANG-CODER/MangNotch/releases/latest",
   "store_url": "ms-windows-store://pdp/?ProductId=9PNWT253Z5RL"

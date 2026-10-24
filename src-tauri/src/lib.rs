@@ -1,9 +1,7 @@
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::os::windows::process::CommandExt;
 use std::path::PathBuf;
-use std::process::Command;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
@@ -50,21 +48,21 @@ use windows::{
                 ShellExecuteW,
             },
             WindowsAndMessaging::{
-                FindWindowW, GetClassNameW, GetCursorPos, GetForegroundWindow, GetWindowLongPtrW,
-                GetWindowRect, IsIconic, SendMessageTimeoutW, SetForegroundWindow,
-                SetWindowLongPtrW, SetWindowPos, ShowWindow, GWL_EXSTYLE, HWND_TOPMOST,
-                SMTO_ABORTIFHUNG, SWP_NOACTIVATE, SWP_NOSIZE, SWP_SHOWWINDOW, SW_HIDE,
-                SW_RESTORE, SW_SHOW, SW_SHOWNOACTIVATE, SW_SHOWNORMAL, WM_NCHITTEST,
+                GetClassNameW, GetCursorPos, GetForegroundWindow, GetWindowLongPtrW, GetWindowRect,
+                IsIconic, SendMessageTimeoutW, SetWindowLongPtrW, SetWindowPos, ShowWindow,
+                GWL_EXSTYLE, HWND_TOPMOST, SMTO_ABORTIFHUNG, SWP_NOACTIVATE, SWP_NOSIZE,
+                SWP_SHOWWINDOW, SW_HIDE, SW_SHOWNOACTIVATE, SW_SHOWNORMAL, WM_NCHITTEST,
                 WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW,
             },
         },
     },
 };
 
-const CREATE_NO_WINDOW: u32 = 0x08000000;
 const WINDOW_WIDTH: i32 = 600;
+const HKEY_CURRENT_USER: isize = -2147483647i32 as isize; // 0x80000001
+const REG_SZ: u32 = 1;
+const WAIT_OBJECT_0: u32 = 0;
 
-// Native Win32 FFI untuk membaca Brightness (\\.\LCD) & Bluetooth tanpa spawn CMD/PowerShell
 #[cfg(windows)]
 #[repr(C)]
 #[derive(Default)]
@@ -143,6 +141,34 @@ extern "system" {
     ) -> i32;
     fn LoadLibraryW(lp_lib_file_name: *const u16) -> isize;
     fn GetProcAddress(h_module: isize, lp_proc_name: *const u8) -> *const std::ffi::c_void;
+
+    fn CreateEventW(
+        lp_event_attributes: *const std::ffi::c_void,
+        b_manual_reset: i32,
+        b_initial_state: i32,
+        lp_name: *const u16,
+    ) -> isize;
+    fn SetEvent(h_event: isize) -> i32;
+    fn ResetEvent(h_event: isize) -> i32;
+    fn WaitForSingleObject(h_handle: isize, dw_milliseconds: u32) -> u32;
+}
+
+#[cfg(windows)]
+#[link(name = "advapi32")]
+extern "system" {
+    fn RegSetKeyValueW(
+        hkey: isize,
+        lp_sub_key: *const u16,
+        lp_value_name: *const u16,
+        dw_type: u32,
+        lp_data: *const std::ffi::c_void,
+        cb_data: u32,
+    ) -> i32;
+    fn RegDeleteKeyValueW(
+        hkey: isize,
+        lp_sub_key: *const u16,
+        lp_value_name: *const u16,
+    ) -> i32;
 }
 
 #[cfg(windows)]
@@ -151,10 +177,10 @@ fn read_screen_brightness() -> Option<u8> {
         let path: Vec<u16> = "\\\\.\\LCD\0".encode_utf16().collect();
         let h_dev = CreateFileW(
             path.as_ptr(),
-            0x80000000 | 0x40000000, // GENERIC_READ | GENERIC_WRITE
-            3,                       // FILE_SHARE_READ | FILE_SHARE_WRITE
+            0x80000000 | 0x40000000,
+            3,
             std::ptr::null(),
-            3, // OPEN_EXISTING
+            3,
             0,
             0,
         );
@@ -163,7 +189,6 @@ fn read_screen_brightness() -> Option<u8> {
         }
         let mut brightness = DisplayBrightness::default();
         let mut bytes_ret: u32 = 0;
-        // IOCTL_VIDEO_QUERY_DISPLAY_BRIGHTNESS = 0x00230498
         let ok = DeviceIoControl(
             h_dev,
             0x00230498,
@@ -454,46 +479,41 @@ fn unblock_file_motw(path: &str) {
     let _ = fs::remove_file(ads_path);
 }
 
+// Menulis / Menghapus Autostart langsung via Win32 Registry API (Tanpa memanggil reg.exe / CMD)
 fn apply_autostart(enable: bool) {
-    thread::spawn(move || {
-        if let Ok(exe_path) = std::env::current_exe() {
-            let exe_str = exe_path.to_string_lossy().to_string();
-            if enable {
+    #[cfg(windows)]
+    unsafe {
+        let sub_key: Vec<u16> = "Software\\Microsoft\\Windows\\CurrentVersion\\Run\0"
+            .encode_utf16()
+            .collect();
+        let val_name: Vec<u16> = "MangNotch\0".encode_utf16().collect();
+
+        if enable {
+            if let Ok(exe_path) = std::env::current_exe() {
+                let exe_str = exe_path.to_string_lossy().to_string();
                 let launch_cmd = if exe_str.contains("WindowsApps") {
-                    r"explorer.exe shell:AppsFolder\vestiapani.MangNotch_33rhz9prkc4x8!mangNotch"
+                    "explorer.exe shell:AppsFolder\\vestiapani.MangNotch_33rhz9prkc4x8!mangNotch"
                         .to_string()
                 } else {
-                    exe_str
+                    format!("\"{}\"", exe_str)
                 };
-
-                let _ = Command::new("reg")
-                    .args([
-                        "add",
-                        r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run",
-                        "/v",
-                        "MangNotch",
-                        "/t",
-                        "REG_SZ",
-                        "/d",
-                        &launch_cmd,
-                        "/f",
-                    ])
-                    .creation_flags(CREATE_NO_WINDOW)
-                    .status();
-            } else {
-                let _ = Command::new("reg")
-                    .args([
-                        "delete",
-                        r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run",
-                        "/v",
-                        "MangNotch",
-                        "/f",
-                    ])
-                    .creation_flags(CREATE_NO_WINDOW)
-                    .status();
+                let data_wide: Vec<u16> = launch_cmd
+                    .encode_utf16()
+                    .chain(std::iter::once(0))
+                    .collect();
+                let _ = RegSetKeyValueW(
+                    HKEY_CURRENT_USER,
+                    sub_key.as_ptr(),
+                    val_name.as_ptr(),
+                    REG_SZ,
+                    data_wide.as_ptr() as *const std::ffi::c_void,
+                    (data_wide.len() * 2) as u32,
+                );
             }
+        } else {
+            let _ = RegDeleteKeyValueW(HKEY_CURRENT_USER, sub_key.as_ptr(), val_name.as_ptr());
         }
-    });
+    }
 }
 
 #[cfg(windows)]
@@ -801,32 +821,40 @@ fn get_install_channel() -> String {
 #[tauri::command]
 fn trigger_update_window(app: AppHandle, is_forced: bool) {
     if is_forced {
-        // Sembunyikan Notch jika terkena Forced Update agar aplikasi terkunci
         if let Some(notch_win) = app.get_webview_window("notch") {
             let _ = notch_win.hide();
         }
     }
-    // Munculkan jendela Control Center ke hadapan user
     if let Some(ctrl_win) = app.get_webview_window("control") {
         let _ = ctrl_win.show();
+        let _ = ctrl_win.unminimize();
         let _ = ctrl_win.set_focus();
     }
 }
 
 #[tauri::command]
 fn open_config_folder() {
-    let dir = get_config_dir();
-    let _ = Command::new("explorer")
-        .arg(dir)
-        .creation_flags(CREATE_NO_WINDOW)
-        .spawn();
+    let dir = get_config_dir().to_string_lossy().to_string();
+    #[cfg(windows)]
+    unsafe {
+        let op: Vec<u16> = "open\0".encode_utf16().collect();
+        let target: Vec<u16> = dir.encode_utf16().chain(std::iter::once(0)).collect();
+        let _ = ShellExecuteW(
+            HWND::default(),
+            PCWSTR(op.as_ptr()),
+            PCWSTR(target.as_ptr()),
+            PCWSTR::null(),
+            PCWSTR::null(),
+            SW_SHOWNORMAL,
+        );
+    }
 }
 
 #[tauri::command]
 fn open_external_url(url: String) {
     #[cfg(windows)]
     unsafe {
-        let op: Vec<u16> = "open".encode_utf16().chain(std::iter::once(0)).collect();
+        let op: Vec<u16> = "open\0".encode_utf16().collect();
         let target: Vec<u16> = url.encode_utf16().chain(std::iter::once(0)).collect();
         let _ = ShellExecuteW(
             HWND::default(),
@@ -935,7 +963,7 @@ fn open_shelf_file(path: String) {
 
     #[cfg(windows)]
     unsafe {
-        let op: Vec<u16> = "open".encode_utf16().chain(std::iter::once(0)).collect();
+        let op: Vec<u16> = "open\0".encode_utf16().collect();
         let file: Vec<u16> = path.encode_utf16().chain(std::iter::once(0)).collect();
         let _ = ShellExecuteW(
             HWND::default(),
@@ -950,10 +978,23 @@ fn open_shelf_file(path: String) {
 
 #[tauri::command]
 fn reveal_shelf_file(path: String) {
-    let _ = Command::new("explorer")
-        .arg(format!("/select,{}", path))
-        .creation_flags(CREATE_NO_WINDOW)
-        .spawn();
+    #[cfg(windows)]
+    unsafe {
+        let op: Vec<u16> = "open\0".encode_utf16().collect();
+        let explorer: Vec<u16> = "explorer.exe\0".encode_utf16().collect();
+        let params: Vec<u16> = format!("/select,\"{}\"", path)
+            .encode_utf16()
+            .chain(std::iter::once(0))
+            .collect();
+        let _ = ShellExecuteW(
+            HWND::default(),
+            PCWSTR(op.as_ptr()),
+            PCWSTR(explorer.as_ptr()),
+            PCWSTR(params.as_ptr()),
+            PCWSTR::null(),
+            SW_SHOWNORMAL,
+        );
+    }
 }
 
 #[tauri::command]
@@ -1046,21 +1087,21 @@ fn media_seek(position_sec: f64) {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    // Single-Instance Lock: Cegah aplikasi terbuka ganda / double tray icon
+    let mut show_ctrl_event: isize = 0;
     #[cfg(windows)]
     unsafe {
+        let event_name: Vec<u16> = "Local\\MangNotchShowControlEvent\0"
+            .encode_utf16()
+            .collect();
+        show_ctrl_event = CreateEventW(std::ptr::null(), 1, 0, event_name.as_ptr());
+
         let mutex_name: Vec<u16> = "Global\\MangNotchSingleInstanceMutex\0"
             .encode_utf16()
             .collect();
         if let Ok(handle) = CreateMutexW(None, true, PCWSTR(mutex_name.as_ptr())) {
             if GetLastError() == ERROR_ALREADY_EXISTS {
-                let title: Vec<u16> = "MangNotch Control Center\0".encode_utf16().collect();
-                if let Ok(existing_hwnd) = FindWindowW(PCWSTR::null(), PCWSTR(title.as_ptr())) {
-                    if !existing_hwnd.0.is_null() {
-                        let _ = ShowWindow(existing_hwnd, SW_SHOW);
-                        let _ = ShowWindow(existing_hwnd, SW_RESTORE);
-                        let _ = SetForegroundWindow(existing_hwnd);
-                    }
+                if show_ctrl_event != 0 {
+                    let _ = SetEvent(show_ctrl_event);
                 }
                 let _ = CloseHandle(handle);
                 std::process::exit(0);
@@ -1102,6 +1143,7 @@ pub fn run() {
                     "show" => {
                         if let Some(w) = app.get_webview_window("control") {
                             let _ = w.show();
+                            let _ = w.unminimize();
                             let _ = w.set_focus();
                         }
                     }
@@ -1119,6 +1161,7 @@ pub fn run() {
                     {
                         if let Some(w) = tray.app_handle().get_webview_window("control") {
                             let _ = w.show();
+                            let _ = w.unminimize();
                             let _ = w.set_focus();
                         }
                     }
@@ -1163,7 +1206,6 @@ pub fn run() {
                 let mut is_obstructed = false;
                 let mut outside_ticks: u32 = 0;
 
-                // Pelacak state untuk System Peeks (Caps Lock, Power, Volume, Brightness, Bluetooth)
                 let mut last_caps = unsafe { (GetKeyState(0x14) & 1) != 0 };
                 let mut last_ac: u8 = 255;
 
@@ -1184,6 +1226,22 @@ pub fn run() {
                 loop {
                     thread::sleep(Duration::from_millis(40));
                     tick_counter = tick_counter.wrapping_add(1);
+
+                    // 0. Cek sinyal dari instance kedua (Search Bar / Shortcut) untuk membuka Control Center
+                    #[cfg(windows)]
+                    unsafe {
+                        if show_ctrl_event != 0
+                            && WaitForSingleObject(show_ctrl_event, 0) == WAIT_OBJECT_0
+                        {
+                            let _ = ResetEvent(show_ctrl_event);
+                            if let Some(ctrl_win) = app_handle.get_webview_window("control") {
+                                let _ = ctrl_win.show();
+                                let _ = ctrl_win.unminimize();
+                                let _ = ctrl_win.set_focus();
+                            }
+                        }
+                    }
+
                     let cfg = bg_cfg.lock().unwrap().clone();
 
                     unsafe {
@@ -1304,7 +1362,7 @@ pub fn run() {
                             }
                         }
 
-                        // 3B. System Peek: Master Volume & Mute (Setiap ~120ms)
+                        // 3B. System Peek: Master Volume & Mute
                         if tick_counter % 3 == 0 {
                             let cur_vol = read_master_volume();
                             if cur_vol.volume != last_vol || cur_vol.muted != last_muted {
@@ -1333,7 +1391,7 @@ pub fn run() {
                             }
                         }
 
-                        // 3C. System Peek: Screen Brightness (Setiap ~200ms)
+                        // 3C. System Peek: Screen Brightness
                         if tick_counter % 5 == 0 {
                             if let Some(br) = read_screen_brightness() {
                                 if let Some(prev_br) = last_brightness {
@@ -1353,7 +1411,7 @@ pub fn run() {
                             }
                         }
 
-                        // 3D. System Peek: Battery & Charging (Setiap ~800ms)
+                        // 3D. System Peek: Battery & Charging
                         if tick_counter % 20 == 0 {
                             let mut sps = SYSTEM_POWER_STATUS::default();
                             if GetSystemPowerStatus(&mut sps).is_ok() {
@@ -1391,7 +1449,7 @@ pub fn run() {
                             }
                         }
 
-                        // 3E. System Peek: Bluetooth Radio & Device Connection (Setiap ~1.2s)
+                        // 3E. System Peek: Bluetooth
                         if tick_counter % 30 == 0 {
                             if let Some(bt) = read_bluetooth_state(bth_mod) {
                                 let radio_changed =

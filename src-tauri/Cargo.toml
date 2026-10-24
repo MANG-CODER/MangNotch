@@ -1,6 +1,6 @@
 [package]
 name = "mangnotch"
-version = "1.1.0"
+version = "1.1.1"
 description = "MangNotch - Living Notch for Windows"
 authors = ["vestiapani"]
 edition = "2021"
