@@ -22,7 +22,6 @@
     -webkit-user-drag: none;
   }
 
-  /* Custom Scrollbar Halus ala Aplikasi Desktop Native */
   ::-webkit-scrollbar {
     width: 5px;
     height: 5px;
@@ -134,25 +133,131 @@
   .switch input:checked + .slider { background: rgba(255, 183, 197, 0.22); border-color: var(--pink); }
   .switch input:checked + .slider::before { transform: translateX(18px); background: var(--pink); }
 
-  /* Custom Input & Select Tanpa Gaya Bawaan Browser */
-  select, input[type="number"], input[type="text"] {
+  input[type="number"], input[type="text"] {
     background: #141019; color: var(--ink); border: 1px solid var(--border);
     padding: 6.5px 10px; border-radius: 9px; font: 500 12.5px inherit; outline: none; transition: border-color .2s;
   }
-  select {
-    width: 185px;
-    appearance: none;
-    -webkit-appearance: none;
-    padding-right: 28px;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23FFB7C5' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
-    background-repeat: no-repeat;
-    background-position: right 10px center;
-    cursor: pointer;
-  }
-  select:disabled { opacity: 0.45; cursor: not-allowed; }
-  select:focus, input:focus { border-color: var(--pink); }
+  input:disabled { opacity: 0.45; cursor: not-allowed; }
+  input:focus { border-color: var(--pink); }
   input[type="number"] { width: 110px; text-align: center; font-weight: 700; }
   input[type="text"] { user-select: text; }
+
+  /* Sembunyikan <select> native dan ganti dengan Custom Themed Dropdown MangNotch */
+  select.native-hidden {
+    display: none !important;
+  }
+  .csel-wrap {
+    position: relative;
+    width: 205px;
+    flex-shrink: 0;
+  }
+  .csel-wrap.disabled {
+    opacity: 0.45;
+    pointer-events: none;
+  }
+  .csel-trigger {
+    width: 100%;
+    background: linear-gradient(180deg, rgba(26, 21, 34, 0.95), rgba(18, 14, 24, 0.95));
+    color: var(--ink);
+    border: 1px solid rgba(226, 209, 249, 0.16);
+    padding: 7px 11px;
+    border-radius: 10px;
+    font: 600 12px inherit;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    cursor: pointer;
+    transition: border-color .2s, box-shadow .2s, background .2s;
+  }
+  .csel-trigger:hover {
+    border-color: rgba(255, 183, 197, 0.45);
+    background: rgba(34, 27, 44, 0.98);
+  }
+  .csel-wrap.open .csel-trigger {
+    border-color: var(--pink);
+    box-shadow: 0 0 0 2px rgba(255, 183, 197, 0.15);
+  }
+  .csel-label {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .csel-arrow {
+    width: 13px;
+    height: 13px;
+    stroke: var(--pink);
+    fill: none;
+    stroke-width: 2.4;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    flex-shrink: 0;
+    transition: transform .22s cubic-bezier(0.34, 1.5, 0.5, 1);
+  }
+  .csel-wrap.open .csel-arrow {
+    transform: rotate(180deg);
+  }
+  .csel-menu {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    width: 100%;
+    min-width: 210px;
+    max-height: 185px;
+    overflow-y: auto;
+    background: rgba(22, 18, 30, 0.97);
+    backdrop-filter: blur(24px);
+    border: 1px solid rgba(255, 183, 197, 0.32);
+    border-radius: 12px;
+    padding: 5px;
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.72), 0 0 18px rgba(255, 183, 197, 0.08);
+    z-index: 999;
+    opacity: 0;
+    transform: translateY(-6px) scale(0.98);
+    pointer-events: none;
+    transition: opacity .16s ease, transform .18s cubic-bezier(0.34, 1.5, 0.5, 1);
+  }
+  .csel-wrap.open .csel-menu {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    pointer-events: auto;
+  }
+  .csel-opt {
+    padding: 7.5px 10px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--mist);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    cursor: pointer;
+    transition: background .14s, color .14s;
+  }
+  .csel-opt:hover {
+    background: rgba(255, 183, 197, 0.11);
+    color: var(--ink);
+  }
+  .csel-opt.selected {
+    background: rgba(255, 183, 197, 0.18);
+    color: var(--pink);
+    font-weight: 700;
+  }
+  .csel-check {
+    width: 12px;
+    height: 12px;
+    stroke: var(--pink);
+    fill: none;
+    stroke-width: 2.6;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    opacity: 0;
+    flex-shrink: 0;
+  }
+  .csel-opt.selected .csel-check {
+    opacity: 1;
+  }
 
   .preset-chips { display: flex; gap: 5px; }
   .chip {
@@ -180,7 +285,7 @@
   }
   .swatch.active { border-color: var(--ink); transform: scale(1.14); }
 
-  .todo-bar { display: flex; gap: 8px; margin-bottom: 9px; }
+  .todo-bar { display: flex; gap: 8px; margin-top: 9px; margin-bottom: 9px; }
   .todo-bar input { flex: 1; }
   .btn {
     background: var(--pink); color: #120F16;
@@ -210,7 +315,6 @@
   .t-item:hover { background: rgba(255, 255, 255, 0.06); }
   .t-item.done span.t-txt { text-decoration: line-through; color: var(--mist); }
 
-  /* Custom Checkbox To-Do List */
   .custom-chk {
     width: 16px; height: 16px; border-radius: 5px;
     border: 1.5px solid rgba(226, 209, 249, 0.35);
@@ -266,7 +370,28 @@
           <span>Living Notch & Desktop Companion</span>
         </div>
       </div>
-      <span class="ver-pill">v1.0.0</span>
+      <span class="ver-pill">v1.1.0</span>
+    </div>
+
+    <!-- Banner Auto-Update (Muncul otomatis jika ada versi baru) -->
+    <div id="updateBanner" style="display:none; background:rgba(255,183,197,0.14); border:1px solid var(--pink); border-radius:14px; padding:11px 15px; margin-bottom:12px; align-items:center; justify-content:space-between; gap:10px;">
+      <div>
+        <b id="updateBannerTitle" style="font-size:13px; color:var(--pink); display:block;">Pembaruan Tersedia!</b>
+        <small id="updateBannerSub" style="font-size:11px; color:var(--ink);">Versi terbaru siap diunduh.</small>
+      </div>
+      <button class="btn" id="updateBannerBtn">Update Sekarang</button>
+    </div>
+
+    <!-- Modal Layar Penuh untuk Forced Update (Tidak bisa ditutup jika versi < min_supported_version) -->
+    <div id="forcedUpdateModal" style="display:none; position:fixed; inset:0; background:rgba(12,9,16,0.94); backdrop-filter:blur(16px); z-index:9999; place-items:center; padding:24px; text-align:center;">
+      <div style="background:var(--surface); border:1px solid var(--pink); border-radius:20px; padding:24px 22px; max-width:380px; box-shadow:0 20px 50px rgba(0,0,0,0.8);">
+        <div style="width:48px; height:48px; border-radius:14px; background:rgba(255,183,197,0.15); border:1px solid var(--pink); display:grid; place-items:center; margin:0 auto 14px;">
+          <svg viewBox="0 0 24 24" style="width:24px; height:24px; stroke:var(--pink); fill:none; stroke-width:2.2;"><path d="M12 9v4M12 17h.01"/><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg>
+        </div>
+        <h2 style="margin:0 0 8px; font-size:18px; color:var(--ink);">Pembaruan Wajib Diperlukan</h2>
+        <p id="forcedUpdateNotes" style="margin:0 0 18px; font-size:12px; color:var(--mist); line-height:1.5;">Versi MangNotch yang kamu gunakan sudah tidak didukung karena perbaikan penting. Silakan perbarui ke versi terbaru.</p>
+        <button class="btn" id="forcedUpdateBtn" style="width:100%; justify-content:center; padding:10px;">Perbarui MangNotch Sekarang</button>
+      </div>
     </div>
 
     <div class="tabs">
@@ -294,8 +419,18 @@
         <div class="card-hdr">
           <div class="card-hdr-left">
             <svg viewBox="0 0 24 24"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4"/></svg>
-            Perilaku Layar & Sistem
+            Perilaku Layar & Interaksi
           </div>
+        </div>
+        <div class="row">
+          <div class="lbl-wrap">
+            <b>Gaya Interaksi Membuka Notch</b>
+            <small>Pilih melebar otomatis saat disentuh kursor atau harus diklik dulu</small>
+          </div>
+          <select id="interactionSelect">
+            <option value="hover">Hover Biasa (Default)</option>
+            <option value="click">Klik Dulu Baru Melebar</option>
+          </select>
         </div>
         <div class="row">
           <div class="lbl-wrap">
@@ -335,7 +470,7 @@
         <div class="row">
           <div class="lbl-wrap">
             <b>System Peeks Overlay</b>
-            <small>Munculkan pop-up saat menekan Caps Lock atau colok Charger</small>
+            <small>Pop-up animasi Volume, Brightness, Bluetooth, Caps Lock & Charger</small>
           </div>
           <label class="switch"><input type="checkbox" id="peekChk" checked><span class="slider"></span></label>
         </div>
@@ -443,19 +578,26 @@
         <div class="card-hdr">
           <div class="card-hdr-left">
             <svg viewBox="0 0 24 24"><path d="M12 2.8s6 6.5 6 11.2a6 6 0 0 1-12 0c0-4.7 6-11.2 6-11.2z"/></svg>
-            Water Tracker & Chime
+            Water Tracker & Chime (Auto-Reset Harian)
           </div>
         </div>
         <div class="row">
-          <div class="lbl-wrap"><b>Target Harian & Ukuran Gelas (ml)</b><small>Kapasitas tangki harian & takaran sekali minum</small></div>
+          <div class="lbl-wrap"><b>Target Harian & Ukuran Gelas (ml)</b><small>Otomatis reset ke 0 ml setiap pergantian hari</small></div>
           <div style="display:flex;gap:6px">
             <input type="number" id="waterGoal" value="1500" step="100" style="width:82px" title="Target Harian (ml)">
             <input type="number" id="waterCup" value="250" step="50" style="width:74px" title="Takaran Sekali Minum (ml)">
           </div>
         </div>
         <div class="row">
-          <div class="lbl-wrap"><b>Interval Pengingat Minum (Menit)</b><small>Pop-up pengingat otomatis di Notch (0 = nonaktif)</small></div>
-          <input type="number" id="waterInterval" value="45" step="15" style="width:82px">
+          <div class="lbl-wrap">
+            <b>Aktifkan Pengingat Minum Berkala</b>
+            <small>Tampilkan pop-up notifikasi minum di Notch sesuai interval</small>
+          </div>
+          <label class="switch"><input type="checkbox" id="waterRemindEnableChk" checked><span class="slider"></span></label>
+        </div>
+        <div class="row">
+          <div class="lbl-wrap"><b>Interval Pengingat Minum (Menit)</b><small>Jeda waktu antar pop-up pengingat minum</small></div>
+          <input type="number" id="waterInterval" value="45" min="1" step="15" style="width:82px">
         </div>
         <div class="row">
           <div class="lbl-wrap">
@@ -480,6 +622,16 @@
             Kelola Daftar Tugas (To-Do List)
           </div>
         </div>
+        <div class="row" style="padding-bottom:10px;margin-bottom:4px">
+          <div class="lbl-wrap">
+            <b>Gaya Tampilan To-Do List di Notch</b>
+            <small>Jika > 2 tugas, gulir ke samping (Horizontal) atau atas-bawah</small>
+          </div>
+          <select id="todoStyleSelect">
+            <option value="horizontal">Geser ke Samping (Horizontal)</option>
+            <option value="vertical">List Atas-Bawah (Vertikal)</option>
+          </select>
+        </div>
         <div class="todo-bar">
           <input type="text" id="newTodoInput" placeholder="Ketik tugas baru untuk ditampilkan di Notch...">
           <button class="btn" onclick="addTodo()">
@@ -498,7 +650,7 @@
             <img class="js-app-logo" alt="MangNotch">
           </div>
           <div class="about-title">
-            <h2>MangNotch <span style="font-size:12px;color:var(--pink);font-weight:600">v1.0.0</span></h2>
+            <h2>MangNotch <span style="font-size:12px;color:var(--pink);font-weight:600">v1.1.0</span></h2>
             <p>Interactive Living Notch & Productivity Companion dengan sentuhan estetika editorial <i>MangNime</i>.</p>
             <div class="tag-list">
               <span class="tag">Rust Backend</span>
@@ -511,20 +663,20 @@
 
         <div class="feat-grid">
           <div class="feat-box">
-            <b>Media & Live Lyrics</b>
-            <span>Integrasi Windows GSMTC, ekstraksi warna sampul album, dan lirik sinkron real-time.</span>
+            <b>Media, Volume & Live Lyrics</b>
+            <span>Integrasi Windows GSMTC, kontrol master volume real-time, warna album, dan lirik.</span>
           </div>
           <div class="feat-box">
             <b>Native File Shelf</b>
             <span>Simpan file sementara via Drag-in dari Explorer & Drag-out langsung ke WhatsApp/Discord.</span>
           </div>
           <div class="feat-box">
-            <b>Focus & Hydration</b>
-            <span>Timer Pomodoro kustom dengan chime Web Audio API serta pencatat hidrasi harian.</span>
+            <b>Focus, Hydration & Tasks</b>
+            <span>Timer Pomodoro kustom, pencatat hidrasi auto-reset harian, & To-Do List dual style.</span>
           </div>
           <div class="feat-box">
-            <b>Smart Proximity Engine</b>
-            <span>Otomatis menyusut saat tertutup tab browser & hilang 100% saat bermain game fullscreen.</span>
+            <b>System Peeks & Proximity</b>
+            <span>Pop-up interaktif Volume, Brightness, Bluetooth, Caps Lock, Charger & auto-shrink.</span>
           </div>
         </div>
       </div>
@@ -570,6 +722,8 @@
     const { invoke } = window.__TAURI__.core;
     const { listen } = window.__TAURI__.event;
 
+    const interactionSelect = document.getElementById("interactionSelect");
+    const todoStyleSelect = document.getElementById("todoStyleSelect");
     const startWinChk = document.getElementById("startWinChk");
     const primaryChk = document.getElementById("primaryChk");
     const monSelect = document.getElementById("monSelect");
@@ -577,6 +731,7 @@
     const proxChk = document.getElementById("proxChk");
     const peekChk = document.getElementById("peekChk");
     const soundChk = document.getElementById("soundChk");
+    const waterRemindEnableChk = document.getElementById("waterRemindEnableChk");
     const waterTapSoundChk = document.getElementById("waterTapSoundChk");
     const waterRemSoundChk = document.getElementById("waterRemSoundChk");
     const restSelect = document.getElementById("restSelect");
@@ -588,6 +743,76 @@
     const newTodoInput = document.getElementById("newTodoInput");
 
     let currentCfg = null;
+    const customSelectRegistry = new Map();
+
+    // Komponen Dropdown Kustom Bertema MangNotch (Menggantikan Popup Bawaan Browser)
+    function setupCustomSelect(selectEl) {
+      selectEl.classList.add("native-hidden");
+      let wrap = customSelectRegistry.get(selectEl);
+      if (!wrap) {
+        wrap = document.createElement("div");
+        wrap.className = "csel-wrap";
+        selectEl.parentNode.insertBefore(wrap, selectEl.nextSibling);
+        customSelectRegistry.set(selectEl, wrap);
+      }
+
+      const renderMenu = () => {
+        const opts = Array.from(selectEl.options);
+        const selOpt = opts.find(o => o.value === selectEl.value) || opts[0];
+        const selText = selOpt ? selOpt.textContent : "";
+
+        wrap.classList.toggle("disabled", selectEl.disabled);
+        wrap.innerHTML = `
+          <div class="csel-trigger">
+            <span class="csel-label">${selText}</span>
+            <svg class="csel-arrow" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
+          </div>
+          <div class="csel-menu">
+            ${opts.map(o => `
+              <div class="csel-opt ${o.value === selectEl.value ? 'selected' : ''}" data-val="${o.value}">
+                <span>${o.textContent}</span>
+                <svg class="csel-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>
+              </div>
+            `).join("")}
+          </div>
+        `;
+
+        const trigger = wrap.querySelector(".csel-trigger");
+        trigger.onclick = (e) => {
+          e.stopPropagation();
+          if (selectEl.disabled) return;
+          const isOpen = wrap.classList.contains("open");
+          document.querySelectorAll(".csel-wrap.open").forEach(w => w.classList.remove("open"));
+          if (!isOpen) wrap.classList.add("open");
+        };
+
+        wrap.querySelectorAll(".csel-opt").forEach(optEl => {
+          optEl.onclick = (e) => {
+            e.stopPropagation();
+            const val = optEl.dataset.val;
+            if (selectEl.value !== val) {
+              selectEl.value = val;
+              selectEl.dispatchEvent(new Event("change"));
+            }
+            wrap.classList.remove("open");
+            renderMenu();
+          };
+        });
+      };
+
+      wrap._refresh = renderMenu;
+      renderMenu();
+    }
+
+    function refreshAllCustomSelects() {
+      customSelectRegistry.forEach(wrap => {
+        if (wrap._refresh) wrap._refresh();
+      });
+    }
+
+    window.addEventListener("click", () => {
+      document.querySelectorAll(".csel-wrap.open").forEach(w => w.classList.remove("open"));
+    });
 
     function switchTab(id, btn) {
       document.querySelectorAll(".tab-pane").forEach(p => p.classList.remove("active"));
@@ -601,6 +826,8 @@
     }
 
     async function initControl() {
+      [interactionSelect, todoStyleSelect, restSelect, monSelect].forEach(setupCustomSelect);
+
       const logoDataUrl = await invoke("get_app_logo");
       document.querySelectorAll(".js-app-logo").forEach(img => img.src = logoDataUrl);
 
@@ -608,10 +835,13 @@
       monSelect.innerHTML = monitors.map(m => `<option value="${m.index}">${m.name}</option>`).join("");
       const cfg = await invoke("get_config");
       populateUI(cfg);
+      checkAppUpdate();
     }
 
     function populateUI(cfg) {
       currentCfg = cfg;
+      interactionSelect.value = cfg.interaction_mode || "hover";
+      todoStyleSelect.value = cfg.todo_style || "horizontal";
       startWinChk.checked = cfg.start_with_windows;
       primaryChk.checked = cfg.use_primary_monitor;
       monSelect.value = cfg.selected_monitor_index;
@@ -620,12 +850,14 @@
       proxChk.checked = cfg.smart_proximity !== false;
       peekChk.checked = cfg.enable_peeks;
       soundChk.checked = cfg.enable_sound !== false;
+      waterRemindEnableChk.checked = cfg.water_reminder_enabled !== false;
+      waterInterval.disabled = !waterRemindEnableChk.checked;
       waterTapSoundChk.checked = cfg.water_tap_sound !== false;
       waterRemSoundChk.checked = cfg.water_reminder_sound !== false;
       restSelect.value = cfg.resting_mode;
       waterGoal.value = cfg.water_goal_ml;
       waterCup.value = cfg.water_cup_ml;
-      waterInterval.value = cfg.water_interval_min;
+      waterInterval.value = cfg.water_interval_min || 45;
       pomoMin.value = cfg.pomo_minutes || 25;
       pomoBreakMin.value = cfg.pomo_break_minutes || 5;
 
@@ -639,6 +871,7 @@
         s.classList.toggle("active", s.dataset.t === cfg.theme_preset);
       });
 
+      refreshAllCustomSelects();
       renderCtrlTodos();
     }
 
@@ -689,6 +922,10 @@
     function saveAll() {
       if (!currentCfg) return;
       monSelect.disabled = primaryChk.checked;
+      waterInterval.disabled = !waterRemindEnableChk.checked;
+
+      currentCfg.interaction_mode = interactionSelect.value;
+      currentCfg.todo_style = todoStyleSelect.value;
       currentCfg.start_with_windows = startWinChk.checked;
       currentCfg.use_primary_monitor = primaryChk.checked;
       currentCfg.selected_monitor_index = parseInt(monSelect.value || "0", 10);
@@ -696,12 +933,13 @@
       currentCfg.smart_proximity = proxChk.checked;
       currentCfg.enable_peeks = peekChk.checked;
       currentCfg.enable_sound = soundChk.checked;
+      currentCfg.water_reminder_enabled = waterRemindEnableChk.checked;
       currentCfg.water_tap_sound = waterTapSoundChk.checked;
       currentCfg.water_reminder_sound = waterRemSoundChk.checked;
       currentCfg.resting_mode = restSelect.value;
       currentCfg.water_goal_ml = parseInt(waterGoal.value || "1500", 10);
       currentCfg.water_cup_ml = parseInt(waterCup.value || "250", 10);
-      currentCfg.water_interval_min = parseInt(waterInterval.value || "0", 10);
+      currentCfg.water_interval_min = Math.max(1, parseInt(waterInterval.value || "45", 10));
       currentCfg.pomo_minutes = Math.max(1, parseInt(pomoMin.value || "25", 10));
       currentCfg.pomo_break_minutes = Math.max(1, parseInt(pomoBreakMin.value || "5", 10));
 
@@ -730,9 +968,59 @@
       saveAll();
     }
 
+    const APP_VERSION = "1.1.0";
+    const VERSION_MANIFEST_URL = "https://raw.githubusercontent.com/MANG-CODER/MangNotch/main/version.json";
+
+    function compareSemver(v1, v2) {
+      const a = String(v1).split(".").map(Number);
+      const b = String(v2).split(".").map(Number);
+      for (let i = 0; i < 3; i++) {
+        if ((a[i] || 0) > (b[i] || 0)) return 1;
+        if ((a[i] || 0) < (b[i] || 0)) return -1;
+      }
+      return 0;
+    }
+
+    async function checkAppUpdate() {
+      try {
+        const channel = await invoke("get_install_channel");
+        const res = await fetch(`${VERSION_MANIFEST_URL}?t=${Date.now()}`, { cache: "no-store" });
+        if (!res.ok) return;
+        const data = await res.json();
+
+        const targetUrl = channel === "msix"
+          ? (data.store_url || "ms-windows-store://pdp/?ProductId=9PNWT253Z5RL")
+          : (data.github_download_url || "https://github.com/MANG-CODER/MangNotch/releases/latest");
+
+        // 1. Cek apakah kena Forced Update (APP_VERSION < min_supported_version)
+        if (data.min_supported_version && compareSemver(APP_VERSION, data.min_supported_version) < 0) {
+          const modal = document.getElementById("forcedUpdateModal");
+          document.getElementById("forcedUpdateNotes").textContent =
+            data.release_notes || `Versi v${APP_VERSION} wajib diperbarui ke v${data.latest_version}.`;
+          document.getElementById("forcedUpdateBtn").onclick = () => openUrl(targetUrl);
+          modal.style.display = "grid";
+          invoke("trigger_update_window", { isForced: true }); // <-- Otomatis buka Control Center & sembunyikan Notch
+          return;
+        }
+
+        // 2. Cek apakah ada Update Baru (APP_VERSION < latest_version)
+        if (data.latest_version && compareSemver(APP_VERSION, data.latest_version) < 0) {
+          const banner = document.getElementById("updateBanner");
+          document.getElementById("updateBannerTitle").textContent =
+            `Update MangNotch v${data.latest_version} Tersedia!`;
+          document.getElementById("updateBannerSub").textContent =
+            data.release_notes || (channel === "msix" ? "Klik untuk update via Microsoft Store" : "Klik untuk unduh installer terbaru di GitHub");
+          document.getElementById("updateBannerBtn").onclick = () => openUrl(targetUrl);
+          banner.style.display = "flex";
+        }
+      } catch (err) {
+        // Abaikan jika user sedang offline
+      }
+    }
+
     [
-      startWinChk, primaryChk, monSelect, fsChk, proxChk, peekChk,
-      soundChk, waterTapSoundChk, waterRemSoundChk, restSelect,
+      interactionSelect, todoStyleSelect, startWinChk, primaryChk, monSelect, fsChk, proxChk, peekChk,
+      soundChk, waterRemindEnableChk, waterTapSoundChk, waterRemSoundChk, restSelect,
       waterGoal, waterCup, waterInterval, pomoMin, pomoBreakMin
     ].forEach(el => {
       el.addEventListener("change", saveAll);
