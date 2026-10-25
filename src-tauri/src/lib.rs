@@ -2,7 +2,10 @@ use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
+use std::sync::{
+    atomic::{AtomicBool, AtomicIsize, Ordering},
+    Arc, Mutex,
+};
 use std::thread;
 use std::time::Duration;
 use tauri::{
@@ -49,19 +52,39 @@ use windows::{
             },
             WindowsAndMessaging::{
                 GetClassNameW, GetCursorPos, GetForegroundWindow, GetWindowLongPtrW, GetWindowRect,
-                IsIconic, SendMessageTimeoutW, SetWindowLongPtrW, SetWindowPos, ShowWindow,
-                GWL_EXSTYLE, HWND_TOPMOST, SMTO_ABORTIFHUNG, SWP_NOACTIVATE, SWP_NOSIZE,
-                SWP_SHOWWINDOW, SW_HIDE, SW_SHOWNOACTIVATE, SW_SHOWNORMAL, WM_NCHITTEST,
-                WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW,
+                IsIconic, SendMessageTimeoutW, SetForegroundWindow, SetWindowLongPtrW,
+                SetWindowPos, SetWindowTextW, ShowWindow, GWL_EXSTYLE, GWL_STYLE, HWND_TOPMOST,
+                SMTO_ABORTIFHUNG, SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_SHOWWINDOW, SW_HIDE,
+                SW_SHOWNOACTIVATE, SW_SHOWNORMAL, WINDOW_LONG_PTR_INDEX, WM_NCHITTEST,
+                WS_EX_LAYERED, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TRANSPARENT,
             },
         },
     },
 };
 
-const WINDOW_WIDTH: i32 = 600;
-const HKEY_CURRENT_USER: isize = -2147483647i32 as isize; // 0x80000001
+const WINDOW_WIDTH: i32 = 1100;
+const HKEY_CURRENT_USER: isize = -2147483647i32 as isize;
 const REG_SZ: u32 = 1;
 const WAIT_OBJECT_0: u32 = 0;
+const ASFW_ANY: u32 = 0xFFFFFFFF;
+const DWMWA_TRANSITIONS_FORCEDISABLED: u32 = 3;
+const DWMWA_CLOAK: u32 = 13;
+const DWMWA_WINDOW_CORNER_PREFERENCE: u32 = 33;
+const DWMWCP_DONOTROUND: u32 = 1;
+const DWMWA_BORDER_COLOR: u32 = 34;
+const DWMWA_COLOR_NONE: u32 = 0xFFFFFFFE;
+const NOTCH_REVEAL_DELAY_MS: u64 = 250;
+
+static NOTCH_READY_CALLED: AtomicBool = AtomicBool::new(false);
+static NOTCH_POSITIONED: AtomicBool = AtomicBool::new(false);
+static ORIG_NOTCH_WNDPROC: AtomicIsize = AtomicIsize::new(0);
+
+#[cfg(windows)]
+#[repr(C)]
+struct StyleStruct {
+    style_old: u32,
+    style_new: u32,
+}
 
 #[cfg(windows)]
 #[repr(C)]
@@ -151,6 +174,16 @@ extern "system" {
     fn SetEvent(h_event: isize) -> i32;
     fn ResetEvent(h_event: isize) -> i32;
     fn WaitForSingleObject(h_handle: isize, dw_milliseconds: u32) -> u32;
+    fn AllowSetForegroundWindow(dw_process_id: u32) -> i32;
+    fn IsWindowVisible(hwnd: isize) -> i32;
+    fn GetDpiForWindow(hwnd: isize) -> u32;
+    fn CallWindowProcW(
+        lp_prev_wnd_func: isize,
+        hwnd: isize,
+        msg: u32,
+        wparam: usize,
+        lparam: isize,
+    ) -> isize;
 }
 
 #[cfg(windows)]
@@ -169,6 +202,178 @@ extern "system" {
         lp_sub_key: *const u16,
         lp_value_name: *const u16,
     ) -> i32;
+}
+
+#[cfg(windows)]
+#[link(name = "dwmapi")]
+extern "system" {
+    fn DwmSetWindowAttribute(
+        hwnd: isize,
+        dw_attribute: u32,
+        pv_attribute: *const std::ffi::c_void,
+        cb_attribute: u32,
+    ) -> i32;
+}
+
+#[cfg(windows)]
+unsafe extern "system" fn notch_wnd_proc(
+    hwnd: isize,
+    msg: u32,
+    wparam: usize,
+    lparam: isize,
+) -> isize {
+    const WM_NCCALCSIZE: u32 = 0x0083;
+    const WM_NCPAINT: u32 = 0x0085;
+    const WM_NCACTIVATE: u32 = 0x0086;
+    const WM_MOUSEACTIVATE: u32 = 0x0021;
+    const WM_STYLECHANGING: u32 = 0x007C;
+    const MA_NOACTIVATE: isize = 3;
+    const WM_QUERYENDSESSION: u32 = 0x0011;
+    const WM_ENDSESSION: u32 = 0x0016;
+
+    match msg {
+        // Izinkan Microsoft Store / Windows Restart Manager mematikan app saat proses update
+        WM_QUERYENDSESSION => return 1,
+        WM_ENDSESSION => {
+            if wparam != 0 {
+                std::process::exit(0);
+            }
+            return 0;
+        }
+        // Paksa non-client area = 0px secara mutlak
+        WM_NCCALCSIZE => return 0,
+        // Cegah Windows menggambar frame atau bar putih non-client
+        WM_NCPAINT => return 0,
+        // Cegah DefWindowProcW menggambar title bar putih saat pindah fokus / klik tray
+        WM_NCACTIVATE => return 1,
+        // Klik di dalam notch tidak boleh mencuri fokus dari aplikasi lain
+        WM_MOUSEACTIVATE => return MA_NOACTIVATE,
+        // Cegah tao/Windows mengembalikan WS_CAPTION / WS_THICKFRAME secara diam-diam
+        WM_STYLECHANGING => {
+            if lparam != 0 {
+                let ss = &mut *(lparam as *mut StyleStruct);
+                if wparam as i32 == -16 {
+                    ss.style_new &=
+                        !(0x00C00000 | 0x00040000 | 0x00800000 | 0x00400000 | 0x00080000);
+                } else if wparam as i32 == -20 {
+                    ss.style_new |= 0x08000000 | 0x00000080;
+                }
+            }
+            return 0;
+        }
+        _ => {}
+    }
+
+    let prev = ORIG_NOTCH_WNDPROC.load(Ordering::SeqCst);
+    if prev != 0 {
+        CallWindowProcW(prev, hwnd, msg, wparam, lparam)
+    } else {
+        0
+    }
+}
+
+#[cfg(windows)]
+fn install_notch_wndproc(hwnd: HWND) {
+    unsafe {
+        let prev = GetWindowLongPtrW(hwnd, WINDOW_LONG_PTR_INDEX(-4));
+        let hook_fn = notch_wnd_proc as *const () as usize as isize;
+        if prev != 0 && prev != hook_fn {
+            ORIG_NOTCH_WNDPROC.store(prev, Ordering::SeqCst);
+            SetWindowLongPtrW(hwnd, WINDOW_LONG_PTR_INDEX(-4), hook_fn);
+        }
+    }
+}
+
+#[cfg(windows)]
+fn disable_window_transitions(hwnd: HWND) {
+    unsafe {
+        let val: u32 = 1;
+        let _ = DwmSetWindowAttribute(
+            hwnd.0 as isize,
+            DWMWA_TRANSITIONS_FORCEDISABLED,
+            &val as *const _ as *const std::ffi::c_void,
+            std::mem::size_of::<u32>() as u32,
+        );
+        let no_border: u32 = DWMWA_COLOR_NONE;
+        let _ = DwmSetWindowAttribute(
+            hwnd.0 as isize,
+            DWMWA_BORDER_COLOR,
+            &no_border as *const _ as *const std::ffi::c_void,
+            std::mem::size_of::<u32>() as u32,
+        );
+        let corner: u32 = DWMWCP_DONOTROUND;
+        let _ = DwmSetWindowAttribute(
+            hwnd.0 as isize,
+            DWMWA_WINDOW_CORNER_PREFERENCE,
+            &corner as *const _ as *const std::ffi::c_void,
+            std::mem::size_of::<u32>() as u32,
+        );
+    }
+}
+
+#[cfg(windows)]
+fn set_window_cloak(hwnd: HWND, cloak: bool) {
+    unsafe {
+        let val: u32 = if cloak { 1 } else { 0 };
+        let _ = DwmSetWindowAttribute(
+            hwnd.0 as isize,
+            DWMWA_CLOAK,
+            &val as *const _ as *const std::ffi::c_void,
+            std::mem::size_of::<u32>() as u32,
+        );
+    }
+}
+
+#[cfg(windows)]
+fn strip_window_borders(hwnd: HWND) {
+    unsafe {
+        install_notch_wndproc(hwnd);
+
+        let empty_title: [u16; 1] = [0];
+        let _ = SetWindowTextW(hwnd, PCWSTR(empty_title.as_ptr()));
+
+        let style = GetWindowLongPtrW(hwnd, GWL_STYLE);
+        let clean_style = style
+            & !(0x00C00000isize
+                | 0x00040000isize
+                | 0x00800000isize
+                | 0x00400000isize
+                | 0x00080000isize
+                | 0x00020000isize
+                | 0x00010000isize);
+        SetWindowLongPtrW(hwnd, GWL_STYLE, clean_style);
+
+        let ex_style = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
+        SetWindowLongPtrW(
+            hwnd,
+            GWL_EXSTYLE,
+            ex_style
+                | (WS_EX_LAYERED.0 as isize)
+                | (WS_EX_NOACTIVATE.0 as isize)
+                | (WS_EX_TOOLWINDOW.0 as isize),
+        );
+
+        disable_window_transitions(hwnd);
+    }
+}
+
+#[cfg(windows)]
+fn set_hwnd_click_through(hwnd: HWND, ignore: bool) {
+    unsafe {
+        let ex_style = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
+        let base_ex = ex_style
+            | (WS_EX_LAYERED.0 as isize)
+            | (WS_EX_NOACTIVATE.0 as isize)
+            | (WS_EX_TOOLWINDOW.0 as isize);
+        let new_ex = if ignore {
+            base_ex | (WS_EX_TRANSPARENT.0 as isize)
+        } else {
+            base_ex & !(WS_EX_TRANSPARENT.0 as isize)
+        };
+        if new_ex != ex_style {
+            SetWindowLongPtrW(hwnd, GWL_EXSTYLE, new_ex);
+        }
+    }
 }
 
 #[cfg(windows)]
@@ -297,8 +502,9 @@ fn read_bluetooth_state(bth_mod: isize) -> Option<BtState> {
                                 .iter()
                                 .position(|&c| c == 0)
                                 .unwrap_or(dev_info.sz_name.len());
-                            first_dev_name =
-                                String::from_utf16_lossy(&dev_info.sz_name[..len]).trim().to_string();
+                            first_dev_name = String::from_utf16_lossy(&dev_info.sz_name[..len])
+                                .trim()
+                                .to_string();
                         }
                     }
                     if find_next_dev(h_find_dev, &mut dev_info) == 0 {
@@ -479,7 +685,6 @@ fn unblock_file_motw(path: &str) {
     let _ = fs::remove_file(ads_path);
 }
 
-// Menulis / Menghapus Autostart langsung via Win32 Registry API (Tanpa memanggil reg.exe / CMD)
 fn apply_autostart(enable: bool) {
     #[cfg(windows)]
     unsafe {
@@ -514,6 +719,34 @@ fn apply_autostart(enable: bool) {
             let _ = RegDeleteKeyValueW(HKEY_CURRENT_USER, sub_key.as_ptr(), val_name.as_ptr());
         }
     }
+}
+
+fn show_control_center_safe(app: &AppHandle) {
+    let app_clone = app.clone();
+    let _ = app.run_on_main_thread(move || {
+        if let Some(notch_win) = app_clone.get_webview_window("notch") {
+            #[cfg(windows)]
+            if let Some(hwnd) = get_hwnd(&notch_win) {
+                set_hwnd_click_through(hwnd, true);
+            }
+        }
+        let _ = app_clone.emit("notch-hover", false);
+
+        if let Some(ctrl_win) = app_clone.get_webview_window("control") {
+            let _ = ctrl_win.show();
+            let _ = ctrl_win.unminimize();
+            let _ = ctrl_win.set_always_on_top(true);
+            let _ = ctrl_win.set_focus();
+            let _ = ctrl_win.set_always_on_top(false);
+
+            #[cfg(windows)]
+            if let Some(hwnd) = get_hwnd(&ctrl_win) {
+                unsafe {
+                    let _ = SetForegroundWindow(hwnd);
+                }
+            }
+        }
+    });
 }
 
 #[cfg(windows)]
@@ -551,9 +784,13 @@ fn write_master_volume(volume: Option<u32>, mute: Option<bool>) -> VolumePayload
             if let Ok(device) = enumerator.GetDefaultAudioEndpoint(eRender, eConsole) {
                 if let Ok(endpoint) = device.Activate::<IAudioEndpointVolume>(CLSCTX_ALL, None) {
                     if let Some(v) = volume {
-                        let scalar = (v.min(100) as f32) / 100.0;
+                        let clamped = v.min(100);
+                        let scalar = (clamped as f32) / 100.0;
                         let _ = endpoint.SetMasterVolumeLevelScalar(scalar, std::ptr::null());
-                        if v > 0 {
+                        // Jika digeser sampai 0, wajib panggil SetMute(1) agar benar-benar mati di semua audio driver
+                        if clamped == 0 {
+                            let _ = endpoint.SetMute(BOOL(1), std::ptr::null());
+                        } else {
                             let _ = endpoint.SetMute(BOOL(0), std::ptr::null());
                         }
                     }
@@ -621,6 +858,43 @@ fn enumerate_monitors() -> Vec<MonitorItem> {
 }
 
 #[cfg(windows)]
+fn get_scaled_notch_size(notch_hwnd: HWND) -> (i32, i32) {
+    let dpi = unsafe { GetDpiForWindow(notch_hwnd.0 as isize) };
+    let scale = if dpi > 0 { (dpi as f64) / 96.0 } else { 1.0 };
+    let phys_w = ((WINDOW_WIDTH as f64) * scale).round() as i32;
+    let phys_h = (180.0 * scale).round() as i32;
+    (phys_w, phys_h)
+}
+
+#[cfg(windows)]
+fn place_notch_boot_peeking(notch_hwnd: HWND, cfg: &AppConfig) {
+    let monitors = enumerate_monitors();
+    let target = if cfg.use_primary_monitor {
+        monitors.iter().find(|m| m.is_primary).or(monitors.first())
+    } else {
+        monitors.get(cfg.selected_monitor_index).or(monitors.first())
+    };
+
+    if let Some(mon) = target {
+        strip_window_borders(notch_hwnd);
+        let (phys_w, phys_h) = get_scaled_notch_size(notch_hwnd);
+        let x = mon.x + (mon.width - phys_w) / 2;
+        let y = mon.y - phys_h + 2;
+        unsafe {
+            let _ = SetWindowPos(
+                notch_hwnd,
+                HWND_TOPMOST,
+                x,
+                y,
+                phys_w,
+                phys_h,
+                SWP_NOACTIVATE | SWP_FRAMECHANGED,
+            );
+        }
+    }
+}
+
+#[cfg(windows)]
 fn position_notch_window(notch_hwnd: HWND, cfg: &AppConfig) {
     let monitors = enumerate_monitors();
     let target = if cfg.use_primary_monitor {
@@ -630,23 +904,9 @@ fn position_notch_window(notch_hwnd: HWND, cfg: &AppConfig) {
     };
 
     if let Some(mon) = target {
-        let window_width = {
-            let mut rect = RECT::default();
-            unsafe {
-                if GetWindowRect(notch_hwnd, &mut rect).is_ok() {
-                    let measured_width = rect.right - rect.left;
-                    if measured_width > 0 {
-                        measured_width
-                    } else {
-                        WINDOW_WIDTH
-                    }
-                } else {
-                    WINDOW_WIDTH
-                }
-            }
-        };
-
-        let x = mon.x + (mon.width - window_width) / 2;
+        strip_window_borders(notch_hwnd);
+        let (phys_w, phys_h) = get_scaled_notch_size(notch_hwnd);
+        let x = mon.x + (mon.width - phys_w) / 2;
         let y = mon.y;
         unsafe {
             let _ = ShowWindow(notch_hwnd, SW_SHOWNOACTIVATE);
@@ -655,9 +915,9 @@ fn position_notch_window(notch_hwnd: HWND, cfg: &AppConfig) {
                 HWND_TOPMOST,
                 x,
                 y,
-                0,
-                0,
-                SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW,
+                phys_w,
+                phys_h,
+                SWP_NOACTIVATE | SWP_SHOWWINDOW,
             );
         }
     }
@@ -809,6 +1069,11 @@ fn get_app_logo() -> String {
 }
 
 #[tauri::command]
+fn get_app_version() -> String {
+    env!("CARGO_PKG_VERSION").to_string()
+}
+
+#[tauri::command]
 fn get_install_channel() -> String {
     if let Ok(exe_path) = std::env::current_exe() {
         if exe_path.to_string_lossy().contains("WindowsApps") {
@@ -821,15 +1086,14 @@ fn get_install_channel() -> String {
 #[tauri::command]
 fn trigger_update_window(app: AppHandle, is_forced: bool) {
     if is_forced {
-        if let Some(notch_win) = app.get_webview_window("notch") {
-            let _ = notch_win.hide();
-        }
+        let app_clone = app.clone();
+        let _ = app.run_on_main_thread(move || {
+            if let Some(notch_win) = app_clone.get_webview_window("notch") {
+                let _ = notch_win.hide();
+            }
+        });
     }
-    if let Some(ctrl_win) = app.get_webview_window("control") {
-        let _ = ctrl_win.show();
-        let _ = ctrl_win.unminimize();
-        let _ = ctrl_win.set_focus();
-    }
+    show_control_center_safe(&app);
 }
 
 #[tauri::command]
@@ -868,6 +1132,15 @@ fn open_external_url(url: String) {
 }
 
 #[tauri::command]
+fn launch_update_and_exit(app: AppHandle, url: String) {
+    open_external_url(url);
+    thread::spawn(move || {
+        thread::sleep(Duration::from_millis(400));
+        app.exit(0);
+    });
+}
+
+#[tauri::command]
 fn get_monitors() -> Vec<MonitorItem> {
     enumerate_monitors()
 }
@@ -892,9 +1165,11 @@ fn save_full_config(app: AppHandle, state: State<'_, SharedState>, new_cfg: AppC
     apply_autostart(cfg.start_with_windows);
     save_config_to_disk(&cfg);
 
-    if let Some(notch_win) = app.get_webview_window("notch") {
-        if let Some(hwnd) = get_hwnd(&notch_win) {
-            position_notch_window(hwnd, &cfg);
+    if NOTCH_POSITIONED.load(Ordering::SeqCst) {
+        if let Some(notch_win) = app.get_webview_window("notch") {
+            if let Some(hwnd) = get_hwnd(&notch_win) {
+                position_notch_window(hwnd, &cfg);
+            }
         }
     }
 
@@ -1046,6 +1321,29 @@ fn update_notch_hitbox(
 }
 
 #[tauri::command]
+fn notch_ready(app: AppHandle, state: State<'_, SharedState>) {
+    if NOTCH_READY_CALLED.swap(true, Ordering::SeqCst) {
+        return;
+    }
+    let cfg = state.0.lock().unwrap().clone();
+    thread::spawn(move || {
+        thread::sleep(Duration::from_millis(NOTCH_REVEAL_DELAY_MS));
+        let app2 = app.clone();
+        let _ = app.run_on_main_thread(move || {
+            if let Some(w) = app2.get_webview_window("notch") {
+                #[cfg(windows)]
+                if let Some(hwnd) = get_hwnd(&w) {
+                    position_notch_window(hwnd, &cfg);
+                    set_hwnd_click_through(hwnd, true);
+                }
+                NOTCH_POSITIONED.store(true, Ordering::SeqCst);
+                let _ = app2.emit("notch-revealed", ());
+            }
+        });
+    });
+}
+
+#[tauri::command]
 fn media_action(action: String) {
     #[cfg(windows)]
     {
@@ -1095,11 +1393,12 @@ pub fn run() {
             .collect();
         show_ctrl_event = CreateEventW(std::ptr::null(), 1, 0, event_name.as_ptr());
 
-        let mutex_name: Vec<u16> = "Global\\MangNotchSingleInstanceMutex\0"
+        let mutex_name: Vec<u16> = "Local\\MangNotchSingleInstanceMutex\0"
             .encode_utf16()
             .collect();
         if let Ok(handle) = CreateMutexW(None, true, PCWSTR(mutex_name.as_ptr())) {
             if GetLastError() == ERROR_ALREADY_EXISTS {
+                let _ = AllowSetForegroundWindow(ASFW_ANY);
                 if show_ctrl_event != 0 {
                     let _ = SetEvent(show_ctrl_event);
                 }
@@ -1141,11 +1440,7 @@ pub fn run() {
                 .tooltip("MangNotch - Klik untuk membuka Control Center")
                 .on_menu_event(|app, event| match event.id.as_ref() {
                     "show" => {
-                        if let Some(w) = app.get_webview_window("control") {
-                            let _ = w.show();
-                            let _ = w.unminimize();
-                            let _ = w.set_focus();
-                        }
+                        show_control_center_safe(app);
                     }
                     "quit" => {
                         app.exit(0);
@@ -1159,11 +1454,7 @@ pub fn run() {
                         ..
                     } = event
                     {
-                        if let Some(w) = tray.app_handle().get_webview_window("control") {
-                            let _ = w.show();
-                            let _ = w.unminimize();
-                            let _ = w.set_focus();
-                        }
+                        show_control_center_safe(tray.app_handle());
                     }
                 });
 
@@ -1173,25 +1464,34 @@ pub fn run() {
             let _ = tray_builder.build(app)?;
 
             let notch_win = app.get_webview_window("notch").unwrap();
-            let _ = notch_win.show();
             let notch_hwnd = get_hwnd(&notch_win).unwrap();
 
-            unsafe {
-                let ex_style = GetWindowLongPtrW(notch_hwnd, GWL_EXSTYLE);
-                SetWindowLongPtrW(
-                    notch_hwnd,
-                    GWL_EXSTYLE,
-                    ex_style | (WS_EX_NOACTIVATE.0 as isize) | (WS_EX_TOOLWINDOW.0 as isize),
-                );
-            }
+            let ctrl_hwnd = app
+                .get_webview_window("control")
+                .and_then(|w| get_hwnd(&w))
+                .unwrap_or_default();
 
-            {
-                let cfg = bg_cfg.lock().unwrap();
-                position_notch_window(notch_hwnd, &cfg);
-            }
+            let init_cfg_snapshot = bg_cfg.lock().unwrap().clone();
+
+            // 1. Pasang WndProc hook + Cloak + matikan border DWM + parkir di atas layar
+            install_notch_wndproc(notch_hwnd);
+            disable_window_transitions(notch_hwnd);
+            set_window_cloak(notch_hwnd, true);
+            strip_window_borders(notch_hwnd);
+            place_notch_boot_peeking(notch_hwnd, &init_cfg_snapshot);
+
+            // 2. Panggil show() sekali saat cloaked agar state internal Tauri tercatat visible
+            let _ = notch_win.show();
+            let _ = notch_win.set_ignore_cursor_events(true);
+
+            // 3. Kunci WndProc & click-through Win32, lalu uncloak agar WebView2 merender
+            place_notch_boot_peeking(notch_hwnd, &init_cfg_snapshot);
+            set_hwnd_click_through(notch_hwnd, true);
+            set_window_cloak(notch_hwnd, false);
 
             let app_handle = app.handle().clone();
-            let raw_hwnd = notch_hwnd.0 as isize;
+            let raw_notch_hwnd = notch_hwnd.0 as isize;
+            let raw_ctrl_hwnd = ctrl_hwnd.0 as isize;
             let fallback_dpi = notch_win.scale_factor().unwrap_or(1.0);
 
             thread::spawn(move || {
@@ -1200,7 +1500,8 @@ pub fn run() {
                     let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
                 }
 
-                let hwnd = HWND(raw_hwnd as *mut _);
+                let hwnd = HWND(raw_notch_hwnd as *mut _);
+                let ctrl_win_hwnd = HWND(raw_ctrl_hwnd as *mut _);
                 let mut is_hovered = false;
                 let mut is_hidden_by_fs = false;
                 let mut is_obstructed = false;
@@ -1227,19 +1528,29 @@ pub fn run() {
                     thread::sleep(Duration::from_millis(40));
                     tick_counter = tick_counter.wrapping_add(1);
 
-                    // 0. Cek sinyal dari instance kedua (Search Bar / Shortcut) untuk membuka Control Center
+                    // Fallback pengaman (~3 detik) kalau frontend tidak mengirim notch_ready
+                    if tick_counter == 75 && !NOTCH_POSITIONED.swap(true, Ordering::SeqCst) {
+                        NOTCH_READY_CALLED.store(true, Ordering::SeqCst);
+                        let cfg = bg_cfg.lock().unwrap().clone();
+                        position_notch_window(hwnd, &cfg);
+                        set_hwnd_click_through(hwnd, true);
+                        let _ = app_handle.emit("notch-revealed", ());
+                    }
+
                     #[cfg(windows)]
                     unsafe {
                         if show_ctrl_event != 0
                             && WaitForSingleObject(show_ctrl_event, 0) == WAIT_OBJECT_0
                         {
                             let _ = ResetEvent(show_ctrl_event);
-                            if let Some(ctrl_win) = app_handle.get_webview_window("control") {
-                                let _ = ctrl_win.show();
-                                let _ = ctrl_win.unminimize();
-                                let _ = ctrl_win.set_focus();
-                            }
+                            is_hovered = false;
+                            outside_ticks = 0;
+                            show_control_center_safe(&app_handle);
                         }
+                    }
+
+                    if !NOTCH_POSITIONED.load(Ordering::SeqCst) {
+                        continue;
                     }
 
                     let cfg = bg_cfg.lock().unwrap().clone();
@@ -1292,7 +1603,7 @@ pub fn run() {
 
                         // 1. Deteksi Aplikasi Fullscreen Murni
                         if cfg.hide_on_fullscreen {
-                            if fg_is_same_mon && !is_desktop {
+                            if fg_is_same_mon && !is_desktop && fg != ctrl_win_hwnd {
                                 let m = mi.rcMonitor;
                                 let fullscreen = fg_rect.left == m.left
                                     && fg_rect.top == m.top
@@ -1321,19 +1632,22 @@ pub fn run() {
 
                         // 2. Smart Proximity Auto-Shrink
                         if tick_counter % 3 == 0 && !is_hovered {
-                            let now_obstructed =
-                                if cfg.smart_proximity && fg_is_same_mon && !is_desktop {
-                                    check_window_obstruction(
-                                        fg,
-                                        &class_name,
-                                        &fg_rect,
-                                        &mi.rcMonitor,
-                                        notch_center_x,
-                                        cfg.resting_width,
-                                    )
-                                } else {
-                                    false
-                                };
+                            let now_obstructed = if cfg.smart_proximity
+                                && fg_is_same_mon
+                                && !is_desktop
+                                && fg != ctrl_win_hwnd
+                            {
+                                check_window_obstruction(
+                                    fg,
+                                    &class_name,
+                                    &fg_rect,
+                                    &mi.rcMonitor,
+                                    notch_center_x,
+                                    cfg.resting_width,
+                                )
+                            } else {
+                                false
+                            };
 
                             if now_obstructed != is_obstructed {
                                 is_obstructed = now_obstructed;
@@ -1485,7 +1799,7 @@ pub fn run() {
                             }
                         }
 
-                        // 4. Smart Hover, Safe-Zone Lebar & Collapse Debounce
+                        // 4. Smart Hover, Safe-Zone Lebar & Proteksi Jendela Control Center
                         let mut pt = POINT::default();
                         if GetCursorPos(&mut pt).is_ok() {
                             let effective_w = if is_hovered && cfg.interaction_mode != "click" {
@@ -1523,38 +1837,52 @@ pub fn run() {
                             let hit_right = notch_center_x + half_w;
                             let hit_top = win_rect.top - scale_px(10);
 
-                            let inside = pt.x >= hit_left
+                            let mut inside = pt.x >= hit_left
                                 && pt.x <= hit_right
                                 && pt.y >= hit_top
                                 && pt.y <= hit_bottom;
 
-                            if let Some(w) = app_handle.get_webview_window("notch") {
-                                if inside {
-                                    outside_ticks = 0;
-                                    if !is_hovered {
-                                        is_hovered = true;
-                                        if cfg.interaction_mode != "click" {
-                                            if let Ok(mut c) = bg_cfg.lock() {
-                                                c.active_width = c.active_width.max(420);
-                                                c.active_height = c.active_height.max(140);
-                                            }
-                                        }
-                                        let _ = w.set_ignore_cursor_events(false);
-                                        let _ = app_handle.emit("notch-hover", true);
+                            if !ctrl_win_hwnd.0.is_null()
+                                && IsWindowVisible(ctrl_win_hwnd.0 as isize) != 0
+                                && !IsIconic(ctrl_win_hwnd).as_bool()
+                            {
+                                let mut ctrl_rect = RECT::default();
+                                if GetWindowRect(ctrl_win_hwnd, &mut ctrl_rect).is_ok() {
+                                    let in_ctrl = pt.x >= ctrl_rect.left
+                                        && pt.x <= ctrl_rect.right
+                                        && pt.y >= ctrl_rect.top
+                                        && pt.y <= ctrl_rect.bottom;
+                                    if in_ctrl && pt.y > win_rect.top + scale_px(34) {
+                                        inside = false;
                                     }
-                                } else if is_hovered {
-                                    outside_ticks += 1;
-                                    let required_ticks = if is_expanded { 7 } else { 3 };
-                                    if outside_ticks >= required_ticks {
-                                        is_hovered = false;
-                                        outside_ticks = 0;
+                                }
+                            }
+
+                            if inside {
+                                outside_ticks = 0;
+                                if !is_hovered {
+                                    is_hovered = true;
+                                    if cfg.interaction_mode != "click" {
                                         if let Ok(mut c) = bg_cfg.lock() {
-                                            c.active_width = c.resting_width.max(155);
-                                            c.active_height = 32;
+                                            c.active_width = c.active_width.max(420);
+                                            c.active_height = c.active_height.max(140);
                                         }
-                                        let _ = w.set_ignore_cursor_events(true);
-                                        let _ = app_handle.emit("notch-hover", false);
                                     }
+                                    set_hwnd_click_through(hwnd, false);
+                                    let _ = app_handle.emit("notch-hover", true);
+                                }
+                            } else if is_hovered {
+                                outside_ticks += 1;
+                                let required_ticks = if is_expanded { 7 } else { 3 };
+                                if outside_ticks >= required_ticks {
+                                    is_hovered = false;
+                                    outside_ticks = 0;
+                                    if let Ok(mut c) = bg_cfg.lock() {
+                                        c.active_width = c.resting_width.max(155);
+                                        c.active_height = 32;
+                                    }
+                                    set_hwnd_click_through(hwnd, true);
+                                    let _ = app_handle.emit("notch-hover", false);
                                 }
                             }
                         }
@@ -1585,10 +1913,12 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             get_app_logo,
+            get_app_version,
             get_install_channel,
             trigger_update_window,
             open_config_folder,
             open_external_url,
+            launch_update_and_exit,
             get_monitors,
             get_config,
             save_full_config,
@@ -1599,6 +1929,7 @@ pub fn run() {
             reveal_shelf_file,
             start_file_drag,
             update_notch_hitbox,
+            notch_ready,
             media_action,
             media_seek
         ])

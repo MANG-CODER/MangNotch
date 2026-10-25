@@ -12,9 +12,9 @@
   IgnorableNamespaces="uap uap2 uap3 uap10 desktop desktop6 rescap">
 
   <Identity
-  Name="MangNotch"
-  Publisher="CN=28FFBFD0-E3DA-43F3-BA08-F102416C984C"
-  Version="1.0.0.0" />
+    Name="vestiapani.MangNotch"
+    Publisher="CN=28FFBFD0-E3DA-43F3-BA08-F102416C984C"
+    Version="1.1.2.0" />
 
   <Properties>
     <DisplayName>MangNotch</DisplayName>
@@ -35,7 +35,7 @@
 
   <Applications>
     <Application Id="mangNotch"
-      Executable="$targetnametoken$.exe"
+      Executable="mangnotch.exe"
       EntryPoint="Windows.FullTrustApplication">
       <uap:VisualElements
         DisplayName="MangNotch"
@@ -45,6 +45,11 @@
         Square44x44Logo="Assets\AppList.png">
         <uap:DefaultTile Wide310x150Logo="Assets\WideTile.png" />
       </uap:VisualElements>
+      <Extensions>
+        <desktop:Extension Category="windows.startupTask" Executable="mangnotch.exe" EntryPoint="Windows.FullTrustApplication">
+          <desktop:StartupTask TaskId="MangNotchStartup" Enabled="false" DisplayName="MangNotch" />
+        </desktop:Extension>
+      </Extensions>
     </Application>
   </Applications>
 

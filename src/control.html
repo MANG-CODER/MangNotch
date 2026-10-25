@@ -77,6 +77,23 @@
     background: rgba(255, 183, 197, 0.12); border: 1px solid rgba(255, 183, 197, 0.28); color: var(--pink);
   }
 
+    .hdr { cursor: default; }
+  .hdr-right { display: flex; align-items: center; gap: 8px; }
+  .close-btn {
+    width: 28px; height: 28px; border-radius: 8px;
+    border: 1px solid var(--border); background: rgba(255, 255, 255, 0.04);
+    color: var(--mist); display: grid; place-items: center; cursor: pointer;
+    transition: all .15s;
+  }
+  .close-btn:hover {
+    background: rgba(255, 120, 140, 0.2); color: #ff8fa3;
+    border-color: rgba(255, 120, 140, 0.4);
+  }
+  .close-btn svg {
+    width: 12px; height: 12px; stroke: currentColor; fill: none;
+    stroke-width: 2.4; stroke-linecap: round;
+  }
+
   .tabs {
     display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px;
     padding: 5px; border-radius: 13px; background: var(--surface);
@@ -360,7 +377,7 @@
 </head>
 <body oncontextmenu="return false;">
   <div class="app-wrap">
-    <div class="hdr">
+      <div class="hdr" id="hdr">
       <div class="brand">
         <div class="brand-logo">
           <img class="js-app-logo" alt="MangNotch">
@@ -370,7 +387,12 @@
           <span>Living Notch & Desktop Companion</span>
         </div>
       </div>
-      <span class="ver-pill">v1.1.1</span>
+            <div class="hdr-right">
+        <span class="ver-pill" id="hdrVerPill">v1.1.2</span>
+        <button class="close-btn" id="closeBtn" title="Tutup">
+          <svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
     </div>
 
     <!-- Banner Auto-Update (Muncul otomatis jika ada versi baru) -->
@@ -382,7 +404,7 @@
       <button class="btn" id="updateBannerBtn">Update Sekarang</button>
     </div>
 
-    <!-- Modal Layar Penuh untuk Forced Update (Tidak bisa ditutup jika versi < min_supported_version) -->
+    <!-- Modal Layar Penuh untuk Forced Update -->
     <div id="forcedUpdateModal" style="display:none; position:fixed; inset:0; background:rgba(12,9,16,0.94); backdrop-filter:blur(16px); z-index:9999; place-items:center; padding:24px; text-align:center;">
       <div style="background:var(--surface); border:1px solid var(--pink); border-radius:20px; padding:24px 22px; max-width:380px; box-shadow:0 20px 50px rgba(0,0,0,0.8);">
         <div style="width:48px; height:48px; border-radius:14px; background:rgba(255,183,197,0.15); border:1px solid var(--pink); display:grid; place-items:center; margin:0 auto 14px;">
@@ -650,7 +672,7 @@
             <img class="js-app-logo" alt="MangNotch">
           </div>
           <div class="about-title">
-            <h2>MangNotch <span style="font-size:12px;color:var(--pink);font-weight:600">v1.1.0</span></h2>
+            <h2>MangNotch <span id="aboutVerTxt" style="font-size:12px;color:var(--pink);font-weight:600">v1.1.2</span></h2>
             <p>Interactive Living Notch & Productivity Companion dengan sentuhan estetika editorial <i>MangNime</i>.</p>
             <div class="tag-list">
               <span class="tag">Rust Backend</span>
@@ -743,9 +765,11 @@
     const newTodoInput = document.getElementById("newTodoInput");
 
     let currentCfg = null;
+    let APP_VERSION = "1.1.2";
+    const VERSION_MANIFEST_URL = "https://raw.githubusercontent.com/MANG-CODER/MangNotch/main/version.json";
     const customSelectRegistry = new Map();
+    const esc = (s) => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
-    // Komponen Dropdown Kustom Bertema MangNotch (Menggantikan Popup Bawaan Browser)
     function setupCustomSelect(selectEl) {
       selectEl.classList.add("native-hidden");
       let wrap = customSelectRegistry.get(selectEl);
@@ -827,6 +851,12 @@
 
     async function initControl() {
       [interactionSelect, todoStyleSelect, restSelect, monSelect].forEach(setupCustomSelect);
+
+      try {
+        APP_VERSION = await invoke("get_app_version");
+        document.getElementById("hdrVerPill").textContent = "v" + APP_VERSION;
+        document.getElementById("aboutVerTxt").textContent = "v" + APP_VERSION;
+      } catch {}
 
       const logoDataUrl = await invoke("get_app_logo");
       document.querySelectorAll(".js-app-logo").forEach(img => img.src = logoDataUrl);
@@ -910,7 +940,7 @@
             <span class="custom-chk">
               <svg viewBox="0 0 10 10"><path d="M2 5l2.2 2.2L8 2.5"/></svg>
             </span>
-            <span class="t-txt">${t.text}</span>
+            <span class="t-txt">${esc(t.text)}</span>
           </div>
           <button class="icon-btn" onclick="deleteCtrlTodo(${i})" title="Hapus Tugas">
             <svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>
@@ -968,9 +998,6 @@
       saveAll();
     }
 
-    const APP_VERSION = "1.1.1";
-    const VERSION_MANIFEST_URL = "https://raw.githubusercontent.com/MANG-CODER/MangNotch/main/version.json";
-
     function compareSemver(v1, v2) {
       const a = String(v1).split(".").map(Number);
       const b = String(v2).split(".").map(Number);
@@ -992,26 +1019,38 @@
           ? (data.store_url || "ms-windows-store://pdp/?ProductId=9PNWT253Z5RL")
           : (data.github_download_url || "https://github.com/MANG-CODER/MangNotch/releases/latest");
 
-        // 1. Cek apakah kena Forced Update (APP_VERSION < min_supported_version)
-        if (data.min_supported_version && compareSemver(APP_VERSION, data.min_supported_version) < 0) {
+        const minVer = channel === "msix"
+          ? (data.store_min_supported_version || "1.0.0")
+          : (data.min_supported_version || "1.0.0");
+
+        const latestVer = channel === "msix"
+          ? (data.store_latest_version || APP_VERSION)
+          : (data.latest_version || APP_VERSION);
+
+        if (minVer && compareSemver(APP_VERSION, minVer) < 0) {
           const modal = document.getElementById("forcedUpdateModal");
           document.getElementById("forcedUpdateNotes").textContent =
-            data.release_notes || `Versi v${APP_VERSION} wajib diperbarui ke v${data.latest_version}.`;
-          document.getElementById("forcedUpdateBtn").onclick = () => openUrl(targetUrl);
+            data.release_notes || `Versi v${APP_VERSION} wajib diperbarui ke v${latestVer}.`;
+          document.getElementById("forcedUpdateBtn").onclick = () => {
+            invoke("launch_update_and_exit", { url: targetUrl });
+          };
           modal.style.display = "grid";
-          invoke("trigger_update_window", { isForced: true }); // <-- Otomatis buka Control Center & sembunyikan Notch
+          invoke("trigger_update_window", { isForced: true });
           return;
         }
 
-        // 2. Cek apakah ada Update Baru (APP_VERSION < latest_version)
-        if (data.latest_version && compareSemver(APP_VERSION, data.latest_version) < 0) {
+        if (latestVer && compareSemver(APP_VERSION, latestVer) < 0) {
           const banner = document.getElementById("updateBanner");
           document.getElementById("updateBannerTitle").textContent =
-            `Update MangNotch v${data.latest_version} Tersedia!`;
+            `Update MangNotch v${latestVer} Tersedia!`;
           document.getElementById("updateBannerSub").textContent =
             data.release_notes || (channel === "msix" ? "Klik untuk update via Microsoft Store" : "Klik untuk unduh installer terbaru di GitHub");
-          document.getElementById("updateBannerBtn").onclick = () => openUrl(targetUrl);
+          document.getElementById("updateBannerBtn").onclick = () => {
+            invoke("launch_update_and_exit", { url: targetUrl });
+          };
           banner.style.display = "flex";
+        } else {
+          document.getElementById("updateBanner").style.display = "none";
         }
       } catch (err) {
         // Abaikan jika user sedang offline
@@ -1029,6 +1068,12 @@
 
     listen("config-updated", (ev) => populateUI(ev.payload));
     initControl();
+        const appWin = window.__TAURI__.window.getCurrentWindow();
+    document.getElementById("hdr").addEventListener("mousedown", (e) => {
+      if (e.buttons !== 1 || e.target.closest("button")) return;
+      appWin.startDragging();
+    });
+    document.getElementById("closeBtn").addEventListener("click", () => appWin.hide());
   </script>
 </body>
 </html>

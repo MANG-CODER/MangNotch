@@ -9,6 +9,8 @@
     --lyr-glow: linear-gradient(90deg, #2b1d38, #4a2d5e 50%, #1f2a44);
     --ui: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
     --spring: cubic-bezier(0.34, 1.32, 0.5, 1);
+    --dyn-lyr-w: 520px;
+    --dyn-idle-lyr-w: 340px;
   }
   * { box-sizing: border-box; user-select: none; }
   html, body {
@@ -25,7 +27,7 @@
     --w: 155px; --h: 30px; --r: 14px; --e: 10px;
     position: relative; width: var(--w); height: var(--h);
     background: #08060c; border-radius: 0 0 var(--r) var(--r);
-    transition: width .56s var(--spring), height .56s var(--spring), border-radius .4s ease, box-shadow .25s ease;
+    transition: width .52s var(--spring), height .56s var(--spring), border-radius .4s ease, box-shadow .25s ease;
     color: #f6f2f8; font-size: 13px; line-height: 1;
   }
   .mn.click-ready {
@@ -41,17 +43,23 @@
   .mn::before { right: 100%; background: radial-gradient(circle at 0 100%, transparent calc(var(--e) - .5px), #08060c var(--e)); }
   .mn::after  { left: 100%;  background: radial-gradient(circle at 100% 100%, transparent calc(var(--e) - .5px), #08060c var(--e)); }
 
+  .mn[data-s="boot"]        { --w: 44px;  --h: 4px;  --r: 3px;  --e: 2px; }
+  .mn[data-s="intro"]       {
+    --w: 284px; --h: 64px; --r: 22px; --e: 14px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.75), 0 0 22px rgba(255, 183, 197, 0.22);
+  }
   .mn[data-s="minimal"]     { --w: 130px; --h: 6px;  --r: 5px;  --e: 4px; }
-  .mn[data-s="idle-lyrics"] { --w: 340px; --h: 32px; --r: 15px; --e: 10px; }
+  .mn[data-s="idle-lyrics"] { --w: var(--dyn-idle-lyr-w, 340px); --h: 32px; --r: 15px; --e: 10px; }
   .mn[data-s="peek"]        { --w: 320px; --h: 62px; --r: 19px; --e: 13px; }
   .mn[data-s="music"], .mn[data-s="pomo"], .mn[data-s="water"], .mn[data-s="shelf"], .mn[data-s="todo"] {
     --w: 420px; --h: 140px; --r: 32px; --e: 22px;
   }
   .mn[data-s="lyrics"] {
-    --w: 520px; --h: 140px; --r: 32px; --e: 22px;
+    --w: var(--dyn-lyr-w, 520px); --h: 140px; --r: 32px; --e: 22px;
   }
 
   .ly { position: absolute; inset: 0; overflow: hidden; border-radius: inherit; opacity: 0; transition: opacity .18s ease; pointer-events: none; }
+  .mn[data-s="intro"] .l-intro,
   .mn[data-s="minimal"] .l-min,
   .mn[data-s="pet"] .l-pet,
   .mn[data-s="idle"] .l-idle,
@@ -75,6 +83,80 @@
   .sb { font-weight: 600; }
   .b { font-weight: 700; }
 
+  /* Running Text / Marquee untuk Judul & Artis */
+  .mq-box {
+    overflow: hidden;
+    white-space: nowrap;
+    display: block;
+  }
+  .mq-box.is-marquee {
+    -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 5%, #000 95%, transparent 100%);
+    mask-image: linear-gradient(90deg, transparent 0%, #000 5%, #000 95%, transparent 100%);
+  }
+  .mq-track {
+    display: inline-flex;
+    align-items: center;
+    white-space: nowrap;
+    will-change: transform;
+    animation: marqueeRun var(--mq-dur, 8s) linear infinite;
+  }
+  .mq-gap {
+    padding: 0 18px;
+    color: var(--c1);
+    opacity: 0.7;
+    font-size: 0.85em;
+  }
+  @keyframes marqueeRun {
+    0%, 18% { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
+  }
+
+  /* Opening Intro Animation Card */
+  .intro-wrap {
+    position: relative; z-index: 2; width: 100%; height: 100%;
+    display: flex; align-items: center; padding: 0 18px; gap: 13px;
+  }
+  .intro-orb {
+    width: 36px; height: 36px; border-radius: 12px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 183, 197, 0.35);
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    box-shadow: 0 0 14px rgba(255, 183, 197, 0.25);
+    flex-shrink: 0;
+  }
+  .intro-eye {
+    width: 6px; height: 8px; background: #fff;
+    border-radius: 2px 6px 2px 6px;
+    box-shadow: 0 0 8px var(--c1);
+    animation: introWake .6s var(--spring) forwards;
+  }
+  .intro-eye:last-child { border-radius: 6px 2px 6px 2px; }
+  @keyframes introWake {
+    0% { transform: scaleY(0.1); opacity: 0.3; }
+    100% { transform: scaleY(1); opacity: 1; }
+  }
+  .intro-text { flex: 1; overflow: hidden; }
+  .intro-title { font-size: 13.5px; font-weight: 700; letter-spacing: -0.01em; color: #fff; }
+  .intro-title span { color: var(--c1); }
+  .intro-sub { font-size: 10px; color: rgba(246, 242, 248, 0.62); margin-top: 3px; }
+  .intro-bar {
+    width: 100%; height: 3px; border-radius: 2px;
+    background: rgba(255, 255, 255, 0.14);
+    margin-top: 6px; overflow: hidden;
+  }
+  .intro-bar i {
+    display: block; height: 100%; width: 0%;
+    background: var(--glow); border-radius: 2px;
+    transition: width 0.65s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .intro-badge {
+    font-size: 9px; font-weight: 700; letter-spacing: 0.08em;
+    padding: 3px 7px; border-radius: 6px;
+    background: rgba(255, 183, 197, 0.15);
+    border: 1px solid rgba(255, 183, 197, 0.35);
+    color: var(--c1); flex-shrink: 0;
+  }
+
   .ambient {
     position: absolute; inset: auto 0 0 0; height: 92%; pointer-events: none;
     background: var(--glow);
@@ -89,25 +171,25 @@
     width: 48px; height: 2.5px; border-radius: 2px; background: var(--glow); opacity: .75;
   }
 
-  /* Compact Idle Lyrics Bar */
+  /* Compact Idle Lyrics Bar (Dynamic Width untuk Lirik, Default + Marquee untuk Judul) */
   .idle-lyr-row {
     position: relative; z-index: 2; width: 100%; height: 100%;
     display: flex; align-items: center; padding: 0 14px; gap: 10px;
   }
-  .idle-lyr-left { display: flex; align-items: center; gap: 7px; width: 135px; flex-shrink: 0; }
+  .idle-lyr-left { display: flex; align-items: center; gap: 7px; width: 135px; flex-shrink: 0; overflow: hidden; }
   .idle-mini-art {
     width: 19px; height: 19px; border-radius: 5px; background-size: cover; background-position: center;
     background-image: linear-gradient(135deg, #2b5876, #4e4376); flex-shrink: 0;
   }
   .idle-lyr-title {
     font-size: 11.5px; font-weight: 600; color: rgba(255,255,255,.88);
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    width: 108px;
   }
   .idle-lyr-sep { width: 1px; height: 14px; background: rgba(255,255,255,.22); flex-shrink: 0; }
-  .idle-lyr-right { flex: 1; display: flex; align-items: center; gap: 6px; overflow: hidden; }
+  .idle-lyr-right { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; overflow: hidden; }
   .idle-lyr-text {
     font-size: 12px; font-weight: 700; color: #fff;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    white-space: nowrap; flex: 1; min-width: 0;
   }
 
   /* Animated System Peek Bar */
@@ -242,38 +324,83 @@
   .bub:hover { transform: translate(-50%, -50%) scale(1.14); background: rgba(255, 183, 197, 0.2); }
   .bub:active { transform: translate(-50%, -50%) scale(0.95); }
 
-  /* Master Volume Slider dengan Efek Live Seek Fill Bar */
+  /* Master Volume Capsule Ala YouTube Modern */
   .vol-wrap {
-    left: 274px; top: 116px; transform: translateY(-50%);
-    display: flex; align-items: center; gap: 5px; width: 122px; z-index: 25;
+    left: 254px; top: 115px; transform: translateY(-50%);
+    display: inline-flex; align-items: center;
+    height: 28px; padding: 0 6px; border-radius: 99px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    z-index: 28;
+    transition: background .22s ease, border-color .22s ease, padding .28s var(--spring), box-shadow .22s ease;
+  }
+  .vol-wrap:hover, .vol-wrap.active {
+    background: rgba(18, 14, 26, 0.92);
+    border-color: rgba(255, 183, 197, 0.28);
+    padding: 0 10px 0 8px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.55);
+  }
+  .vol-btn {
+    width: 18px; height: 18px; display: grid; place-items: center;
+    cursor: pointer; flex-shrink: 0;
   }
   .vol-ico {
-    width: 15px; height: 15px; stroke: rgba(255,255,255,.88); fill: none;
+    width: 15px; height: 15px; stroke: rgba(255,255,255,.92); fill: none;
     stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
-    cursor: pointer; pointer-events: bounding-box; flex-shrink: 0; transition: stroke .15s, transform .15s;
+    transition: stroke .15s, transform .15s;
   }
-  .vol-ico:hover { stroke: var(--c1); transform: scale(1.12); }
-  .vol-slider {
-    -webkit-appearance: none; appearance: none;
-    width: 72px; height: 5px; border-radius: 3px;
-    background: linear-gradient(90deg, var(--c1) 0%, var(--c2) var(--vol-pct, 50%), rgba(255,255,255,.2) var(--vol-pct, 50%));
-    outline: none; cursor: pointer;
-  }
-  .vol-slider::-webkit-slider-thumb {
-    -webkit-appearance: none; appearance: none;
-    width: 11px; height: 11px; border-radius: 50%;
-    background: #fff; border: 2px solid var(--c1);
-    box-shadow: 0 0 6px rgba(255,183,197,.9);
-    cursor: pointer; transition: transform .12s;
-  }
-  .vol-slider::-webkit-slider-thumb:hover { transform: scale(1.22); }
-  .vol-pct {
-    font-size: 10px; font-weight: 700; color: rgba(255,255,255,.78);
-    width: 26px; text-align: right; flex-shrink: 0;
-  }
+  .vol-btn:hover .vol-ico { stroke: var(--c1); transform: scale(1.1); }
+  .vol-wrap.muted .vol-ico { stroke: #ff7b7b; }
 
+  .vol-drawer {
+    display: flex; align-items: center; gap: 8px;
+    width: 0; opacity: 0; overflow: hidden; pointer-events: none;
+    margin-left: 0;
+    transition: width .32s var(--spring), opacity .2s ease, margin-left .28s var(--spring);
+  }
+  .vol-wrap:hover .vol-drawer, .vol-wrap.active .vol-drawer {
+    width: 98px; opacity: 1; pointer-events: auto;
+    margin-left: 7px;
+  }
+  .vol-slider-box {
+    position: relative; width: 62px; height: 22px;
+    display: flex; align-items: center; flex-shrink: 0;
+  }
+  .vol-track {
+    width: 100%; height: 4px; border-radius: 99px;
+    background: rgba(255, 255, 255, 0.18);
+    position: relative; pointer-events: none;
+  }
+  .vol-fill {
+    height: 100%; width: var(--vol-pct, 50%);
+    background: var(--glow); border-radius: 99px;
+    position: relative; transition: width .06s linear;
+  }
+  .vol-thumb {
+    position: absolute; right: -5px; top: 50%;
+    transform: translateY(-50%) scale(0.85);
+    width: 10px; height: 10px; border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 0 8px var(--c1);
+    transition: transform .15s var(--spring);
+  }
+  .vol-slider-box:hover .vol-thumb {
+    transform: translateY(-50%) scale(1.12);
+  }
+  .vol-input {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    margin: 0; opacity: 0; cursor: pointer;
+  }
+  .vol-pct {
+    font-size: 10px; font-weight: 700; color: rgba(255,255,255,.88);
+    font-variant-numeric: tabular-nums;
+    width: 28px; text-align: right; flex-shrink: 0;
+  }
+  .vol-wrap.muted .vol-pct { color: #ff7b7b; }
+
+  /* Dynamic Lyrics Panel */
   .lyr {
-    left: 264px; width: 238px; top: 14px; bottom: 8px; overflow: hidden;
+    left: 264px; right: 18px; top: 14px; bottom: 8px; overflow: hidden;
     -webkit-mask: linear-gradient(transparent, #000 20%, #000 80%, transparent);
     mask: linear-gradient(transparent, #000 20%, #000 80%, transparent);
   }
@@ -282,9 +409,10 @@
     font-weight: 700; font-size: 14.5px; line-height: 1.28; padding: 5px 0;
     color: rgba(255,255,255,.32); transform: scale(.94); transform-origin: left center;
     transition: color .35s, transform .35s; cursor: pointer;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
   .lyr li:hover { color: rgba(255,255,255,.7); }
-  .lyr li.on { color: #fff; transform: scale(1); }
+  .lyr li.on { color: #fff; transform: scale(1); white-space: nowrap; text-overflow: clip; }
   .music-note-svg { width: 13px; height: 13px; fill: currentColor; display: inline-block; vertical-align: middle; }
 
   .pomo-wrap { left: 82px; top: 76px; width: 72px; height: 72px; transform: translate(-50%, -50%); display: grid; place-items: center; }
@@ -345,7 +473,7 @@
   .sh-card:hover .sh-del { opacity: 1; }
   .sh-del svg { width: 8px; height: 8px; stroke: #ff7b7b; stroke-width: 2.5; }
 
-  /* To-Do List Dual Style: Vertical List vs Horizontal Flow (> 2 item scroll ke samping) */
+  /* To-Do List Dual Style: Vertical List vs Horizontal Flow */
   .tlist {
     left: 178px; top: 32px; width: 200px; height: 90px;
     display: flex; flex-direction: column; gap: 5px;
@@ -402,7 +530,24 @@
 </head>
 <body>
   <div class="holder">
-    <div class="mn" id="mn" data-s="pet" onclick="onNotchContainerClick(event)">
+    <div class="mn" id="mn" data-s="boot" onclick="onNotchContainerClick(event)">
+
+      <!-- Mode Opening Intro Animation -->
+      <div class="ly l-intro">
+        <div class="ambient" style="opacity:0.75"></div>
+        <div class="intro-wrap">
+          <div class="intro-orb">
+            <span class="intro-eye"></span>
+            <span class="intro-eye"></span>
+          </div>
+          <div class="intro-text">
+            <div class="intro-title">Mang<span>Notch</span></div>
+            <div class="intro-sub">Living Notch Companion</div>
+            <div class="intro-bar"><i id="introBarFill"></i></div>
+          </div>
+          <span class="intro-badge">ONLINE</span>
+        </div>
+      </div>
 
       <!-- Mode Minimalis -->
       <div class="ly l-min">
@@ -422,23 +567,23 @@
         <span class="a bars c js-bars" style="left:134px;top:15px"><i></i><i></i><i></i><i></i><i></i></span>
       </div>
 
-      <!-- Mode Compact Idle Lyrics -->
+      <!-- Mode Compact Idle Lyrics (Dynamic Width untuk Lirik, Default + Marquee untuk Judul) -->
       <div class="ly l-idle-lyrics">
         <div class="ambient"></div>
         <div class="idle-lyr-row">
           <div class="idle-lyr-left">
             <span class="idle-mini-art js-art"></span>
-            <span class="idle-lyr-title js-title">Tidak ada media</span>
+            <span class="idle-lyr-title mq-box js-title" data-maxw="108" data-font="600 11.5px Segoe UI">Tidak ada media</span>
           </div>
           <span class="idle-lyr-sep"></span>
           <div class="idle-lyr-right">
             <svg class="music-note-svg" style="flex-shrink:0;color:var(--c1)" viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
-            <span class="idle-lyr-text" id="idleLyrText">Menunggu lirik...</span>
+            <span class="idle-lyr-text mq-box" id="idleLyrText" data-maxw="135" data-font="700 12px Segoe UI">Menunggu lirik...</span>
           </div>
         </div>
       </div>
 
-      <!-- Mode System Peek (Dilengkapi Animated Seek Bar) -->
+      <!-- Mode System Peek -->
       <div class="ly l-peek">
         <span class="a c" id="peekIcon" style="left:32px;top:31px;width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,.11);display:grid;place-items:center"></span>
         <span class="a vc sb" id="peekTitle" style="left:58px;top:20px;font-size:13.5px">Volume</span>
@@ -468,8 +613,8 @@
       <!-- HALAMAN 1: MUSIK -->
       <div class="ly l-music">
         <span class="a art js-art" style="left:22px;top:12px;width:62px;height:62px"></span>
-        <span class="a vc sb js-title" style="left:100px;top:46px;font-size:15px;max-width:265px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Tidak ada media</span>
-        <span class="a vc dim js-artist" style="left:100px;top:63px;font-size:11.5px;max-width:265px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Putar lagu di Spotify / Browser</span>
+        <span class="a vc sb mq-box js-title" data-maxw="265" data-font="600 15px Segoe UI" style="left:100px;top:46px;font-size:15px;width:265px">Tidak ada media</span>
+        <span class="a vc dim mq-box js-artist" data-maxw="265" data-font="400 11.5px Segoe UI" style="left:100px;top:63px;font-size:11.5px;width:265px">Putar lagu di Spotify / Browser</span>
 
         <span class="a arw c" style="left:26px;top:70px" onclick="prevPage(event)"><svg viewBox="0 0 10 10"><path d="M6.5 1.5 3 5l3.5 3.5"/></svg></span>
         <span class="a arw c" style="left:394px;top:70px" onclick="nextPage(event)"><svg viewBox="0 0 10 10"><path d="M3.5 1.5 7 5l-3.5 3.5"/></svg></span>
@@ -478,36 +623,47 @@
         <span class="a prog vc" onclick="seekBarClick(event, this)" style="left:77px;top:91px;width:260px"><i class="js-prog"></i></span>
         <span class="a vc js-rem" style="right:25px;top:91px">-00:00</span>
 
-        <svg class="a bub c" onclick="toggleLyrics(event, true)" style="left:48px;top:116px" viewBox="0 0 18 16" title="Tampilkan Lirik">
+        <svg class="a bub c" onclick="toggleLyrics(event, true)" style="left:48px;top:115px" viewBox="0 0 18 16">
           <path d="M4 .8h10a3.2 3.2 0 0 1 3.2 3.2v4.6a3.2 3.2 0 0 1-3.2 3.2H8.4L4.6 15l.5-3.2H4A3.2 3.2 0 0 1 .8 8.6V4A3.2 3.2 0 0 1 4 .8z" fill="rgba(255,255,255,.04)" stroke="rgba(255,255,255,.88)" stroke-width="1.4"/>
           <circle cx="6.3" cy="5.4" r="1.3" fill="rgba(255,255,255,.88)"/><circle cx="11.3" cy="5.4" r="1.3" fill="rgba(255,255,255,.88)"/>
         </svg>
-        <svg class="a ctl c" onclick="mediaCmd('prev', event)" style="left:148px;top:116px" viewBox="0 0 24 24"><path d="M11 6 3 12l8 6zM21 6l-8 6 8 6z"/></svg>
-        <svg class="a ctl c js-play-icon" onclick="mediaCmd('play_pause', event)" style="left:192px;top:116px" viewBox="0 0 24 24"><path d="M7 5h4v14H7zM13 5h4v14h-4z"/></svg>
-        <svg class="a ctl c" onclick="mediaCmd('next', event)" style="left:236px;top:116px" viewBox="0 0 24 24"><path d="m13 6 8 6-8 6zM3 6l8 6-8 6z"/></svg>
+        <svg class="a ctl c" onclick="mediaCmd('prev', event)" style="left:142px;top:115px" viewBox="0 0 24 24"><path d="M11 6 3 12l8 6zM21 6l-8 6 8 6z"/></svg>
+        <svg class="a ctl c js-play-icon" onclick="mediaCmd('play_pause', event)" style="left:184px;top:115px" viewBox="0 0 24 24"><path d="M7 5h4v14H7zM13 5h4v14h-4z"/></svg>
+        <svg class="a ctl c" onclick="mediaCmd('next', event)" style="left:226px;top:115px" viewBox="0 0 24 24"><path d="m13 6 8 6-8 6zM3 6l8 6-8 6z"/></svg>
 
-        <!-- Master Volume Slider dengan Live Fill & Persentase -->
+        <!-- Master Volume Capsule Ala YouTube (Expand on Speaker Hover) -->
         <div class="a vol-wrap" id="volWrap" onclick="event.stopPropagation()">
-          <svg class="vol-ico" id="volIcon" onclick="toggleMuteVolume()" viewBox="0 0 24 24">
-            <path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
-          </svg>
-          <input type="range" min="0" max="100" value="50" class="vol-slider" id="volSlider" oninput="onVolumeSlide(this.value)" title="Scroll atau Geser untuk Volume">
-          <span class="vol-pct" id="volPctTxt">50%</span>
+          <div class="vol-btn" onclick="toggleMuteVolume()">
+            <svg class="vol-ico" id="volIcon" viewBox="0 0 24 24">
+              <path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+            </svg>
+          </div>
+          <div class="vol-drawer">
+            <div class="vol-slider-box">
+              <div class="vol-track">
+                <div class="vol-fill">
+                  <span class="vol-thumb"></span>
+                </div>
+              </div>
+              <input type="range" min="0" max="100" value="50" class="vol-input" id="volSlider" oninput="onVolumeSlide(this.value)">
+            </div>
+            <span class="vol-pct" id="volPctTxt">50%</span>
+          </div>
         </div>
       </div>
 
-      <!-- HALAMAN 1B: LIRIK -->
+      <!-- HALAMAN 1B: LIRIK (Dynamic Width) -->
       <div class="ly l-lyrics">
         <div class="ambient"></div>
         <span class="a art js-art" style="left:22px;top:12px;width:62px;height:62px"></span>
-        <span class="a vc sb js-title" style="left:100px;top:46px;font-size:15px;max-width:142px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Tidak ada media</span>
-        <span class="a vc dim js-artist" style="left:100px;top:63px;font-size:11.5px;max-width:142px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">-</span>
+        <span class="a vc sb mq-box js-title" data-maxw="142" data-font="600 15px Segoe UI" style="left:100px;top:46px;font-size:15px;width:142px">Tidak ada media</span>
+        <span class="a vc dim mq-box js-artist" data-maxw="142" data-font="400 11.5px Segoe UI" style="left:100px;top:63px;font-size:11.5px;width:142px">-</span>
 
         <span class="a vc js-pos" style="left:25px;top:91px">00:00</span>
         <span class="a prog vc" onclick="seekBarClick(event, this)" style="left:72px;top:91px;width:112px"><i class="js-prog"></i></span>
         <span class="a vc js-rem" style="left:192px;top:91px">-00:00</span>
 
-        <svg class="a bub c" onclick="toggleLyrics(event, false)" style="left:53px;top:118px" viewBox="0 0 18 16" title="Tutup Lirik">
+        <svg class="a bub c" onclick="toggleLyrics(event, false)" style="left:53px;top:118px" viewBox="0 0 18 16">
           <path d="M4 .8h10a3.2 3.2 0 0 1 3.2 3.2v4.6a3.2 3.2 0 0 1-3.2 3.2H8.4L4.6 15l.5-3.2H4A3.2 3.2 0 0 1 .8 8.6V4A3.2 3.2 0 0 1 4 .8z" fill="#fff"/>
           <circle cx="6.3" cy="5.4" r="1.3" fill="#000"/><circle cx="11.3" cy="5.4" r="1.3" fill="#000"/>
         </svg>
@@ -587,7 +743,7 @@
       <!-- HALAMAN 4: FILE SHELF -->
       <div class="ly l-shelf" id="shelfArea">
         <span class="a ttl vc">File <span style="color:var(--c1)">Shelf</span></span>
-        <span class="a sh-clear vc" id="shelfClearBtn" onclick="clearShelf()" title="Kosongkan Shelf">
+        <span class="a sh-clear vc" id="shelfClearBtn" onclick="clearShelf()">
           <svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>
           Clear
         </span>
@@ -628,6 +784,7 @@
     const { invoke } = window.__TAURI__.core;
     const { listen } = window.__TAURI__.event;
     const mn = document.getElementById("mn");
+    const esc = (s) => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
     const PAGES = ["music", "pomo", "water", "shelf", "todo"];
     const THEMES = {
@@ -639,6 +796,7 @@
     };
     const NOTE_SVG = `<svg class="music-note-svg" viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>`;
 
+    let bootPhase = "boot"; // "boot" -> "intro" -> "done"
     let pageIdx = 0;
     let isLyricsOpen = false;
     let interactionMode = "hover";
@@ -656,6 +814,79 @@
     let isObstructed = false;
     let hasMedia = false;
     let peekTimer = null;
+
+    let dynLyricsW = 520;
+    let dynIdleLyricsW = 340;
+
+    const measureCanvas = document.createElement("canvas");
+    const measureCtx = measureCanvas.getContext("2d");
+    function measureTextPx(text, fontSpec) {
+      if (!text) return 0;
+      measureCtx.font = fontSpec;
+      return measureCtx.measureText(text).width;
+    }
+
+    function applyMarqueeToElements(selector, text) {
+      const clean = String(text || "");
+      document.querySelectorAll(selector).forEach(el => {
+        if (el.dataset.rawText === clean) return;
+        el.dataset.rawText = clean;
+        const maxW = parseFloat(el.dataset.maxw || "260");
+        const fontSpec = el.dataset.font || "600 14px Segoe UI";
+        const textW = measureTextPx(clean, fontSpec);
+
+        if (textW > maxW) {
+          const dur = Math.max(6, (textW + 36) / 28).toFixed(1) + "s";
+          el.classList.add("is-marquee");
+          el.innerHTML = `<span class="mq-track" style="--mq-dur:${dur}"><span>${esc(clean)}</span><span class="mq-gap">•</span><span>${esc(clean)}</span><span class="mq-gap">•</span></span>`;
+        } else {
+          el.classList.remove("is-marquee");
+          el.textContent = clean;
+        }
+      });
+    }
+
+    // Set teks lirik biasa (tanpa marquee, untuk baris lirik dinamis)
+    function setIdleLyricPlain(text) {
+      const el = document.getElementById("idleLyrText");
+      if (!el) return;
+      delete el.dataset.rawText;
+      el.classList.remove("is-marquee");
+      el.textContent = text;
+    }
+
+    // Fallback saat lirik tidak ditemukan: kunci ukuran notch di default standar & jalankan marquee judul
+    function setIdleLyricFallbackTitle(title) {
+      updateDynamicLyricsWidth("");
+      const el = document.getElementById("idleLyrText");
+      if (el) delete el.dataset.rawText;
+      applyMarqueeToElements("#idleLyrText", title);
+    }
+
+    function updateDynamicLyricsWidth(activeText) {
+      const clean = String(activeText || "").trim();
+      if (!clean || clean === "♪" || clean === "Instrumental...") {
+        dynLyricsW = 520;
+        dynIdleLyricsW = 340;
+      } else {
+        // 1. Expanded Lyrics Mode: non-lyric area = 282px (264px kiri + 18px kanan) + 34px buffer
+        const expLinePx = measureTextPx(clean, '700 14.5px "Segoe UI Variable Text", "Segoe UI", sans-serif');
+        const neededExpTotalW = Math.ceil(282 + expLinePx + 34);
+        dynLyricsW = Math.max(520, Math.min(1040, neededExpTotalW));
+
+        // 2. Compact Idle Lyrics Mode: non-lyric area = 203px (135px judul + padding + separator + icon) + 28px buffer
+        const idleLinePx = measureTextPx(clean, '700 12px "Segoe UI Variable Text", "Segoe UI", sans-serif');
+        const neededIdleTotalW = Math.ceil(203 + idleLinePx + 28);
+        dynIdleLyricsW = Math.max(340, Math.min(980, neededIdleTotalW));
+      }
+
+      document.documentElement.style.setProperty("--dyn-lyr-w", dynLyricsW + "px");
+      document.documentElement.style.setProperty("--dyn-idle-lyr-w", dynIdleLyricsW + "px");
+
+      if (mn.dataset.s === "lyrics" || mn.dataset.s === "idle-lyrics") {
+        applyNotchState(mn.dataset.s);
+      }
+    }
 
     function getTodayDateStr() {
       const d = new Date();
@@ -707,7 +938,7 @@
     }
 
     function showCustomPeek(svgHtml, titleTxt, subTxt, rightTxt, rightColor, barPct = null) {
-      if (isNotchExpanded()) return;
+      if (isNotchExpanded() || bootPhase !== "done") return;
       document.getElementById("peekIcon").innerHTML = svgHtml;
       document.getElementById("peekTitle").textContent = titleTxt;
       document.getElementById("peekSub").textContent = subTxt;
@@ -775,17 +1006,28 @@
       mn.classList.toggle("click-ready", interactionMode === "click" && isHovered && !isExpandedByClick);
 
       let w = 155, h = 30;
-      if (stateName === "minimal") { w = 130; h = 6; }
-      else if (stateName === "idle-lyrics") { w = 340; h = 32; }
+      if (stateName === "boot") { w = 44; h = 4; }
+      else if (stateName === "intro") { w = 284; h = 64; }
+      else if (stateName === "minimal") { w = 130; h = 6; }
+      else if (stateName === "idle-lyrics") { w = dynIdleLyricsW; h = 32; }
       else if (stateName === "peek") { w = 320; h = 62; }
-      else if (stateName === "lyrics") { w = 520; h = 140; }
+      else if (stateName === "lyrics") { w = dynLyricsW; h = 140; }
       else if (!["pet", "idle"].includes(stateName)) { w = 420; h = 140; }
 
-      const restingW = (isLyricsOpen && hasMedia) ? 340 : (restingMode === "minimal" ? 130 : 155);
+      const restingW = (isLyricsOpen && hasMedia) ? dynIdleLyricsW : (restingMode === "minimal" ? 130 : 155);
       invoke("update_notch_hitbox", { width: w, height: h, restingWidth: restingW });
     }
 
     function renderActivePage() {
+      if (bootPhase === "boot") {
+        applyNotchState("boot");
+        return;
+      }
+      if (bootPhase === "intro") {
+        applyNotchState("intro");
+        return;
+      }
+
       const expanded = isNotchExpanded();
       if (peekTimer && !expanded) return;
 
@@ -829,10 +1071,22 @@
       if (ev) ev.stopPropagation();
       isLyricsOpen = open;
       renderActivePage();
-      if (open) syncLyricScroll();
+      if (open) {
+        lastActiveLyrIdx = -1;
+        syncLyricScroll();
+      }
     }
 
-    // Penanganan Scroll Cerdas: Cegah slide halaman saat menggulir To-Do List, File Shelf, atau Volume
+    let volActiveTimer = null;
+    function pulseVolumeDrawer() {
+      const wrap = document.getElementById("volWrap");
+      if (!wrap) return;
+      wrap.classList.add("active");
+      if (volActiveTimer) clearTimeout(volActiveTimer);
+      volActiveTimer = setTimeout(() => wrap.classList.remove("active"), 1300);
+    }
+
+    // Penanganan Scroll Cerdas
     window.addEventListener("wheel", (e) => {
       if (!isNotchExpanded() || document.activeElement.tagName === "INPUT") return;
 
@@ -860,8 +1114,10 @@
       if (inVol) {
         e.stopPropagation();
         e.preventDefault();
+        pulseVolumeDrawer();
         const step = e.deltaY < 0 ? 4 : -4;
-        const nextVol = Math.max(0, Math.min(100, sysVol + step));
+        const baseVol = sysMuted ? 0 : sysVol;
+        const nextVol = Math.max(0, Math.min(100, baseVol + step));
         onVolumeSlide(nextVol);
         return;
       }
@@ -949,26 +1205,33 @@
 
     // ================= MASTER VOLUME CONTROL =================
     let sysVol = 50;
+    let lastNonZeroVol = 50;
     let sysMuted = false;
     let volInvokeBusy = false;
     let pendingVolValue = null;
 
     function renderVolumeUI(vol, muted) {
       sysVol = vol;
-      sysMuted = muted;
-      const effectiveVol = muted ? 0 : vol;
+      if (vol > 0) lastNonZeroVol = vol;
+      sysMuted = muted || vol === 0;
+      const effectiveVol = sysMuted ? 0 : vol;
+      const wrap = document.getElementById("volWrap");
       const slider = document.getElementById("volSlider");
       const icon = document.getElementById("volIcon");
       const pctTxt = document.getElementById("volPctTxt");
+
+      if (wrap) {
+        wrap.classList.toggle("muted", sysMuted);
+        wrap.style.setProperty("--vol-pct", effectiveVol + "%");
+      }
       if (slider) {
         slider.value = effectiveVol;
-        slider.style.setProperty("--vol-pct", effectiveVol + "%");
       }
       if (pctTxt) {
-        pctTxt.textContent = muted ? "MUTE" : (vol + "%");
+        pctTxt.textContent = sysMuted ? "MUTE" : (vol + "%");
       }
       if (icon) {
-        if (muted || vol === 0) {
+        if (sysMuted) {
           icon.innerHTML = `<path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M22 9l-6 6M16 9l6 6"/>`;
         } else if (vol < 50) {
           icon.innerHTML = `<path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>`;
@@ -992,7 +1255,9 @@
     }
 
     async function onVolumeSlide(val) {
-      const v = Math.max(0, Math.min(100, parseInt(val, 10) || 0));
+      const parsed = parseInt(val, 10);
+      const v = Number.isNaN(parsed) ? 0 : Math.max(0, Math.min(100, parsed));
+      pulseVolumeDrawer();
       renderVolumeUI(v, v === 0);
       pendingVolValue = v;
       if (volInvokeBusy) return;
@@ -1001,16 +1266,23 @@
         const target = pendingVolValue;
         pendingVolValue = null;
         try {
-          await invoke("set_system_volume", { volume: target, mute: null });
+          await invoke("set_system_volume", { volume: target, mute: target === 0 });
         } catch {}
       }
       volInvokeBusy = false;
     }
 
     async function toggleMuteVolume() {
+      pulseVolumeDrawer();
       try {
-        const res = await invoke("set_system_volume", { volume: null, mute: !sysMuted });
-        renderVolumeUI(res.volume, res.muted);
+        if (sysMuted) {
+          const restoreVol = sysVol > 0 ? sysVol : (lastNonZeroVol || 35);
+          const res = await invoke("set_system_volume", { volume: restoreVol, mute: false });
+          renderVolumeUI(res.volume, res.muted);
+        } else {
+          const res = await invoke("set_system_volume", { volume: null, mute: true });
+          renderVolumeUI(res.volume, res.muted);
+        }
       } catch {}
     }
 
@@ -1067,11 +1339,11 @@
 
     async function fetchLyricsLRCLIB(title, artist) {
       const lyrList = document.getElementById("lyrList");
-      const idleLyrText = document.getElementById("idleLyrText");
       lyrList.innerHTML = `<li class="on">${NOTE_SVG}</li><li>Mencari lirik...</li>`;
-      idleLyrText.textContent = "Mencari lirik...";
+      setIdleLyricPlain("Mencari lirik...");
       parsedLyrics = [];
       lastActiveLyrIdx = -1;
+      updateDynamicLyricsWidth("");
 
       const cleanTitle = title.replace(/\(.*?\)|\[.*?\]/g, "").trim();
       const cleanArtist = artist.replace(/- Topic/i, "").trim();
@@ -1084,7 +1356,7 @@
 
         if (!best || !best.syncedLyrics) {
           lyrList.innerHTML = `<li class="on">${NOTE_SVG}</li><li>Lirik belum tersedia</li>`;
-          idleLyrText.textContent = title;
+          setIdleLyricFallbackTitle(title);
           return;
         }
 
@@ -1102,12 +1374,12 @@
         });
 
         lyrList.innerHTML = parsedLyrics.map((l, i) =>
-          `<li onclick="seekToSec(${l.time})" data-idx="${i}">${l.isNote ? NOTE_SVG : l.text}</li>`
+          `<li onclick="seekToSec(${l.time})" data-idx="${i}">${l.isNote ? NOTE_SVG : esc(l.text)}</li>`
         ).join("");
         syncLyricScroll();
       } catch {
         lyrList.innerHTML = `<li class="on">${NOTE_SVG}</li><li>Gagal memuat lirik</li>`;
-        idleLyrText.textContent = title;
+        setIdleLyricFallbackTitle(title);
       }
     }
 
@@ -1120,17 +1392,23 @@
       if (activeIdx === lastActiveLyrIdx) return;
       lastActiveLyrIdx = activeIdx;
 
+      const activeLine = parsedLyrics[activeIdx];
+      const lineStr = activeLine.isNote ? "Instrumental..." : activeLine.text;
+
+      updateDynamicLyricsWidth(activeLine.isNote ? "" : activeLine.text);
+
       const lyrList = document.getElementById("lyrList");
       const items = lyrList.querySelectorAll("li");
       items.forEach((li, i) => li.classList.toggle("on", i === activeIdx));
-      const activeEl = items[activeIdx];
-      if (activeEl) {
-        lyrList.style.transform = `translateY(${52 - activeEl.offsetTop - activeEl.offsetHeight / 2}px)`;
-      }
 
-      const idleLyrText = document.getElementById("idleLyrText");
-      const activeLine = parsedLyrics[activeIdx];
-      idleLyrText.textContent = activeLine.isNote ? "Instrumental..." : activeLine.text;
+      requestAnimationFrame(() => {
+        const activeEl = items[activeIdx];
+        if (activeEl) {
+          lyrList.style.transform = `translateY(${52 - activeEl.offsetTop - activeEl.offsetHeight / 2}px)`;
+        }
+      });
+
+      setIdleLyricPlain(lineStr);
     }
 
     function updateMediaUI() {
@@ -1164,8 +1442,8 @@
 
       if (!m.has_media) return;
 
-      document.querySelectorAll(".js-title").forEach(e => e.textContent = m.title);
-      document.querySelectorAll(".js-artist").forEach(e => e.textContent = m.artist);
+      applyMarqueeToElements(".js-title", m.title);
+      applyMarqueeToElements(".js-artist", m.artist);
       if (m.duration_sec > 1) curDur = m.duration_sec;
 
       const key = `${m.title}::${m.artist}`;
@@ -1337,14 +1615,13 @@
         <div class="sh-card"
              onmousedown="onCardMouseDown(event, ${i})"
              onmouseup="onCardMouseUp(event, ${i})"
-             oncontextmenu="revealShelfItem(event, ${i})"
-             title="Tahan & Geser: Drag keluar ke WhatsApp/Discord/Explorer\nKlik: Buka File\nKlik Kanan: Buka di Folder\n${f.path}">
+             oncontextmenu="revealShelfItem(event, ${i})">
           <span class="sh-del" onmousedown="event.stopPropagation()" onclick="removeShelfItem(event, ${i})">
             <svg viewBox="0 0 10 10"><path d="M2 2l6 6M8 2L2 8"/></svg>
           </span>
           <svg class="f-ico" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
-          <span class="sh-name">${f.name}</span>
-          <span class="sh-ext">${f.ext || 'FILE'}</span>
+          <span class="sh-name">${esc(f.name)}</span>
+          <span class="sh-ext">${esc(f.ext || 'FILE')}</span>
         </div>
       `).join("");
     }
@@ -1432,7 +1709,7 @@
       }
     });
 
-    // ================= 5. TO-DO LIST (Horizontal Flow & Vertical List) =================
+    // ================= 5. TO-DO LIST =================
     let todos = [];
     const addTodoBtn = document.getElementById("addTodoBtn");
     const todoInput = document.getElementById("todoInlineInput");
@@ -1448,10 +1725,10 @@
         return;
       }
       listEl.innerHTML = todos.map((t, i) => `
-        <div class="trow ${t.done ? 'done' : ''}" onclick="toggleTodo(${i}, event)" title="${t.text}">
+        <div class="trow ${t.done ? 'done' : ''}" onclick="toggleTodo(${i}, event)">
           <div class="trow-left">
             <span class="chk"><svg viewBox="0 0 10 10"><path d="M2 5l2.2 2.2L8 2.5"/></svg></span>
-            <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${t.text}</span>
+            <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(t.text)}</span>
           </div>
           <span class="tdel" onclick="deleteTodo(event, ${i})">
             <svg viewBox="0 0 10 10"><path d="M2 2l6 6M8 2L2 8"/></svg>
@@ -1535,7 +1812,39 @@
     renderMascot();
     syncVolumeFromSystem();
     listen("config-updated", (ev) => applyConfigData(ev.payload));
-    invoke("get_config").then(applyConfigData);
+
+    function startOpeningAnimation() {
+      if (bootPhase !== "boot") return;
+      bootPhase = "intro";
+      renderActivePage();
+
+      requestAnimationFrame(() => {
+        const fill = document.getElementById("introBarFill");
+        if (fill) fill.style.width = "100%";
+      });
+
+      setTimeout(() => {
+        bootPhase = "done";
+        renderActivePage();
+      }, 950);
+    }
+
+    listen("notch-revealed", () => {
+      startOpeningAnimation();
+    });
+
+    invoke("get_config").then(applyConfigData).then(() => {
+      let sent = false;
+      const ready = () => {
+        if (!sent) {
+          sent = true;
+          invoke("notch_ready");
+          setTimeout(startOpeningAnimation, 700);
+        }
+      };
+      requestAnimationFrame(() => requestAnimationFrame(ready));
+      setTimeout(ready, 300);
+    });
 
     const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
     const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
