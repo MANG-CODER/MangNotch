@@ -732,6 +732,7 @@
   .tdel:hover { opacity: 1; }
   .tdel svg { width: 10px; height: 10px; stroke: #ff7b7b; stroke-width: 2.2; }
   .todo-input-box {
+    user-select: text; -webkit-user-select: text;
     left: 42px; top: 92px; width: 130px; height: 27px; border-radius: 14px;
     background: rgba(255,255,255,.14); border: 1px solid var(--c1);
     color: #fff; padding: 0 10px; font-size: 11px; outline: none; display: none; z-index: 25;
@@ -1271,6 +1272,7 @@
 
       const expanded = isNotchExpanded();
       if (peekTimer && !expanded) return;
+      if (todoInputOpen && (!expanded || PAGES[pageIdx] !== "todo")) hideTodoInput();
 
       if (!expanded) {
         if (isObstructed && !(interactionMode === "click" && isHovered)) {
@@ -1989,7 +1991,7 @@
     function updateShelfCount() {
       if (!shelfAllBtn) return;
       const sel = filesOnShelf.filter(f => f.selected !== false).length;
-      shelfAllBtn.textContent = `All ${sel}/${filesOnShelf.length}`;
+      shelfAllBtn.textContent = "All";
       shelfAllBtn.classList.toggle("on", filesOnShelf.length > 0 && sel === filesOnShelf.length);
     }
 
@@ -2207,15 +2209,25 @@
       renderTodos();
       syncAllWidgetData();
     }
-    function showTodoInput() {
+    let todoInputOpen = false;
+    let todoInputShownAt = 0;
+    async function showTodoInput() {
       addTodoBtn.style.display = "none";
       todoInput.style.display = "block";
       todoInput.value = "";
-      todoInput.focus();
+      todoInputOpen = true;
+      todoInputShownAt = performance.now();
+      // Notch normalnya non-activatable (tidak bisa terima keyboard). Aktifkan dulu, baru fokus ke input.
+      try { await invoke("set_notch_text_input", { active: true }); } catch {}
+      setTimeout(() => { if (todoInputOpen) todoInput.focus(); }, 50);
+      setTimeout(() => { if (todoInputOpen && document.activeElement !== todoInput) todoInput.focus(); }, 250);
     }
     function hideTodoInput() {
+      if (!todoInputOpen) return;
+      todoInputOpen = false;
       todoInput.style.display = "none";
       addTodoBtn.style.display = "flex";
+      invoke("set_notch_text_input", { active: false }).catch(() => {});
     }
     todoInput.addEventListener("keydown", (e) => {
       if (e.key === "Enter" && todoInput.value.trim()) {
@@ -2227,7 +2239,11 @@
         hideTodoInput();
       }
     });
-    todoInput.addEventListener("blur", hideTodoInput);
+    todoInput.addEventListener("blur", () => {
+      // abaikan blur sesaat setelah dibuka (window masih proses activate)
+      if (performance.now() - todoInputShownAt < 400) return;
+      hideTodoInput();
+    });
 
     function applyConfigData(cfg) {
       const prevStyle = mascotStyle;

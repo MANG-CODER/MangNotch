@@ -80,6 +80,9 @@ const NOTCH_REVEAL_DELAY_MS: u64 = 250;
 static NOTCH_READY_CALLED: AtomicBool = AtomicBool::new(false);
 static NOTCH_POSITIONED: AtomicBool = AtomicBool::new(false);
 static ORIG_NOTCH_WNDPROC: AtomicIsize = AtomicIsize::new(0);
+// true selama user mengetik di notch (Add Task) -> window boleh di-activate & menerima keyboard
+static NOTCH_TEXT_INPUT: AtomicBool = AtomicBool::new(false);
+static NOTCH_PREV_FG: AtomicIsize = AtomicIsize::new(0);
 
 #[cfg(windows)]
 #[repr(C)]
@@ -279,7 +282,11 @@ unsafe extern "system" fn notch_wnd_proc(
         // Cegah DefWindowProcW menggambar title bar putih saat pindah fokus / klik tray
         WM_NCACTIVATE => return 1,
         // Klik di dalam notch tidak boleh mencuri fokus dari aplikasi lain
-        WM_MOUSEACTIVATE => return MA_NOACTIVATE,
+        WM_MOUSEACTIVATE => {
+            if !NOTCH_TEXT_INPUT.load(Ordering::SeqCst) {
+                return MA_NOACTIVATE;
+            }
+        }
         // Cegah tao/Windows mengembalikan WS_CAPTION / WS_THICKFRAME secara diam-diam
         WM_STYLECHANGING => {
             if lparam != 0 {
@@ -288,7 +295,12 @@ unsafe extern "system" fn notch_wnd_proc(
                     ss.style_new &=
                         !(0x00C00000 | 0x00040000 | 0x00800000 | 0x00400000 | 0x00080000);
                 } else if wparam as i32 == -20 {
-                    ss.style_new |= 0x08000000 | 0x00000080;
+                    ss.style_new |= 0x00000080;
+                    if NOTCH_TEXT_INPUT.load(Ordering::SeqCst) {
+                        ss.style_new &= !0x08000000;
+                    } else {
+                        ss.style_new |= 0x08000000;
+                    }
                 }
             }
             return 0;
@@ -393,10 +405,14 @@ fn strip_window_borders(hwnd: HWND) {
 fn set_hwnd_click_through(hwnd: HWND, ignore: bool) {
     unsafe {
         let ex_style = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
-        let base_ex = ex_style
-            | (WS_EX_LAYERED.0 as isize)
-            | (WS_EX_NOACTIVATE.0 as isize)
-            | (WS_EX_TOOLWINDOW.0 as isize);
+        let typing = NOTCH_TEXT_INPUT.load(Ordering::SeqCst);
+        let mut base_ex = ex_style | (WS_EX_LAYERED.0 as isize) | (WS_EX_TOOLWINDOW.0 as isize);
+        if typing {
+            base_ex &= !(WS_EX_NOACTIVATE.0 as isize);
+        } else {
+            base_ex |= WS_EX_NOACTIVATE.0 as isize;
+        }
+        let ignore = ignore && !typing;
         let new_ex = if ignore {
             base_ex | (WS_EX_TRANSPARENT.0 as isize)
         } else {
@@ -1717,6 +1733,51 @@ fn update_notch_hitbox(
 }
 
 #[tauri::command]
+fn set_notch_text_input(app: AppHandle, active: bool) {
+    #[cfg(windows)]
+    {
+        let was = NOTCH_TEXT_INPUT.swap(active, Ordering::SeqCst);
+        if was == active {
+            return;
+        }
+        let app2 = app.clone();
+        let _ = app.run_on_main_thread(move || {
+            if let Some(w) = app2.get_webview_window("notch") {
+                if let Some(hwnd) = get_hwnd(&w) {
+                    unsafe {
+                        let ex = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
+                        if active {
+                            let prev = GetForegroundWindow();
+                            if prev.0 as isize != hwnd.0 as isize {
+                                NOTCH_PREV_FG.store(prev.0 as isize, Ordering::SeqCst);
+                            }
+                            SetWindowLongPtrW(
+                                hwnd,
+                                GWL_EXSTYLE,
+                                ex & !(WS_EX_NOACTIVATE.0 as isize) & !(WS_EX_TRANSPARENT.0 as isize),
+                            );
+                            let _ = AllowSetForegroundWindow(ASFW_ANY);
+                            let _ = SetForegroundWindow(hwnd);
+                            let _ = w.set_focus();
+                        } else {
+                            SetWindowLongPtrW(hwnd, GWL_EXSTYLE, ex | (WS_EX_NOACTIVATE.0 as isize));
+                            let prev = NOTCH_PREV_FG.swap(0, Ordering::SeqCst);
+                            if prev != 0 && GetForegroundWindow().0 as isize == hwnd.0 as isize {
+                                let _ = SetForegroundWindow(HWND(prev as *mut _));
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = (app, active);
+    }
+}
+
+#[tauri::command]
 fn notch_ready(app: AppHandle, state: State<'_, SharedState>) {
     if NOTCH_READY_CALLED.swap(true, Ordering::SeqCst) {
         return;
@@ -2384,7 +2445,10 @@ pub fn run() {
                                     set_hwnd_click_through(hwnd, false);
                                     let _ = app_handle.emit("notch-hover", true);
                                 }
-                            } else if is_hovered && !hotkey_pinned_open {
+                            } else if is_hovered
+                                && !hotkey_pinned_open
+                                && !NOTCH_TEXT_INPUT.load(Ordering::SeqCst)
+                            {
                                 outside_ticks += 1;
                                 let required_ticks = if is_expanded { 7 } else { 3 };
                                 if outside_ticks >= required_ticks {
@@ -2447,6 +2511,7 @@ pub fn run() {
             reveal_shelf_file,
             start_file_drag,
             update_notch_hitbox,
+            set_notch_text_input,
             notch_ready,
             media_action,
             media_seek
