@@ -1,3 +1,9 @@
-4f12b82cf387cb2843c79feb5f41ecd2fd9d8d04d99e09141302effad171486d  MangNotch_1.1.2_x64-setup.exe
-d96c4ab9c58c4c246fdaa68466716523f7e36da8720d7291a4fca716b60c6205  MangNotch_1.1.2_x64_en-US.msi
-eb45a7eb9a0d6f418a37dab8bb4f22994d4bebf724941f40e5d4ef1b1f32b102  MangNotch_1.1.2_x64.msix
+
+Algorithm Hash                                                             Path                                                                               
+--------- ----                                                             ----                                                                               
+SHA256    592B7E2FF754E143EB1DE52AD766745647E429DCC86F9396588D96A131B05FD1 D:\Project\mangnotch\MangNotch_1.2.0_x64.msix                                      
+SHA256    6245D2CC40FA15E1F615B6718D09BBC003D999F76FB489728C08901281109AC6 D:\Project\mangnotch\src-tauri\target\release\bundle\nsis\MangNotch_1.2.0_x64-se...
+SHA256    3127CCF475E19BF0723AE6208B508DF10A00AB9FD077359B4171D25304087408 D:\Project\mangnotch\src-tauri\target\release\bundle\msi\MangNotch_1.2.0_x64_en-...
+
+
+

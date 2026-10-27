@@ -11,12 +11,12 @@ use std::time::Duration;
 use tauri::{
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
-    AppHandle, Emitter, Manager, State, WebviewWindow, WindowEvent,
+    AppHandle, DragDropEvent, Emitter, Manager, State, WebviewWindow, WindowEvent,
 };
 
 #[cfg(windows)]
 use windows::{
-    core::PCWSTR,
+    core::{Interface, PCWSTR},
     Media::Control::{
         GlobalSystemMediaTransportControlsSessionManager,
         GlobalSystemMediaTransportControlsSessionPlaybackStatus,
@@ -32,12 +32,13 @@ use windows::{
             MONITORINFOEXW, MONITOR_DEFAULTTONEAREST,
         },
         Media::Audio::{
-            eConsole, eRender, Endpoints::IAudioEndpointVolume, IMMDeviceEnumerator,
-            MMDeviceEnumerator,
+            eCapture, eConsole, eRender,
+            Endpoints::{IAudioEndpointVolume, IAudioMeterInformation},
+            IMMDeviceEnumerator, MMDeviceEnumerator,
         },
         System::{
             Com::{
-                CoCreateInstance, CoInitializeEx, IBindCtx, IDataObject, CLSCTX_ALL,
+                CoCreateInstance, CoInitializeEx, CoTaskMemFree, IBindCtx, IDataObject, CLSCTX_ALL,
                 COINIT_MULTITHREADED,
             },
             Ole::{IDropSource, OleInitialize, DROPEFFECT_COPY, DROPEFFECT_LINK},
@@ -45,10 +46,11 @@ use windows::{
             Threading::CreateMutexW,
         },
         UI::{
-            Input::KeyboardAndMouse::{GetKeyState, ReleaseCapture},
+            Input::KeyboardAndMouse::{GetAsyncKeyState, GetKeyState, ReleaseCapture},
             Shell::{
-                BHID_DataObject, IShellItem, SHCreateItemFromParsingName, SHDoDragDrop,
-                ShellExecuteW,
+                BHID_DataObject, FileOpenDialog, IFileOpenDialog, IShellItemArray, SHDoDragDrop,
+                ShellExecuteW, FOS_ALLOWMULTISELECT, FOS_FILEMUSTEXIST, FOS_FORCEFILESYSTEM,
+                SIGDN_FILESYSPATH,
             },
             WindowsAndMessaging::{
                 GetClassNameW, GetCursorPos, GetForegroundWindow, GetWindowLongPtrW, GetWindowRect,
@@ -212,6 +214,36 @@ extern "system" {
         dw_attribute: u32,
         pv_attribute: *const std::ffi::c_void,
         cb_attribute: u32,
+    ) -> i32;
+}
+
+#[cfg(windows)]
+#[link(name = "user32")]
+extern "system" {
+    fn OpenClipboard(h_wnd_new_owner: isize) -> i32;
+    fn CloseClipboard() -> i32;
+    fn IsClipboardFormatAvailable(format: u32) -> i32;
+    fn GetClipboardData(u_format: u32) -> isize;
+}
+
+#[cfg(windows)]
+#[link(name = "kernel32")]
+extern "system" {
+    fn GlobalLock(h_mem: isize) -> *const u8;
+    fn GlobalUnlock(h_mem: isize) -> i32;
+    fn GlobalSize(h_mem: isize) -> usize;
+}
+
+#[cfg(windows)]
+#[link(name = "shell32")]
+extern "system" {
+    fn DragQueryFileW(hdrop: isize, i_file: u32, lpsz_file: *mut u16, cch: u32) -> u32;
+    fn ILCreateFromPathW(psz_path: *const u16) -> *mut std::ffi::c_void;
+    fn ILFree(pidl: *mut std::ffi::c_void);
+    fn SHCreateShellItemArrayFromIDLists(
+        cidl: u32,
+        rgpidl: *const *const std::ffi::c_void,
+        ppsia: *mut *mut std::ffi::c_void,
     ) -> i32;
 }
 
@@ -543,11 +575,14 @@ pub struct TodoItem {
     pub done: bool,
 }
 
-#[derive(Clone, Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug, Default)]
+#[serde(default)]
 pub struct ShelfItem {
     pub name: String,
     pub path: String,
     pub ext: String,
+    pub size_str: String,
+    pub thumb_b64: String,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
@@ -787,7 +822,6 @@ fn write_master_volume(volume: Option<u32>, mute: Option<bool>) -> VolumePayload
                         let clamped = v.min(100);
                         let scalar = (clamped as f32) / 100.0;
                         let _ = endpoint.SetMasterVolumeLevelScalar(scalar, std::ptr::null());
-                        // Jika digeser sampai 0, wajib panggil SetMute(1) agar benar-benar mati di semua audio driver
                         if clamped == 0 {
                             let _ = endpoint.SetMute(BOOL(1), std::ptr::null());
                         } else {
@@ -802,6 +836,249 @@ fn write_master_volume(volume: Option<u32>, mute: Option<bool>) -> VolumePayload
         }
     }
     read_master_volume()
+}
+
+#[cfg(windows)]
+fn read_audio_peak() -> f32 {
+    unsafe {
+        let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
+        if let Ok(enumerator) =
+            CoCreateInstance::<_, IMMDeviceEnumerator>(&MMDeviceEnumerator, None, CLSCTX_ALL)
+        {
+            if let Ok(device) = enumerator.GetDefaultAudioEndpoint(eRender, eConsole) {
+                if let Ok(meter) = device.Activate::<IAudioMeterInformation>(CLSCTX_ALL, None) {
+                    if let Ok(peak) = meter.GetPeakValue() {
+                        return peak.clamp(0.0, 1.0);
+                    }
+                }
+            }
+        }
+    }
+    0.0
+}
+
+#[cfg(windows)]
+fn read_mic_muted() -> Option<bool> {
+    unsafe {
+        let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
+        if let Ok(enumerator) =
+            CoCreateInstance::<_, IMMDeviceEnumerator>(&MMDeviceEnumerator, None, CLSCTX_ALL)
+        {
+            if let Ok(device) = enumerator.GetDefaultAudioEndpoint(eCapture, eConsole) {
+                if let Ok(endpoint) = device.Activate::<IAudioEndpointVolume>(CLSCTX_ALL, None) {
+                    if let Ok(muted) = endpoint.GetMute() {
+                        return Some(muted.as_bool());
+                    }
+                }
+            }
+        }
+    }
+    None
+}
+
+#[cfg(windows)]
+fn toggle_mic_muted_state() -> Option<bool> {
+    unsafe {
+        let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
+        if let Ok(enumerator) =
+            CoCreateInstance::<_, IMMDeviceEnumerator>(&MMDeviceEnumerator, None, CLSCTX_ALL)
+        {
+            if let Ok(device) = enumerator.GetDefaultAudioEndpoint(eCapture, eConsole) {
+                if let Ok(endpoint) = device.Activate::<IAudioEndpointVolume>(CLSCTX_ALL, None) {
+                    let cur = endpoint.GetMute().map(|b| b.as_bool()).unwrap_or(false);
+                    let next = !cur;
+                    let _ = endpoint.SetMute(BOOL(if next { 1 } else { 0 }), std::ptr::null());
+                    return Some(next);
+                }
+            }
+        }
+    }
+    None
+}
+
+fn format_file_size(bytes: u64) -> String {
+    if bytes < 1024 {
+        format!("{} B", bytes)
+    } else if bytes < 1024 * 1024 {
+        format!("{:.1} KB", (bytes as f64) / 1024.0)
+    } else {
+        format!("{:.1} MB", (bytes as f64) / (1024.0 * 1024.0))
+    }
+}
+
+fn enrich_shelf_item(full_path: &str) -> Option<ShelfItem> {
+    let p = PathBuf::from(full_path);
+    if !p.exists() {
+        return None;
+    }
+    unblock_file_motw(full_path);
+    let name = p
+        .file_name()
+        .map(|s| s.to_string_lossy().to_string())
+        .unwrap_or_else(|| full_path.to_string());
+    let ext = p
+        .extension()
+        .map(|s| s.to_string_lossy().to_uppercase())
+        .unwrap_or_else(|| "FILE".to_string());
+    let meta = fs::metadata(&p).ok();
+    let file_len = meta.as_ref().map(|m| m.len()).unwrap_or(0);
+    let size_str = if meta.as_ref().map(|m| m.is_dir()).unwrap_or(false) {
+        "FOLDER".to_string()
+    } else {
+        format_file_size(file_len)
+    };
+
+    let mut thumb_b64 = String::new();
+    let ext_low = ext.to_lowercase();
+    if matches!(
+        ext_low.as_str(),
+        "png" | "jpg" | "jpeg" | "webp" | "gif" | "bmp" | "ico"
+    ) && file_len > 0
+        && file_len <= 4_500_000
+    {
+        if let Ok(bytes) = fs::read(&p) {
+            let mime = match ext_low.as_str() {
+                "jpg" | "jpeg" => "image/jpeg",
+                "webp" => "image/webp",
+                "gif" => "image/gif",
+                "bmp" => "image/bmp",
+                "ico" => "image/x-icon",
+                _ => "image/png",
+            };
+            thumb_b64 = format!("data:{};base64,{}", mime, BASE64.encode(&bytes));
+        }
+    }
+
+    Some(ShelfItem {
+        name,
+        path: full_path.to_string(),
+        ext: ext.chars().take(5).collect(),
+        size_str,
+        thumb_b64,
+    })
+}
+
+#[cfg(windows)]
+fn read_clipboard_to_shelf_paths() -> Vec<String> {
+    let mut paths = Vec::new();
+    unsafe {
+        if OpenClipboard(0) == 0 {
+            return paths;
+        }
+
+        // 1. Cek apakah ada file yang di-copy dari File Explorer (CF_HDROP = 15)
+        if IsClipboardFormatAvailable(15) != 0 {
+            let hdrop = GetClipboardData(15);
+            if hdrop != 0 {
+                let count = DragQueryFileW(hdrop, 0xFFFFFFFF, std::ptr::null_mut(), 0);
+                for i in 0..count {
+                    let len = DragQueryFileW(hdrop, i, std::ptr::null_mut(), 0);
+                    if len > 0 {
+                        let mut buf = vec![0u16; (len + 1) as usize];
+                        DragQueryFileW(hdrop, i, buf.as_mut_ptr(), len + 1);
+                        let path_str = String::from_utf16_lossy(&buf[..len as usize]);
+                        if !path_str.is_empty() {
+                            paths.push(path_str);
+                        }
+                    }
+                }
+            }
+        }
+        // 2. Cek apakah ada gambar/screenshot di Clipboard (CF_DIB = 8)
+        else if IsClipboardFormatAvailable(8) != 0 {
+            let hdib = GetClipboardData(8);
+            if hdib != 0 {
+                let ptr = GlobalLock(hdib);
+                let size = GlobalSize(hdib);
+                if !ptr.is_null() && size > 40 {
+                    let dib_slice = std::slice::from_raw_parts(ptr, size);
+                    let bi_size = u32::from_le_bytes([
+                        dib_slice[0],
+                        dib_slice[1],
+                        dib_slice[2],
+                        dib_slice[3],
+                    ]);
+                    let bi_bit_count = u16::from_le_bytes([dib_slice[14], dib_slice[15]]);
+                    let bi_compression = u32::from_le_bytes([
+                        dib_slice[16],
+                        dib_slice[17],
+                        dib_slice[18],
+                        dib_slice[19],
+                    ]);
+                    let bi_clr_used = u32::from_le_bytes([
+                        dib_slice[32],
+                        dib_slice[33],
+                        dib_slice[34],
+                        dib_slice[35],
+                    ]);
+                    let mask_bytes = if bi_compression == 3 && bi_size == 40 { 12 } else { 0 };
+                    let palette_size = if bi_clr_used > 0 {
+                        bi_clr_used * 4
+                    } else if bi_bit_count <= 8 {
+                        (1u32 << bi_bit_count) * 4
+                    } else {
+                        0
+                    };
+                    let bf_off_bits = 14 + bi_size + mask_bytes + palette_size;
+                    let file_size = (14 + size) as u32;
+
+                    let mut bmp_bytes = Vec::with_capacity(14 + size);
+                    bmp_bytes.extend_from_slice(b"BM");
+                    bmp_bytes.extend_from_slice(&file_size.to_le_bytes());
+                    bmp_bytes.extend_from_slice(&[0u8; 4]);
+                    bmp_bytes.extend_from_slice(&bf_off_bits.to_le_bytes());
+                    bmp_bytes.extend_from_slice(dib_slice);
+
+                    let _ = GlobalUnlock(hdib);
+
+                    let drops_dir = get_config_dir().join("ShelfDrops");
+                    let _ = fs::create_dir_all(&drops_dir);
+                    let ts = std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .map(|d| d.as_millis())
+                        .unwrap_or(0);
+                    let file_path = drops_dir.join(format!("screenshot_{}.bmp", ts));
+                    if fs::write(&file_path, bmp_bytes).is_ok() {
+                        paths.push(file_path.to_string_lossy().to_string());
+                    }
+                } else if !ptr.is_null() {
+                    let _ = GlobalUnlock(hdib);
+                }
+            }
+        }
+        // 3. Cek apakah ada teks di Clipboard (CF_UNICODETEXT = 13)
+        else if IsClipboardFormatAvailable(13) != 0 {
+            let htext = GetClipboardData(13);
+            if htext != 0 {
+                let ptr = GlobalLock(htext) as *const u16;
+                if !ptr.is_null() {
+                    let mut len = 0usize;
+                    while *ptr.add(len) != 0 && len < 100_000 {
+                        len += 1;
+                    }
+                    let slice = std::slice::from_raw_parts(ptr, len);
+                    let text_str = String::from_utf16_lossy(slice).trim().to_string();
+                    let _ = GlobalUnlock(htext);
+
+                    if !text_str.is_empty() {
+                        let drops_dir = get_config_dir().join("ShelfDrops");
+                        let _ = fs::create_dir_all(&drops_dir);
+                        let ts = std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .map(|d| d.as_millis())
+                            .unwrap_or(0);
+                        let file_path = drops_dir.join(format!("note_{}.txt", ts));
+                        if fs::write(&file_path, text_str.as_bytes()).is_ok() {
+                            paths.push(file_path.to_string_lossy().to_string());
+                        }
+                    }
+                }
+            }
+        }
+
+        let _ = CloseClipboard();
+    }
+    paths
 }
 
 #[cfg(windows)]
@@ -1232,6 +1509,106 @@ fn set_system_volume(volume: Option<u32>, mute: Option<bool>) -> VolumePayload {
 }
 
 #[tauri::command]
+fn prepare_shelf_files(paths: Vec<String>) -> Vec<ShelfItem> {
+    paths
+        .iter()
+        .filter_map(|p| enrich_shelf_item(p))
+        .collect()
+}
+
+#[tauri::command]
+fn pick_shelf_files() -> Vec<ShelfItem> {
+    let mut out = Vec::new();
+    #[cfg(windows)]
+    unsafe {
+        let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
+        if let Ok(dialog) = CoCreateInstance::<_, IFileOpenDialog>(&FileOpenDialog, None, CLSCTX_ALL)
+        {
+            if let Ok(opts) = dialog.GetOptions() {
+                let _ = dialog.SetOptions(
+                    opts | FOS_ALLOWMULTISELECT | FOS_FILEMUSTEXIST | FOS_FORCEFILESYSTEM,
+                );
+            }
+            if dialog.Show(HWND::default()).is_ok() {
+                if let Ok(results) = dialog.GetResults() {
+                    let count = results.GetCount().unwrap_or(0);
+                    for i in 0..count {
+                        if let Ok(item) = results.GetItemAt(i) {
+                            if let Ok(pwstr) = item.GetDisplayName(SIGDN_FILESYSPATH) {
+                                let path_str = pwstr.to_string().unwrap_or_default();
+                                CoTaskMemFree(Some(pwstr.0 as *const _));
+                                if let Some(enriched) = enrich_shelf_item(&path_str) {
+                                    out.push(enriched);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    out
+}
+
+#[tauri::command]
+fn save_clipboard_to_shelf(
+    image_b64: Option<String>,
+    text_content: Option<String>,
+) -> Option<ShelfItem> {
+    let drops_dir = get_config_dir().join("ShelfDrops");
+    let _ = fs::create_dir_all(&drops_dir);
+    let ts = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+
+    if let Some(b64_raw) = image_b64 {
+        let clean = b64_raw.split(',').nth(1).unwrap_or(&b64_raw);
+        if let Ok(bytes) = BASE64.decode(clean) {
+            let file_path = drops_dir.join(format!("clip_{}.png", ts));
+            if fs::write(&file_path, bytes).is_ok() {
+                return enrich_shelf_item(&file_path.to_string_lossy());
+            }
+        }
+    }
+
+    if let Some(txt) = text_content {
+        let trimmed = txt.trim();
+        if !trimmed.is_empty() {
+            let file_path = drops_dir.join(format!("note_{}.txt", ts));
+            if fs::write(&file_path, trimmed.as_bytes()).is_ok() {
+                return enrich_shelf_item(&file_path.to_string_lossy());
+            }
+        }
+    }
+    None
+}
+
+#[tauri::command]
+fn toggle_system_mic(app: AppHandle) -> bool {
+    #[cfg(windows)]
+    {
+        if let Some(muted) = toggle_mic_muted_state() {
+            let _ = app.emit("mic-sync", muted);
+            return muted;
+        }
+    }
+    false
+}
+
+#[tauri::command]
+fn get_system_mic() -> bool {
+    #[cfg(windows)]
+    {
+        read_mic_muted().unwrap_or(false)
+    }
+    #[cfg(not(windows))]
+    {
+        false
+    }
+}
+
+#[tauri::command]
 fn open_shelf_file(path: String) {
     unblock_file_motw(&path);
     std::env::set_var("SEE_MASK_NOZONECHECKS", "1");
@@ -1273,8 +1650,10 @@ fn reveal_shelf_file(path: String) {
 }
 
 #[tauri::command]
-fn start_file_drag(app: AppHandle, path: String) {
-    unblock_file_motw(&path);
+fn start_file_drag(app: AppHandle, paths: Vec<String>) {
+    for p in &paths {
+        unblock_file_motw(p);
+    }
     let app_clone = app.clone();
     let _ = app.run_on_main_thread(move || {
         #[cfg(windows)]
@@ -1287,20 +1666,37 @@ fn start_file_drag(app: AppHandle, path: String) {
                 .and_then(|w| get_hwnd(&w))
                 .unwrap_or_default();
 
-            let wide_path: Vec<u16> = path.encode_utf16().chain(std::iter::once(0)).collect();
-            if let Ok(shell_item) = SHCreateItemFromParsingName::<_, _, IShellItem>(
-                PCWSTR(wide_path.as_ptr()),
-                None::<&IBindCtx>,
-            ) {
-                if let Ok(data_obj) =
-                    shell_item.BindToHandler::<_, IDataObject>(None::<&IBindCtx>, &BHID_DataObject)
-                {
-                    let _ = SHDoDragDrop(
-                        hwnd,
-                        &data_obj,
-                        None::<&IDropSource>,
-                        DROPEFFECT_COPY | DROPEFFECT_LINK,
-                    );
+            let mut pidls: Vec<*const std::ffi::c_void> = Vec::new();
+            for p in &paths {
+                let wide_path: Vec<u16> = p.encode_utf16().chain(std::iter::once(0)).collect();
+                let pidl = ILCreateFromPathW(wide_path.as_ptr());
+                if !pidl.is_null() {
+                    pidls.push(pidl as *const _);
+                }
+            }
+
+            if !pidls.is_empty() {
+                let mut raw_array: *mut std::ffi::c_void = std::ptr::null_mut();
+                let hr = SHCreateShellItemArrayFromIDLists(
+                    pidls.len() as u32,
+                    pidls.as_ptr(),
+                    &mut raw_array,
+                );
+                if hr >= 0 && !raw_array.is_null() {
+                    let shell_array = IShellItemArray::from_raw(raw_array);
+                    if let Ok(data_obj) = shell_array
+                        .BindToHandler::<_, IDataObject>(None::<&IBindCtx>, &BHID_DataObject)
+                    {
+                        let _ = SHDoDragDrop(
+                            hwnd,
+                            &data_obj,
+                            None::<&IDropSource>,
+                            DROPEFFECT_COPY | DROPEFFECT_LINK,
+                        );
+                    }
+                }
+                for &pidl in &pidls {
+                    ILFree(pidl as *mut _);
                 }
             }
         }
@@ -1426,6 +1822,35 @@ pub fn run() {
                     api.prevent_close();
                     let _ = window.hide();
                 }
+            } else if window.label() == "notch" {
+                if let WindowEvent::DragDrop(drag_ev) = event {
+                    let app = window.app_handle();
+                    let state = app.state::<SharedState>();
+                    match drag_ev {
+                        DragDropEvent::Enter { paths, .. } => {
+                            if let Ok(mut c) = state.0.lock() {
+                                c.active_width = c.active_width.max(420);
+                                c.active_height = c.active_height.max(140);
+                            }
+                            let str_paths: Vec<String> = paths
+                                .iter()
+                                .map(|p| p.to_string_lossy().to_string())
+                                .collect();
+                            let _ = app.emit("shelf-drag-enter", str_paths);
+                        }
+                        DragDropEvent::Drop { paths, .. } => {
+                            let str_paths: Vec<String> = paths
+                                .iter()
+                                .map(|p| p.to_string_lossy().to_string())
+                                .collect();
+                            let _ = app.emit("shelf-drag-drop", str_paths);
+                        }
+                        DragDropEvent::Leave => {
+                            let _ = app.emit("shelf-drag-leave", ());
+                        }
+                        _ => {}
+                    }
+                }
             }
         })
         .setup(move |app| {
@@ -1482,7 +1907,6 @@ pub fn run() {
 
             // 2. Panggil show() sekali saat cloaked agar state internal Tauri tercatat visible
             let _ = notch_win.show();
-            let _ = notch_win.set_ignore_cursor_events(true);
 
             // 3. Kunci WndProc & click-through Win32, lalu uncloak agar WebView2 merender
             place_notch_boot_peeking(notch_hwnd, &init_cfg_snapshot);
@@ -1523,6 +1947,12 @@ pub fn run() {
                 let mut last_bt_connected = init_bt.as_ref().map(|b| b.connected_count);
 
                 let mut tick_counter: u32 = 0;
+
+                let mut last_mic_muted: Option<bool> = read_mic_muted();
+                let mut last_hotkey_down = false;
+                let mut last_paste_down = false;
+                let mut hotkey_pinned_open = false;
+                let mut last_audio_peak: f32 = 0.0;
 
                 loop {
                     thread::sleep(Duration::from_millis(40));
@@ -1799,32 +2229,115 @@ pub fn run() {
                             }
                         }
 
+                        // 3F. Real-Time Audio Peak Meter
+                        if tick_counter % 2 == 0 {
+                            let peak = read_audio_peak();
+                            if (peak - last_audio_peak).abs() > 0.025
+                                || (peak == 0.0 && last_audio_peak > 0.0)
+                            {
+                                last_audio_peak = peak;
+                                let _ = app_handle.emit("audio-peak", peak);
+                            }
+                        }
+
+                        // 3G. System Peek: Microphone Mute
+                        if tick_counter % 5 == 0 {
+                            if let Some(mic_muted) = read_mic_muted() {
+                                if let Some(prev_mic) = last_mic_muted {
+                                    if mic_muted != prev_mic {
+                                        let _ = app_handle.emit("mic-sync", mic_muted);
+                                        if cfg.enable_peeks {
+                                            let _ = app_handle.emit(
+                                                "system-peek",
+                                                SystemPeekPayload {
+                                                    kind: "mic".to_string(),
+                                                    active: !mic_muted,
+                                                    percent: if mic_muted { 0 } else { 100 },
+                                                    label: if mic_muted {
+                                                        "Microphone Muted".to_string()
+                                                    } else {
+                                                        "Microphone Live".to_string()
+                                                    },
+                                                },
+                                            );
+                                        }
+                                    }
+                                }
+                                last_mic_muted = Some(mic_muted);
+                            }
+                        }
+
+                        // 3H. Global Shortcut: Alt + N untuk Buka/Tutup Notch
+                        let alt_down = (GetAsyncKeyState(0x12) as u16 & 0x8000) != 0;
+                        let n_down = (GetAsyncKeyState(0x4E) as u16 & 0x8000) != 0;
+                        let hotkey_now = alt_down && n_down;
+                        if hotkey_now && !last_hotkey_down {
+                            hotkey_pinned_open = !hotkey_pinned_open;
+                            is_hovered = hotkey_pinned_open;
+                            outside_ticks = 0;
+                            if let Ok(mut c) = bg_cfg.lock() {
+                                if hotkey_pinned_open {
+                                    c.active_width = c.active_width.max(420);
+                                    c.active_height = c.active_height.max(140);
+                                } else {
+                                    c.active_width = c.resting_width.max(155);
+                                    c.active_height = 32;
+                                }
+                            }
+                            set_hwnd_click_through(hwnd, !hotkey_pinned_open);
+                            let _ = app_handle.emit("notch-hotkey-toggle", hotkey_pinned_open);
+                        }
+                        last_hotkey_down = hotkey_now;
+
+                        // 3I. Shortcut Ctrl + V saat Notch terbuka -> Paste ke File Shelf
+                        let ctrl_down = (GetAsyncKeyState(0x11) as u16 & 0x8000) != 0;
+                        let v_down = (GetAsyncKeyState(0x56) as u16 & 0x8000) != 0;
+                        let paste_now = is_hovered && ctrl_down && v_down;
+                        if paste_now && !last_paste_down {
+                            let pasted_paths = read_clipboard_to_shelf_paths();
+                            if !pasted_paths.is_empty() {
+                                let _ = app_handle.emit("shelf-drag-drop", pasted_paths);
+                            }
+                        }
+                        last_paste_down = paste_now;
+
                         // 4. Smart Hover, Safe-Zone Lebar & Proteksi Jendela Control Center
                         let mut pt = POINT::default();
                         if GetCursorPos(&mut pt).is_ok() {
-                            let effective_w = if is_hovered && cfg.interaction_mode != "click" {
+                            let is_mouse_dragging = (GetKeyState(0x01) as u16 & 0x8000) != 0;
+
+                            let effective_w = if is_hovered
+                                && (cfg.interaction_mode != "click"
+                                    || is_mouse_dragging
+                                    || hotkey_pinned_open)
+                            {
                                 cfg.active_width.max(420)
                             } else {
                                 cfg.active_width
                             };
-                            let effective_h = if is_hovered && cfg.interaction_mode != "click" {
+                            let effective_h = if is_hovered
+                                && (cfg.interaction_mode != "click"
+                                    || is_mouse_dragging
+                                    || hotkey_pinned_open)
+                            {
                                 cfg.active_height.max(140)
                             } else {
                                 cfg.active_height
                             };
 
                             let is_expanded = effective_h >= 100;
-                            let is_minimal = is_obstructed || effective_h <= 12;
+                            let is_minimal =
+                                (is_obstructed || effective_h <= 12) && !is_mouse_dragging;
 
                             let scale_px =
                                 |value: i32| (value as f64 * dpi_scale).round() as i32;
 
                             let (half_w, hit_bottom) = if !is_hovered && is_minimal {
                                 (scale_px(65), win_rect.top + scale_px(6))
-                            } else if is_expanded {
+                            } else if is_expanded || is_mouse_dragging {
                                 (
-                                    scale_px(effective_w / 2 + 55),
-                                    win_rect.top + scale_px(effective_h + 40),
+                                    scale_px(effective_w.max(240) / 2 + 55),
+                                    win_rect.top + scale_px(effective_h.max(48) + 40),
                                 )
                             } else {
                                 (
@@ -1862,7 +2375,7 @@ pub fn run() {
                                 outside_ticks = 0;
                                 if !is_hovered {
                                     is_hovered = true;
-                                    if cfg.interaction_mode != "click" {
+                                    if cfg.interaction_mode != "click" || is_mouse_dragging {
                                         if let Ok(mut c) = bg_cfg.lock() {
                                             c.active_width = c.active_width.max(420);
                                             c.active_height = c.active_height.max(140);
@@ -1871,7 +2384,7 @@ pub fn run() {
                                     set_hwnd_click_through(hwnd, false);
                                     let _ = app_handle.emit("notch-hover", true);
                                 }
-                            } else if is_hovered {
+                            } else if is_hovered && !hotkey_pinned_open {
                                 outside_ticks += 1;
                                 let required_ticks = if is_expanded { 7 } else { 3 };
                                 if outside_ticks >= required_ticks {
@@ -1925,6 +2438,11 @@ pub fn run() {
             sync_widget_data,
             get_system_volume,
             set_system_volume,
+            get_system_mic,
+            toggle_system_mic,
+            prepare_shelf_files,
+            pick_shelf_files,
+            save_clipboard_to_shelf,
             open_shelf_file,
             reveal_shelf_file,
             start_file_drag,
