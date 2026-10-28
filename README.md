@@ -1,93 +1,20 @@
 <div align="center">
   <img src="src-tauri/icons/logo.png" alt="MangNotch Logo" width="96" height="96" style="border-radius: 22px;" />
+
   <h1>MangNotch 「 マン・ノッチ 」</h1>
-  <p><strong>Interactive Living Notch &amp; Desktop Companion for Windows</strong><br/>Dirancang dengan estetika <em>MangNime Dusk</em> menggunakan Rust, Tauri v2, dan Win32 Native API.</p>
 
   <p>
-    <a href="https://github.com/MANG-CODER/MangNotch/releases/latest"><img src="https://img.shields.io/badge/Download-Installer%20(.exe)-FFB7C5?style=for-the-badge&logo=windows&logoColor=120F16" alt="Download" /></a>
-    <a href="https://mangnotch.vercel.app/"><img src="https://img.shields.io/badge/Website-Live%20Demo-E2D1F9?style=for-the-badge&logo=vercel&logoColor=120F16" alt="Website" /></a>
-    <img src="https://img.shields.io/badge/Backend-Rust-DEA584?style=for-the-badge&logo=rust&logoColor=120F16" alt="Rust" />
-    <img src="https://img.shields.io/badge/Framework-Tauri%20v2-A2E4F5?style=for-the-badge&logo=tauri&logoColor=120F16" alt="Tauri v2" />
+    <strong>Interactive Living Notch &amp; Desktop Companion for Windows</strong><br/>
+    Inspired by the <em>MangNime Dusk</em> aesthetic, powered by Rust, Tauri v2, and the native Win32 API.
   </p>
-</div>
-
----
-
-## ✨ Tentang MangNotch
-
-**MangNotch** mengubah tepi atas layar Windows 10 & 11 menjadi ruang pendamping interaktif yang hidup tanpa menghalangi alur kerjamu. Berjalan sangat ringan di *background* dan dikendalikan penuh lewat *System Tray*, MangNotch menyatukan kontrol musik, lirik *real-time*, *native file shelf*, dan asisten produktivitas dalam satu *living island* berestetika **MangNime Dusk**.
-
-🌐 **Coba Simulator Interaktif di Browser:** [**mangnotch.vercel.app**](https://mangnotch.vercel.app/)
-
----
-
-## 🚀 Fitur Utama
-
-- 🎵 **Windows GSMTC Media & Synced Lyrics (LRCLIB):**
-  Mendeteksi lagu yang sedang diputar di Spotify, Browser (YouTube/Web), atau pemutar media Windows secara otomatis. Dilengkapi ekstraksi warna sampul album dinamis untuk efek gradasi latar belakang dan lirik berjalan *real-time*.
-- 🎶 **Compact Idle Lyrics Bar:**
-  Saat membuka mode lirik dan menggeser kursor keluar dari Notch, tampilan otomatis menyusut menjadi 1 baris lirik ringkas dengan sampul & judul lagu di sisi kiri.
-- 🧠 **Smart Proximity Auto-Shrink:**
-  Memindai posisi tab browser (*Chrome, Edge, Brave, Firefox*) dan jendela aktif menggunakan `WM_NCHITTEST`. Jika deretan tab atau tombol `+` menyentuh area Notch, Notch otomatis menyusut ke garis tipis **6px** sehingga tab di bawahnya tetap bebas diklik.
-- 📂 **Native OLE File Shelf (Drag-In & Drag-Out):**
-  Tarik file dari Windows Explorer ke dalam Shelf untuk disimpan sementara, klik untuk membuka langsung tanpa *security warning popup*, atau tarik keluar (*drag-out*) langsung ke WhatsApp, Discord, dan aplikasi lainnya.
-- 🍅 **Pomodoro Timer & Water Wave Tank:**
-  Dilengkapi pengatur waktu fokus & *short break*, visualisasi tangki air bergelombang, daftar tugas (*To-Do List*), dan synthesizer suara *chime* lembut berbasis Web Audio API dengan opsi toggle On/Off terpisah.
-- 🐾 **3 Karakter Maskot & 5 Tema Warna:**
-  Pilih antara **MangCat (Cyber-Neko)**, **PitVisor (Telemetry HUD)**, atau **Kitsune Spirit Orbs** dengan 5 palet cahaya (*MangNime Dusk, Matcha Emerald, Racing Red, Sunset, Ice Blue*).
-- 🎮 **True Fullscreen Auto-Hide & Headless Tray Startup:**
-  Hilang 100% (`SW_HIDE`) saat bermain game atau menonton video *fullscreen* (`F11`), serta berjalan senyap saat *startup* tanpa memunculkan jendela pengaturan sebelum dipanggil lewat *System Tray*.
-
----
-
-## 📦 Instalasi
-
-### Unduh Installer Siap Pakai (Direkomendasikan)
-1. Buka halaman [**GitHub Releases**](https://github.com/MANG-CODER/MangNotch/releases/latest).
-2. Unduh file **`MangNotch_1.0.0_x64-setup.exe`** (atau paket `.msi`).
-3. Jalankan installer. Setelah selesai, MangNotch akan langsung aktif di bagian atas layar dan ikon pengaturannya dapat diakses melalui **System Tray** Windows.
-
----
-
-## 🛠️ Build dari Source Code
-
-Pastikan perangkatmu sudah terinstal **Node.js** dan **Rust (`rustup`)** beserta *C++ Build Tools for Visual Studio*.
-
-```
-# 1. Clone repositori
-git clone [https://github.com/MANG-CODER/MangNotch.git](https://github.com/MANG-CODER/MangNotch.git)
-cd MangNotch
-
-# 2. Instal dependensi
-npm install
-
-# 3. Jalankan dalam mode development
-npm run tauri dev
-
-# 4. Build menjadi file Installer (.exe & .msi)
-npm run tauri build
-```
-🔒 Privasi & Keamanan
-MangNotch berjalan 100% secara lokal tanpa mengumpulkan data pribadi, analitik, maupun telemetri. Baca selengkapnya pada dokumen Privacy Policy / Kebijakan Privasi (PRIVACY.md).
-
-👤 Pengembang
-Dikembangkan oleh vestiapani sebagai bagian dari ekosistem kreatif MangNime.
-
-🌐 Website: mangnotch.vercel.app
-
-💻 GitHub: @MANG-CODER
-
----
-```html
-<div align="center">
-  <img src="src-tauri/icons/logo.png" alt="MangNotch Logo" width="96" height="96" style="border-radius: 22px;" />
-  <h1>MangNotch 「 マン・ノッチ 」</h1>
-  <p><strong>Interactive Living Notch &amp; Desktop Companion for Windows</strong><br/>
-  Designed with the <em>MangNime Dusk</em> aesthetic, powered by Rust, Tauri v2, and the native Win32 API.</p>
 
   <p>
-    <a href="https://github.com/MANG-CODER/MangNotch/releases/latest"><img src="https://img.shields.io/badge/Download-Installer%20(.exe)-FFB7C5?style=for-the-badge&logo=windows&logoColor=120F16" alt="Download" /></a>
-    <a href="https://mangnotch.vercel.app/"><img src="https://img.shields.io/badge/Website-Live%20Demo-E2D1F9?style=for-the-badge&logo=vercel&logoColor=120F16" alt="Website" /></a>
+    <a href="https://github.com/MANG-CODER/MangNotch/releases/latest">
+      <img src="https://img.shields.io/badge/Download-GitHub%20Release-FFB7C5?style=for-the-badge&logo=windows&logoColor=120F16" alt="GitHub Releases" />
+    </a>
+    <a href="https://mangnotch.vercel.app/">
+      <img src="https://img.shields.io/badge/Website-Live%20Demo-E2D1F9?style=for-the-badge&logo=vercel&logoColor=120F16" alt="Website" />
+    </a>
     <img src="https://img.shields.io/badge/Backend-Rust-DEA584?style=for-the-badge&logo=rust&logoColor=120F16" alt="Rust" />
     <img src="https://img.shields.io/badge/Framework-Tauri%20v2-A2E4F5?style=for-the-badge&logo=tauri&logoColor=120F16" alt="Tauri v2" />
   </p>
@@ -97,50 +24,151 @@ Dikembangkan oleh vestiapani sebagai bagian dari ekosistem kreatif MangNime.
 
 ## ✨ About MangNotch
 
-**MangNotch** transforms the top edge of your Windows 10 and 11 screen into a living, interactive desktop companion without disrupting your workflow. Designed to run efficiently in the background and managed through the **System Tray**, MangNotch brings together media controls, real-time lyrics, a native file shelf, and productivity tools in a single interactive island featuring the distinctive **MangNime Dusk** aesthetic.
+**MangNotch** transforms the top edge of your Windows 10 or Windows 11 screen into a living, interactive desktop companion.
 
-🌐 **Try the Interactive Browser Simulator:** [**mangnotch.vercel.app**](https://mangnotch.vercel.app/)
+Designed to run in the background and managed through the Windows **System Tray**, MangNotch brings media controls, synchronized lyrics, quick file access, and productivity tools together in a customizable desktop experience inspired by the **MangNime Dusk** aesthetic.
+
+From checking your currently playing music to managing daily tasks, tracking water intake, or starting a Pomodoro session, MangNotch keeps useful tools close at hand without requiring a separate application window for every activity.
+
+🌐 **Try the Interactive Browser Simulator:** [mangnotch.vercel.app](https://mangnotch.vercel.app/)
 
 ---
 
 ## 🚀 Key Features
 
-- 🎵 **Windows GSMTC Media Integration & Synced Lyrics (LRCLIB):**  
-  Automatically detects currently playing media from Spotify, browsers (YouTube/Web), and other Windows media players. Features dynamic album artwork color extraction for gradient backgrounds and real-time scrolling lyrics.
+### 🎵 Media Controls & Synchronized Lyrics
 
-- 🎶 **Compact Idle Lyrics Bar:**  
-  When using lyrics mode, moving the cursor away from the Notch automatically collapses it into a compact, single-line lyrics bar, with album artwork and the track title displayed on the left.
+- Detects currently playing media through Windows media session integration.
+- Supports media playback from compatible applications, including Spotify and supported browser media.
+- Displays synchronized lyrics using LRCLIB when matching lyrics are available.
+- Extracts colors from album artwork for a more dynamic visual experience.
+- Provides dedicated music and live lyrics modes.
 
-- 🧠 **Smart Proximity Auto-Shrink:**  
-  Monitors browser tab positions (Chrome, Edge, Brave, and Firefox) and active windows using `WM_NCHITTEST`. When browser tabs or the `+` button overlap the Notch area, the Notch automatically shrinks to a slim **6px** line, keeping the underlying tabs accessible.
+### 🎶 Compact Idle Lyrics
 
-- 📂 **Native OLE File Shelf (Drag-In & Drag-Out):**  
-  Drag files from Windows Explorer into the Shelf for temporary storage. Click a file to open it directly, or drag it out into WhatsApp, Discord, and other applications.
+When using lyrics mode, the Notch can collapse into a compact lyrics bar when the cursor moves away, keeping the track title, album artwork, and lyrics within a smaller footprint.
 
-- 🍅 **Pomodoro Timer & Water Wave Tank:**  
-  Includes focus and short-break timers, a wave-based water tank visualization, a To-Do List, and a soft chime synthesizer powered by the Web Audio API, with a dedicated On/Off toggle.
+### 🧠 Smart Proximity
 
-- 🐾 **3 Mascot Characters & 5 Color Themes:**  
-  Choose between **MangCat (Cyber-Neko)**, **PitVisor (Telemetry HUD)**, and **Kitsune Spirit Orbs**, alongside five color palettes: **MangNime Dusk, Matcha Emerald, Racing Red, Sunset, and Ice Blue**.
+Smart Proximity helps prevent the Notch from interfering with browser tabs and nearby window controls. When an overlapping area is detected, the Notch can shrink to a slim line so underlying interface elements remain accessible.
 
-- 🎮 **True Fullscreen Auto-Hide & Headless Tray Startup:**  
-  Completely hides the Notch (`SW_HIDE`) during fullscreen games or video playback (`F11`). MangNotch can also start silently in the background without opening the settings window, which remains accessible through the **System Tray**.
+### 📂 Native File Shelf
+
+Keep frequently used files close at hand with the integrated File Shelf.
+
+- Drag files from Windows Explorer into the Shelf.
+- Select and manage items stored in the Shelf.
+- Open files directly from the interface.
+- Drag files out to supported applications and workflows.
+
+### 🍅 Pomodoro & Focus Sessions
+
+Manage focused work sessions with the built-in Pomodoro timer.
+
+- Configure focus and short-break durations.
+- Use integrated sound feedback, including rain sound options.
+- Customize the experience to suit your workflow.
+
+### 💧 Water Tracker
+
+Track your daily water intake directly from the Notch.
+
+- Configure your daily hydration goal.
+- Set the amount recorded per cup.
+- Customize reminder intervals.
+- Monitor your progress through the water tank visualization.
+
+### ✅ TodoList
+
+Keep daily tasks accessible without opening a separate task manager.
+
+- Add, complete, and delete tasks.
+- Choose between supported list layouts.
+- View task completion progress.
+- Improved text handling helps accommodate longer task names.
+
+### 🖥️ System Peek
+
+Access system-related information through the System Peek mode, keeping useful desktop information available from the Notch.
+
+### 🐾 Customizable Mascots & Themes
+
+Personalize the appearance of your desktop companion.
+
+**Mascots**
+- MangCat — Cyber-Neko
+- Mochi - Cute Blob
+- Kitsune — Spirit Orbs
+
+**Color Themes**
+- MangNime Dusk
+- Matcha Emerald
+- Racing Red
+- Sunset
+- Ice Blue
+- etc
+
+### ⚙️ Control Center
+
+Manage MangNotch preferences through its dedicated Control Center.
+
+- **English language support** for the Control Center.
+- Configure supported appearance and interaction settings.
+- Choose the monitor used by the Notch.
+- Configure startup behavior and fullscreen hiding.
+- Adjust supported productivity settings, including Pomodoro and Water Tracker preferences.
+
+### 🪟 Windows Integration
+
+- Runs in the background and is accessible through the Windows System Tray.
+- Supports configurable startup behavior.
+- Includes fullscreen auto-hide behavior.
+- Built with Rust, Tauri v2, and native Windows APIs.
+
+---
+
+## 🌐 Language Support
+
+MangNotch v1.3.0 introduces **English language support in the Control Center**, making its settings more accessible to English-speaking users.
 
 ---
 
 ## 📦 Installation
 
-### Download a Prebuilt Installer (Recommended)
+### Option 1: Microsoft Store
 
-1. Visit the [**GitHub Releases**](https://github.com/MANG-CODER/MangNotch/releases/latest) page.
-2. Download the latest Windows installer (`.exe`) or the `.msi` package.
-3. Run the installer. Once installation is complete, MangNotch will become active at the top of your screen. You can access its settings through the Windows **System Tray**.
+Install MangNotch through the [Microsoft Store](https://apps.microsoft.com/) if the listing is available in your region.
+
+If you already installed MangNotch from the Store, check your Store Library for available updates.
+
+### Option 2: GitHub Releases
+
+1. Open the [latest MangNotch release](https://github.com/MANG-CODER/MangNotch/releases/latest).
+2. Download the installer that matches your preferred installation method.
+3. Run the installer and follow the on-screen instructions.
+4. Once launched, access MangNotch settings through the Windows System Tray.
+
+Available release assets may include:
+- **NSIS installer** (`.exe`)
+- **Windows Installer package** (`.msi`)
+- **MSIX package** (`.msix`), when provided in the release
+
+For existing installations, use the same distribution channel whenever possible to update MangNotch.
 
 ---
 
 ## 🛠️ Build from Source
 
-Make sure **Node.js**, **Rust (`rustup`)**, and the **C++ Build Tools for Visual Studio** are installed on your system.
+### Requirements
+
+Make sure the following tools are installed:
+
+- Node.js and npm
+- Rust with `rustup`
+- C++ Build Tools for Visual Studio
+- The Windows development components required by Tauri
+
+### Setup
 
 ```bash
 # 1. Clone the repository
@@ -153,15 +181,33 @@ npm install
 # 3. Run in development mode
 npm run tauri dev
 
-# 4. Build the installers (.exe and .msi)
+# 4. Build the application and supported installers
 npm run tauri build
 ```
+
+Build output and available installer formats depend on the project's Tauri configuration and installed build tools.
 
 ---
 
 ## 🔒 Privacy & Security
 
-MangNotch runs entirely locally and does not collect personal data, analytics, or telemetry. For more information, please refer to the [Privacy Policy](PRIVACY.md).
+MangNotch is designed to run locally on your Windows device.
+
+For more information about its data handling practices, please review the [Privacy Policy](PRIVACY.md).
+
+---
+
+## 📝 Latest Release
+
+**Current release: v1.3.0**
+
+Highlights:
+- Added English language support in the Control Center.
+- Fixed an issue with the Notch address bar.
+- Improved the naturalness of rain sounds in Pomodoro mode.
+- Improved text length handling in TodoList.
+
+For the complete release history and downloadable packages, visit [GitHub Releases](https://github.com/MANG-CODER/MangNotch/releases).
 
 ---
 
@@ -171,5 +217,10 @@ Developed by **vestiapani** as part of the MangNime creative ecosystem.
 
 🌐 **Website:** [mangnotch.vercel.app](https://mangnotch.vercel.app/)
 
-💻 **GitHub:** [@MANG-CODER](https://github.com/MANG-CODER)
-```
+💻 **GitHub:** [MANG-CODER/MangNotch](https://github.com/MANG-CODER/MangNotch)
+
+---
+
+<div align="center">
+  <sub>Built with Rust, Tauri, and a little MangNime spirit.</sub>
+</div>
