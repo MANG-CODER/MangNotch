@@ -1,9 +1,3 @@
-
-Algorithm Hash                                                             Path                                                                               
---------- ----                                                             ----                                                                               
-SHA256    9CB79DD19CC35DD85E0526837FF32BC6E287AD28E644C16177125BFAA8823193 D:\Project\mangnotch\MangNotch_1.2.0_x64.msix                                      
-SHA256    E6298EF581184CCCAAEA59268997AC93EE87597838D7676127738A9E85373F8A D:\Project\mangnotch\src-tauri\target\release\bundle\nsis\MangNotch_1.2.0_x64-se...
-SHA256    9304B90DF0574794F407CE0603A062FF6451FA5BE1AB4D11DE4D5ABDABC4668F D:\Project\mangnotch\src-tauri\target\release\bundle\msi\MangNotch_1.2.0_x64_en-...
-
-
-
+﻿f8bc01cbb47e73e5ecf149910095587801c922467485458dd2fd9a7f6ab48009  MangNotch_1.3.0_x64-setup.exe
+85eb19da9828c66bf90c454efba636bbd7ddb23861a3429f3e19044bd546b544  MangNotch_1.3.0_x64_en-US.msi
+9c5834735dd44432526dfd9f409935ebd50b25b090f5eee205db82e4d3f409e8  MangNotch_1.3.0_x64.msix

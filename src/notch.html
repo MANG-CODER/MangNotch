@@ -565,21 +565,32 @@
   }
   .vol-wrap.muted .vol-pct { color: #ff7b7b; }
 
-  /* Dynamic Lyrics Panel */
+  /* Dynamic Lyrics Panel (Tinggi Baris Terkunci & Anti-Lompat) */
   .lyr {
     left: 264px; right: 18px; top: 14px; bottom: 8px; overflow: hidden;
     -webkit-mask: linear-gradient(transparent, #000 20%, #000 80%, transparent);
     mask: linear-gradient(transparent, #000 20%, #000 80%, transparent);
   }
-  .lyr ol { list-style: none; margin: 0; padding: 0; transition: transform .5s var(--spring); }
+  .lyr ol {
+    list-style: none; margin: 0; padding: 0;
+    transition: transform .48s var(--spring);
+    will-change: transform;
+  }
   .lyr li {
-    font-weight: 700; font-size: 14.5px; line-height: 1.28; padding: 5px 0;
-    color: rgba(255,255,255,.32); transform: scale(.94); transform-origin: left center;
-    transition: color .35s, transform .35s; cursor: pointer;
+    height: 28px; line-height: 28px; padding: 0 6px 0 0;
+    display: flex; align-items: center;
+    font-weight: 700; font-size: 14.5px;
+    color: rgba(255,255,255,.32);
+    transform: scale(.94); transform-origin: left center;
+    transition: color .3s, transform .3s, font-size .2s;
+    cursor: pointer;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
   .lyr li:hover { color: rgba(255,255,255,.7); }
-  .lyr li.on { color: #fff; transform: scale(1); white-space: nowrap; text-overflow: clip; }
+  .lyr li.on {
+    color: #fff; transform: scale(1);
+    overflow: visible; text-overflow: clip;
+  }
   .music-note-svg { width: 13px; height: 13px; fill: currentColor; display: inline-block; vertical-align: middle; }
 
   .pomo-wrap { left: 82px; top: 76px; width: 72px; height: 72px; transform: translate(-50%, -50%); display: grid; place-items: center; }
@@ -722,7 +733,8 @@
     background: rgba(255,255,255,.14);
     border-color: rgba(255,183,197,.28);
   }
-  .trow-left { display: flex; align-items: center; gap: 7px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+  .trow-left { display: flex; align-items: center; gap: 7px; overflow: hidden; flex: 1; min-width: 0; margin-right: 4px; }
+  .trow-txt { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; display: block; }
   .trow.done { background: rgba(40,120,60,.35); color: rgba(255,255,255,.6); text-decoration: line-through; }
   .chk { width: 14px; height: 14px; border-radius: 50%; border: 1.5px solid rgba(255,255,255,.5); display: grid; place-items: center; flex: none; }
   .trow.done .chk { background: #2fd06b; border-color: #2fd06b; }
@@ -911,7 +923,7 @@
         <span class="a b c" id="pomoTime" style="left:236px;top:48px;font-size:30px;letter-spacing:-.5px">25:00</span>
         <span class="a c dim" id="pomoLabel" style="left:236px;top:73px;font-size:11.5px">Focus Session</span>
 
-        <span class="a pill c" id="ambientBtn" onclick="toggleAmbientNoise(event)" style="left:336px;top:52px;height:24px;padding:0 9px;font-size:10.5px;background:rgba(255,255,255,.1)" title="Suara Hujan / Ambient Fokus">
+        <span class="a pill c" id="ambientBtn" onclick="toggleAmbientNoise(event)" style="left:336px;top:52px;height:24px;padding:0 9px;font-size:10.5px;background:rgba(255,255,255,.1)">
           <svg viewBox="0 0 24 24" style="width:12px;height:12px"><path d="M16 13v8M8 13v8M12 15v8M20 16.58A5 5 0 0 0 18 7h-1.26A8 8 0 1 0 4 15.25"/></svg>
           <span id="ambientTxt">Rain</span>
         </span>
@@ -990,7 +1002,7 @@
         <span class="a pill" id="addTodoBtn" onclick="showTodoInput()" style="left:44px;top:92px;width:96px">
           <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Add Task
         </span>
-        <input type="text" id="todoInlineInput" class="a todo-input-box" placeholder="Tulis & Enter..." maxlength="40">
+        <input type="text" id="todoInlineInput" class="a todo-input-box" placeholder="Tulis & Enter..." maxlength="120">
 
         <div class="a tlist horiz" id="todoList"></div>
       </div>
@@ -1003,6 +1015,73 @@
     const { listen } = window.__TAURI__.event;
     const mn = document.getElementById("mn");
     const esc = (s) => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+
+    const ID_TO_EN = {"Tutup": "Close", "Pembaruan Tersedia!": "Update Available!", "Versi terbaru siap diunduh.": "A new version is ready to download.", "Update Sekarang": "Update Now", "Pembaruan Wajib Diperlukan": "Required Update", "Versi MangNotch yang kamu gunakan sudah tidak didukung karena perbaikan penting. Silakan perbarui ke versi terbaru.": "Your version of MangNotch is no longer supported due to important fixes. Please update to the latest version.", "Perbarui MangNotch Sekarang": "Update MangNotch Now", "Produktivitas": "Productivity", "TAB 1: DISPLAY & SYSTEM": "TAB 1: DISPLAY & SYSTEM", "Perilaku Layar & Interaksi": "Display & Interaction", "Gaya Interaksi Membuka Notch": "Notch Interaction Mode", "Pilih melebar otomatis saat disentuh kursor atau harus diklik dulu": "Choose whether the notch expands on hover or only after clicking", "Hover Biasa (Default)": "Standard Hover (Default)", "Klik Dulu Baru Melebar": "Click to Expand", "Jalankan MangNotch otomatis di background saat komputer menyala": "Start MangNotch automatically in the background when Windows starts", "Monitor & Tampilan": "Monitor & Display", "Selalu di Primary Monitor": "Use Primary Monitor", "Ikuti layar utama Windows secara otomatis": "Automatically follow the primary Windows display", "Pilih Monitor Manual": "Choose Monitor Manually", "Pindahkan Notch ke layar eksternal tertentu": "Move the notch to a specific external display", "Auto-Hide Total saat Fullscreen": "Auto-hide in Fullscreen", "Sembunyikan Notch 100% saat bermain game atau video F11": "Completely hide the notch during games or fullscreen videos", "Otomatis mengecil ke garis minimalis saat tertutup tab browser/jendela": "Automatically shrink to a minimal line when covered by a browser tab or window", "Pop-up animasi Volume, Brightness, Bluetooth, Caps Lock & Charger": "Animated pop-ups for volume, brightness, Bluetooth, Caps Lock, and charging", "TAB 2: MASCOT & THEME": "TAB 2: MASCOT & THEME", "Pilih Karakter Maskot MangNotch": "Choose Your MangNotch Mascot", "Blob Imut": "Cute Blob", "Spirit Orbs": "Spirit Orbs", "Tampilan Notch Saat Idle": "Idle Notch Appearance", "Saat mode Lirik aktif, otomatis menampilkan 1 baris lirik": "When lyrics mode is active, automatically show one line of lyrics", "Jam & Equalizer": "Clock & Equalizer", "Minimalis (Garis Tipis)": "Minimal (Thin Line)", "Palet Warna Cahaya Notch": "Notch Glow Color Palette", "Termasuk palet MangNime Dark Dusk (Pink - Lavender - Ice Cyan)": "Includes the MangNime Dark Dusk palette (Pink - Lavender - Ice Cyan)", "TAB 3: POMODORO, WATER & TASKS": "TAB 3: POMODORO, WATER & TASKS", "Durasi Fokus & Short Break (Menit)": "Focus & Short Break Duration (Minutes)", "Waktu sesi fokus utama & jeda istirahat": "Main focus session and break duration", "Suara Chime Pomodoro": "Pomodoro Chime Sound", "Bunyikan chime saat waktu fokus selesai": "Play a chime when a focus session ends", "Water Tracker & Chime (Auto-Reset Harian)": "Water Tracker & Chime (Daily Auto-Reset)", "Target Harian & Ukuran Gelas (ml)": "Daily Goal & Cup Size (ml)", "Otomatis reset ke 0 ml setiap pergantian hari": "Automatically reset to 0 ml at the start of each day", "Aktifkan Pengingat Minum Berkala": "Enable Periodic Water Reminders", "Tampilkan pop-up notifikasi minum di Notch sesuai interval": "Show water reminder pop-ups on the notch at the selected interval", "Interval Pengingat Minum (Menit)": "Water Reminder Interval (Minutes)", "Jeda waktu antar pop-up pengingat minum": "Time between water reminder pop-ups", "Suara Chime Tap Pertakaran (+ Drink)": "Water Tap Chime Sound (+ Drink)", "Bunyikan chime saat menekan tombol tambah minum": "Play a chime when adding water", "Suara Chime Notifikasi Pengingat Minum": "Water Reminder Chime Sound", "Bunyikan chime saat pop-up pengingat minum berkala muncul": "Play a chime when a periodic water reminder appears", "Kelola Daftar Tugas (To-Do List)": "Manage To-Do List", "Gaya Tampilan To-Do List di Notch": "To-Do List Layout on the Notch", "Jika > 2 tugas, gulir ke samping (Horizontal) atau atas-bawah": "When there are more than 2 tasks, scroll horizontally or vertically", "Geser ke Samping (Horizontal)": "Horizontal Scrolling", "List Atas-Bawah (Vertikal)": "Vertical List", "Tambah": "Add", "TAB 4: ABOUT PAGE": "TAB 4: ABOUT PAGE", "Interactive Living Notch & Productivity Companion dengan sentuhan estetika editorial": "Interactive Living Notch & Productivity Companion with an editorial aesthetic", "Integrasi Windows GSMTC, kontrol master volume real-time, warna album, dan lirik.": "Windows GSMTC integration, real-time master volume control, album colors, and lyrics.", "Simpan file sementara via Drag-in dari Explorer & Drag-out langsung ke WhatsApp/Discord.": "Temporarily store files by dragging them in from Explorer and dragging them directly into WhatsApp/Discord.", "Timer Pomodoro kustom, pencatat hidrasi auto-reset harian, & To-Do List dual style.": "Custom Pomodoro timer, daily auto-reset hydration tracker, and two To-Do List layouts.", "Pop-up interaktif Volume, Brightness, Bluetooth, Caps Lock, Charger & auto-shrink.": "Interactive pop-ups for volume, brightness, Bluetooth, Caps Lock, charging, and auto-shrink.", "Pengembang, Landing Page & Open Source": "Developer, Landing Page & Open Source", "Kunjungi halaman resmi MangNotch & repositori kode sumber": "Visit the official MangNotch page and source repository", "Data & Konfigurasi Lokal": "Local Data & Configuration", "Tersimpan otomatis di %AppData%\\MangNotch\\config.json": "Automatically saved to %AppData%\\MangNotch\\config.json", "Buka Folder Data": "Open Data Folder", "Tersimpan ✓": "Saved ✓", "Belum ada tugas hari ini.": "No tasks for today yet.", "Hapus Tugas": "Delete Task", "Bahasa Aplikasi": "App Language", "Pilih bahasa antarmuka MangNotch": "Choose the MangNotch interface language", "Bahasa Indonesia": "Indonesian", "English": "English", "Tidak ada media": "No media playing", "Putar lagu di Spotify / Browser": "Play a song in Spotify / your browser", "Menunggu lirik...": "Waiting for lyrics...", "Menunggu lirik lagu...": "Waiting for song lyrics...", "Drop files, Klik Pilih, atau tekan Ctrl+V": "Drop files, click Select, or press Ctrl+V", "Klik = pilih · Klik 2x = buka · Drag = keluarkan": "Click = select · Double-click = open · Drag = move out", "Tidak ada tugas": "No tasks", "Simpan": "Save", "Batal": "Cancel", "Pilih": "Select", "Hapus": "Delete", "Volume": "Volume", "Tambah tugas": "Add task", "Masukkan tugas...": "Enter a task...", "Daily Goal": "Target Harian", "Sistem": "System", "Maskot": "Mascot", "Tentang": "About", "Sesi Fokus": "Focus Session", "Istirahat": "Break", "Fokus": "Focus", "Atur Ulang": "Reset", "Tugas Selesai": "Tasks Completed", "Tambah Tugas": "Add Task", "Rak File": "File Shelf", "Pelacak Air": "Water Tracker", "Daftar Tugas": "Todo List", "Timer Pomodoro": "Pomodoro Timer", "Audio Utama Sistem": "System Master Audio", "Kecerahan": "Brightness", "BISU": "MUTE", "Tunda": "Snooze", "Minum": "Drink", "Tugas": "Task", "Selesai": "Done", "Hari ini": "Today", "Semua": "All", "Air": "Water", "Musik": "Music", "Lirik": "Lyrics", "Waktunya minum": "Time to drink",
+"air!": "of water!",
+"dari": "of",
+"gelas hari ini": "glasses today",
+"Target Harian": "Daily Goal",
+"Klik untuk pilih / batal pilih": "Click to select / deselect",
+"Pilih / Batal Pilih Semua untuk Multi-Drag":
+  "Select / Deselect All for Multi-Drag",
+"Hapus semua file dari shelf": "Remove all files from shelf",
+"Hapus": "Delete",
+"Belum ada tugas hari ini": "No tasks for today",
+"Drop files, Klik Pilih, atau tekan Ctrl+V":
+  "Drop files, click Select, or press Ctrl+V",
+"Klik = pilih · Klik 2x = buka · Drag = keluarkan":
+  "Click = select · Double-click = open · Drag = move out",
+"Tulis & Enter...": "Type & press Enter...",
+"Reset": "Reset",
+"Tambah Tugas": "Add Task",};
+    const EN_TO_ID = Object.fromEntries(Object.entries(ID_TO_EN).map(([id, en]) => [en, id]));
+    let appLanguage = "id";
+    const i18nOriginalText = new WeakMap();
+    const i18nOriginalAttrs = new WeakMap();
+    function translateValue(value, lang) {
+      const dict = lang === "en" ? ID_TO_EN : EN_TO_ID;
+      return Object.prototype.hasOwnProperty.call(dict, value) ? dict[value] : value;
+    }
+    function translateTextNode(node) {
+      if (!node || !node.parentElement || node.parentElement.closest("script,style,noscript")) return;
+      let original = i18nOriginalText.get(node);
+      if (original === undefined) { original = node.nodeValue; i18nOriginalText.set(node, original); }
+      const trimmed = original.trim();
+      if (!trimmed) return;
+      const translated = translateValue(trimmed, appLanguage);
+      const nextValue = original.replace(trimmed, translated);
+      if (node.nodeValue !== nextValue) node.nodeValue = nextValue;
+    }
+    function applyLanguage(lang) {
+      appLanguage = lang === "en" ? "en" : "id";
+      document.documentElement.lang = appLanguage;
+      document.querySelectorAll("body *").forEach(el => {
+        for (const attr of ["title", "placeholder", "aria-label", "alt", "data-name"]) {
+          if (!el.hasAttribute(attr)) continue;
+          let attrs = i18nOriginalAttrs.get(el);
+          if (!attrs) { attrs = {}; i18nOriginalAttrs.set(el, attrs); }
+          if (!(attr in attrs)) attrs[attr] = el.getAttribute(attr);
+          const original = attrs[attr];
+          el.setAttribute(attr, translateValue(original, appLanguage));
+        }
+        el.childNodes.forEach(child => { if (child.nodeType === Node.TEXT_NODE) translateTextNode(child); });
+      });
+      if (typeof refreshAllCustomSelects === "function") refreshAllCustomSelects();
+    }
+    const i18nObserver = new MutationObserver(records => {
+      for (const record of records) {
+        if (record.type === "characterData") translateTextNode(record.target);
+        record.addedNodes && record.addedNodes.forEach(node => {
+          if (node.nodeType === Node.TEXT_NODE) translateTextNode(node);
+          else if (node.nodeType === Node.ELEMENT_NODE && !node.closest("script,style,noscript")) {
+            node.querySelectorAll("*").forEach(el => el.childNodes.forEach(ch => { if (ch.nodeType === Node.TEXT_NODE) translateTextNode(ch); }));
+            node.childNodes.forEach(ch => { if (ch.nodeType === Node.TEXT_NODE) translateTextNode(ch); });
+          }
+        });
+      }
+    });
+    i18nObserver.observe(document.documentElement, {subtree:true, childList:true, characterData:true});
 
     const PAGES = ["music", "pomo", "water", "shelf", "todo"];
     const THEMES = {
@@ -1079,13 +1158,66 @@
       });
     }
 
-    // Set teks lirik biasa (tanpa marquee, untuk baris lirik dinamis)
+    // Set teks lirik pada mode Idle: gunakan marquee otomatis jika lirik sangat panjang agar bagian kanan tidak terpotong
     function setIdleLyricPlain(text) {
       const el = document.getElementById("idleLyrText");
       if (!el) return;
-      delete el.dataset.rawText;
-      el.classList.remove("is-marquee");
-      el.textContent = text;
+      const clean = String(text || "");
+      const textW = measureTextPx(clean, '700 12px "Segoe UI Variable Text", "Segoe UI", sans-serif');
+      // Jika lebar total melebihi batas maksimum idle notch (960px), jalankan marquee agar ujung kanan tetap terbaca
+      if (203 + textW + 42 > 960) {
+        delete el.dataset.rawText;
+        el.dataset.maxw = "720";
+        applyMarqueeToElements("#idleLyrText", clean);
+      } else {
+        delete el.dataset.rawText;
+        el.classList.remove("is-marquee");
+        el.textContent = clean;
+      }
+    }
+
+    // Fallback saat lirik tidak ditemukan: kunci ukuran notch di default standar & jalankan marquee judul
+    function setIdleLyricFallbackTitle(title) {
+      updateDynamicLyricsWidth("", "");
+      const el = document.getElementById("idleLyrText");
+      if (el) {
+        delete el.dataset.rawText;
+        el.dataset.maxw = "135";
+      }
+      applyMarqueeToElements("#idleLyrText", title);
+    }
+
+    function updateDynamicLyricsWidth(activeText, nextText = "") {
+      const cleanAct = String(activeText || "").trim();
+      const cleanNext = String(nextText || "").trim();
+      const validAct = (cleanAct && cleanAct !== "♪" && cleanAct !== "Instrumental...") ? cleanAct : "";
+      const validNext = (cleanNext && cleanNext !== "♪" && cleanNext !== "Instrumental...") ? cleanNext : "";
+
+      // Gunakan baris terpanjang antara baris aktif & baris berikutnya agar bagian kanan tidak terpotong
+      const longestExpanded = validAct.length >= validNext.length ? validAct : validNext;
+
+      if (!longestExpanded) {
+        dynLyricsW = 520;
+      } else {
+        const expLinePx = measureTextPx(longestExpanded, '700 14.5px "Segoe UI Variable Text", "Segoe UI", sans-serif');
+        const neededExpTotalW = Math.ceil(282 + expLinePx + 58);
+        dynLyricsW = Math.max(520, Math.min(1040, neededExpTotalW));
+      }
+
+      if (!validAct) {
+        dynIdleLyricsW = 340;
+      } else {
+        const idleLinePx = measureTextPx(validAct, '700 12px "Segoe UI Variable Text", "Segoe UI", sans-serif');
+        const neededIdleTotalW = Math.ceil(203 + idleLinePx + 44);
+        dynIdleLyricsW = Math.max(340, Math.min(960, neededIdleTotalW));
+      }
+
+      document.documentElement.style.setProperty("--dyn-lyr-w", dynLyricsW + "px");
+      document.documentElement.style.setProperty("--dyn-idle-lyr-w", dynIdleLyricsW + "px");
+
+      if (mn.dataset.s === "lyrics" || mn.dataset.s === "idle-lyrics") {
+        applyNotchState(mn.dataset.s);
+      }
     }
 
     // Fallback saat lirik tidak ditemukan: kunci ukuran notch di default standar & jalankan marquee judul
@@ -1102,15 +1234,15 @@
         dynLyricsW = 520;
         dynIdleLyricsW = 340;
       } else {
-        // 1. Expanded Lyrics Mode: non-lyric area = 282px (264px kiri + 18px kanan) + 34px buffer
+        // 1. Expanded Lyrics Mode: non-lyric area = 282px + 54px safety buffer
         const expLinePx = measureTextPx(clean, '700 14.5px "Segoe UI Variable Text", "Segoe UI", sans-serif');
-        const neededExpTotalW = Math.ceil(282 + expLinePx + 34);
-        dynLyricsW = Math.max(520, Math.min(1040, neededExpTotalW));
+        const neededExpTotalW = Math.ceil(282 + expLinePx + 54);
+        dynLyricsW = Math.max(520, Math.min(1060, neededExpTotalW));
 
-        // 2. Compact Idle Lyrics Mode: non-lyric area = 203px (135px judul + padding + separator + icon) + 28px buffer
+        // 2. Compact Idle Lyrics Mode: non-lyric area = 203px + 42px safety buffer
         const idleLinePx = measureTextPx(clean, '700 12px "Segoe UI Variable Text", "Segoe UI", sans-serif');
-        const neededIdleTotalW = Math.ceil(203 + idleLinePx + 28);
-        dynIdleLyricsW = Math.max(340, Math.min(980, neededIdleTotalW));
+        const neededIdleTotalW = Math.ceil(203 + idleLinePx + 42);
+        dynIdleLyricsW = Math.max(340, Math.min(960, neededIdleTotalW));
       }
 
       document.documentElement.style.setProperty("--dyn-lyr-w", dynLyricsW + "px");
@@ -1497,45 +1629,404 @@
       renderActivePage();
     });
 
-    // Generator Suara Hujan / Brown Noise untuk Fokus Pomodoro
-    let ambientNode = null;
-    let ambientGain = null;
-    let isAmbientPlaying = false;
+    // Hujan Gerimis + Petir Jauh + Environment (angin, talang, jangkrik, kodok)
+let ambientStopFn = null;
+let isAmbientPlaying = false;
+let rainWorkletReady = false;
 
-    function toggleAmbientNoise(ev) {
-      if (ev) ev.stopPropagation();
-      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      if (isAmbientPlaying) {
-        if (ambientNode) { try { ambientNode.stop(); ambientNode.disconnect(); } catch {} ambientNode = null; }
-        isAmbientPlaying = false;
-      } else {
-        const bufSize = audioCtx.sampleRate * 2;
-        const buffer = audioCtx.createBuffer(1, bufSize, audioCtx.sampleRate);
-        const out = buffer.getChannelData(0);
-        let lastOut = 0.0;
-        for (let i = 0; i < bufSize; i++) {
-          const white = Math.random() * 2 - 1;
-          out[i] = (lastOut + (0.02 * white)) / 1.02;
-          lastOut = out[i];
-          out[i] *= 0.35;
+// ====== KNOB PETIR ======
+const THUNDER_FIRST_MS = [10000, 20000];
+const THUNDER_GAP_MS   = [30000, 90000];
+const THUNDER_VOLUME   = 0.7;
+// ====== KNOB ENVIRONMENT ======
+const WIND_LEVEL      = 0.12;   // angin sepoi (0 = mati)
+const DRIP_VOLUME     = 0.22;   // tetes talang (0 = mati)
+const DRIP_GAP_MS     = [2500, 8000];
+const CRICKET_VOLUME  = 0.035;  // jangkrik (0 = mati)
+const FROG_VOLUME     = 0.15;   // kodok (0 = mati)
+// ==============================
+
+const RAIN_WORKLET_SRC = `
+class RainProc extends AudioWorkletProcessor {
+  constructor(opts) {
+    super();
+    const o = opts.processorOptions;
+    this.tickP = o.tickRate / sampleRate;
+    this.roofP = o.roofRate / sampleRate;
+    this.bed = o.bedLevel;
+    this.windLevel = o.windLevel;
+    this.aHi = 1 - Math.exp(-2 * Math.PI * 6500 / sampleRate);
+    this.aLo = 1 - Math.exp(-2 * Math.PI * 1500 / sampleRate);
+    this.hiL = 0; this.hiR = 0; this.loL = 0; this.loR = 0;
+
+    // angin: dua lowpass (~400Hz) dikurangi lowpass (~90Hz), gain naik-turun pelan
+    this.wA1 = 1 - Math.exp(-2 * Math.PI * 400 / sampleRate);
+    this.wA2 = 1 - Math.exp(-2 * Math.PI * 90 / sampleRate);
+    this.wSm = 1 - Math.exp(-1 / (1.8 * sampleRate));
+    this.wa = [0, 0]; this.wb = [0, 0]; this.wl = [0, 0];
+    this.wCur = 0.3; this.wTarget = 0.3; this.wCount = 0;
+
+    this.drops = [];
+    this.alive = true;
+    this.port.onmessage = (e) => { if (e.data === 'stop') this.alive = false; };
+  }
+
+  spawn(roof) {
+    if (this.drops.length > 48) return;
+    let freq, decMs, q, amp, click;
+    if (roof) {
+      freq = 300 + Math.random() * 700;
+      decMs = 8 + Math.random() * 14;
+      q = 0.4 + Math.random() * 0.3;
+      amp = 0.05 + Math.random() * 0.10;
+      click = 0.8;
+    } else {
+      freq = 2500 + Math.random() * 4500;
+      decMs = 1.5 + Math.random() * 3.5;
+      q = 1.0 + Math.random() * 0.9;
+      amp = 0.02 + Math.random() * 0.07;
+      click = 0;
+    }
+    const pan = Math.random() * 1.8 - 0.9;
+    this.drops.push({
+      env: 1,
+      decay: Math.exp(-1 / (decMs * 0.001 * sampleRate)),
+      f: Math.min(0.9, 2 * Math.sin(Math.PI * freq / sampleRate)),
+      q, click, lp: 0, bp: 0,
+      gL: amp * (1 - pan) * 0.5,
+      gR: amp * (1 + pan) * 0.5
+    });
+  }
+
+  process(inputs, outputs) {
+    if (!this.alive) return false;
+    const L = outputs[0][0], R = outputs[0][1];
+    const drops = this.drops;
+
+    for (let i = 0; i < L.length; i++) {
+      if (Math.random() < this.tickP) this.spawn(false);
+      if (Math.random() < this.roofP) this.spawn(true);
+
+      // bed tipis
+      const wL = Math.random() * 2 - 1, wR = Math.random() * 2 - 1;
+      this.hiL += (wL - this.hiL) * this.aHi; this.loL += (wL - this.loL) * this.aLo;
+      this.hiR += (wR - this.hiR) * this.aHi; this.loR += (wR - this.loR) * this.aLo;
+      let sL = (this.hiL - this.loL) * this.bed * 3;
+      let sR = (this.hiR - this.loR) * this.bed * 3;
+
+      // angin sepoi (embusan baru tiap 3-8 detik, dihaluskan)
+      if (this.windLevel > 0) {
+        if (--this.wCount <= 0) {
+          this.wTarget = 0.15 + Math.pow(Math.random(), 2) * 0.85;
+          this.wCount = (3 + Math.random() * 5) * sampleRate;
         }
-        ambientNode = audioCtx.createBufferSource();
-        ambientNode.buffer = buffer;
-        ambientNode.loop = true;
-        ambientGain = audioCtx.createGain();
-        ambientGain.gain.value = 0.08;
-        ambientNode.connect(ambientGain);
-        ambientGain.connect(audioCtx.destination);
-        ambientNode.start();
-        isAmbientPlaying = true;
+        this.wCur += (this.wTarget - this.wCur) * this.wSm;
+        const gain = this.windLevel * this.wCur * 6;
+        for (let c = 0; c < 2; c++) {
+          const x = Math.random() * 2 - 1;
+          this.wa[c] += (x - this.wa[c]) * this.wA1;
+          this.wb[c] += (this.wa[c] - this.wb[c]) * this.wA1;
+          this.wl[c] += (x - this.wl[c]) * this.wA2;
+          const w = (this.wb[c] - this.wl[c]) * gain;
+          if (c === 0) sL += w; else sR += w;
+        }
       }
-      const btn = document.getElementById("ambientBtn");
-      const txt = document.getElementById("ambientTxt");
-      if (btn && txt) {
-        btn.style.background = isAmbientPlaying ? "rgba(162,228,245,.25)" : "rgba(255,255,255,.09)";
-        txt.textContent = isAmbientPlaying ? "Rain On" : "Rain Off";
+
+      // tetes individual
+      const white = Math.random() * 2 - 1;
+      for (let d = drops.length - 1; d >= 0; d--) {
+        const dr = drops[d];
+        dr.env *= dr.decay;
+        if (dr.env < 0.003) { drops.splice(d, 1); continue; }
+        const ex = (white + (dr.env > 0.85 ? dr.click * 2 : 0)) * dr.env;
+        dr.lp += dr.f * dr.bp;
+        const hp = ex - dr.lp - dr.q * dr.bp;
+        dr.bp += dr.f * hp;
+        const sig = dr.bp * dr.q;
+        sL += sig * dr.gL;
+        sR += sig * dr.gR;
+      }
+      L[i] = Math.tanh(sL);
+      R[i] = Math.tanh(sR);
+    }
+    return true;
+  }
+}
+registerProcessor('rain-proc', RainProc);
+`;
+
+function makeRainIR(ctx, seconds = 1.0, curve = 3.0) {
+  const len = Math.floor(ctx.sampleRate * seconds);
+  const ir = ctx.createBuffer(2, len, ctx.sampleRate);
+  for (let c = 0; c < 2; c++) {
+    const d = ir.getChannelData(c);
+    for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, curve);
+  }
+  return ir;
+}
+
+function makeThunderBuffer(ctx, d) {            // d: 0 = dekat, 1 = jauh
+  const sr = ctx.sampleRate;
+  const dur = 5 + d * 6;
+  const len = Math.floor(sr * dur);
+  const buf = ctx.createBuffer(2, len, sr);
+
+  const env = new Float32Array(len);
+  const bumps = 6 + Math.floor(Math.random() * 5);
+  for (let k = 0; k < bumps; k++) {
+    const t0  = k === 0 ? 0 : Math.random() * dur * 0.65;
+    const amp = k === 0 ? 1 : 0.2 + Math.random() * 0.5;
+    const atk = k === 0 ? 0.02 + d * 0.25 : 0.05 + Math.random() * 0.2;
+    const dec = 0.6 + Math.random() * 1.4 + d * 0.8;
+    const i0 = Math.floor(t0 * sr);
+    const n1 = Math.min(len, i0 + Math.floor((atk + dec * 5) * sr));
+    for (let n = i0; n < n1; n++) {
+      const t = (n - i0) / sr;
+      env[n] += amp * (t < atk ? t / atk : Math.exp(-(t - atk) / dec));
+    }
+  }
+
+  for (let c = 0; c < 2; c++) {
+    const out = buf.getChannelData(c);
+    let b = 0, y1 = 0, y2 = 0, peak = 0;
+    for (let n = 0; n < len; n++) {
+      const p = n / len;
+      b = (b + 0.02 * (Math.random() * 2 - 1)) / 1.02;
+      const fc = 70 + (900 - d * 600) * Math.exp(-2.5 * p);
+      const a = 1 - Math.exp(-2 * Math.PI * fc / sr);
+      y1 += (b - y1) * a;
+      y2 += (y1 - y2) * a;
+      const v = y2 * env[n] * Math.pow(1 - p, 1.5);
+      out[n] = v;
+      const av = Math.abs(v); if (av > peak) peak = av;
+    }
+    const norm = peak > 0 ? 1 / peak : 1;
+    for (let n = 0; n < len; n++) out[n] *= norm;
+
+    if (d < 0.5) {
+      const crackAmp = (0.5 - d) * 1.2;
+      const cl = Math.floor(0.3 * sr);
+      let lpC = 0;
+      for (let n = 0; n < cl; n++) {
+        lpC += ((Math.random() * 2 - 1) - lpC) * 0.35;
+        out[n] += lpC * Math.exp(-n / (0.05 * sr)) * crackAmp;
       }
     }
+    let pk = 0;
+    for (let n = 0; n < len; n++) { const av = Math.abs(out[n]); if (av > pk) pk = av; }
+    const fin = pk > 0 ? 0.9 / pk : 1;
+    for (let n = 0; n < len; n++) out[n] *= fin;
+  }
+  return buf;
+}
+
+const rand = (a, b) => a + Math.random() * (b - a);
+
+async function toggleAmbientNoise(ev) {
+  if (ev) ev.stopPropagation();
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === "suspended") await audioCtx.resume();
+
+  if (isAmbientPlaying) {
+    if (ambientStopFn) { ambientStopFn(); ambientStopFn = null; }
+    isAmbientPlaying = false;
+  } else {
+    if (!rainWorkletReady) {
+      const url = URL.createObjectURL(new Blob([RAIN_WORKLET_SRC], { type: "application/javascript" }));
+      await audioCtx.audioWorklet.addModule(url);
+      URL.revokeObjectURL(url);
+      rainWorkletReady = true;
+    }
+
+    // ====== KNOB UTAMA (gerimis) ======
+    const TICK_RATE = 50;
+    const ROOF_RATE = 6;
+    const BED_LEVEL = 0.005;
+    const VOLUME = 0.6;
+    // ==================================
+
+    const now = audioCtx.currentTime;
+    const master = audioCtx.createGain();
+    master.gain.setValueAtTime(0.0001, now);
+    master.gain.exponentialRampToValueAtTime(VOLUME, now + 1.0);
+    master.connect(audioCtx.destination);
+
+    const node = new AudioWorkletNode(audioCtx, "rain-proc", {
+      numberOfInputs: 0,
+      outputChannelCount: [2],
+      processorOptions: { tickRate: TICK_RATE, roofRate: ROOF_RATE, bedLevel: BED_LEVEL, windLevel: WIND_LEVEL }
+    });
+
+    const hp = audioCtx.createBiquadFilter();
+    hp.type = "highpass"; hp.frequency.value = 70; hp.Q.value = 0.7;
+    const lp = audioCtx.createBiquadFilter();
+    lp.type = "lowpass"; lp.frequency.value = 9000; lp.Q.value = 0.5;
+
+    const dry = audioCtx.createGain(); dry.gain.value = 0.85;
+    const wet = audioCtx.createGain(); wet.gain.value = 0.28;
+    const verb = audioCtx.createConvolver();
+    verb.buffer = makeRainIR(audioCtx);
+
+    node.connect(hp); hp.connect(lp);
+    lp.connect(dry); dry.connect(master);
+    lp.connect(verb); verb.connect(wet); wet.connect(master);
+
+    // ---------- helper timer & node ----------
+    const timers = [];
+    const liveOscs = new Set();
+    let running = true;
+
+    const later = (fn, ms) => timers.push(setTimeout(fn, ms));
+    function loop(fn, [a, b], first) {
+      later(() => { if (!running) return; fn(); loop(fn, [a, b]); }, first ?? rand(a, b));
+    }
+    // output env: gain -> panner -> (master + reverb)
+    function envOut(pan, level) {
+      const g = audioCtx.createGain(); g.gain.value = level;
+      const p = audioCtx.createStereoPanner(); p.pan.value = pan;
+      g.connect(p); p.connect(master); p.connect(verb);
+      return { input: g, free() { try { g.disconnect(); p.disconnect(); } catch {} } };
+    }
+    function track(osc, out) {
+      liveOscs.add(osc);
+      osc.onended = () => { liveOscs.delete(osc); out.free(); };
+    }
+
+    // ---------- Petir (jauh) ----------
+    function fireThunder() {
+      if (!running) return;
+      const d = 0.5 + Math.random() * 0.5;
+      const buf = makeThunderBuffer(audioCtx, d);
+      const delayMs = 300 + d * 4500;
+      if (typeof window.onRainLightning === "function") window.onRainLightning(d);
+      later(() => {
+        if (!running) return;
+        const src = audioCtx.createBufferSource();
+        src.buffer = buf;
+        const g = audioCtx.createGain();
+        g.gain.value = THUNDER_VOLUME * (1 - d * 0.55);
+        src.connect(g); g.connect(master); g.connect(verb);
+        liveOscs.add(src);
+        src.onended = () => { liveOscs.delete(src); try { g.disconnect(); } catch {} };
+        src.start();
+      }, delayMs);
+    }
+    loop(fireThunder, THUNDER_GAP_MS, rand(...THUNDER_FIRST_MS));
+
+    // ---------- Tetes talang/daun ("plok") ----------
+    function drip() {
+      const t = audioCtx.currentTime + 0.02;
+      const n = Math.random() < 0.3 ? 2 : 1;           // kadang dobel
+      const out = envOut(rand(-0.7, 0.7), DRIP_VOLUME);
+      let lastEnd = t;
+      for (let k = 0; k < n; k++) {
+        const ts = t + k * rand(0.12, 0.25);
+        const amp = k === 0 ? 1 : 0.5;
+        const osc = audioCtx.createOscillator();
+        const g = audioCtx.createGain();
+        const f0 = rand(650, 1100), f1 = rand(220, 380);
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(f0, ts);
+        osc.frequency.exponentialRampToValueAtTime(f1, ts + 0.08);
+        g.gain.setValueAtTime(0.0001, ts);
+        g.gain.exponentialRampToValueAtTime(amp, ts + 0.004);
+        g.gain.exponentialRampToValueAtTime(0.0001, ts + 0.16);
+        osc.connect(g); g.connect(out.input);
+        osc.start(ts); osc.stop(ts + 0.2);
+        lastEnd = ts + 0.2;
+        if (k === n - 1) track(osc, out); else { liveOscs.add(osc); osc.onended = () => liveOscs.delete(osc); }
+      }
+    }
+    if (DRIP_VOLUME > 0) loop(drip, DRIP_GAP_MS, rand(1500, 4000));
+
+    // ---------- Jangkrik ----------
+    function cricketSession() {
+      const t0 = audioCtx.currentTime + 0.05;
+      const dur = rand(5, 12);
+      const f = rand(4300, 5200);
+      const period = rand(0.32, 0.55);
+      const pulses = 2 + Math.floor(Math.random() * 3);
+      const pLen = 0.018, pGap = 0.028;
+      const out = envOut(rand(-0.85, 0.85), CRICKET_VOLUME);
+      const osc = audioCtx.createOscillator();
+      osc.type = "sine"; osc.frequency.value = f;
+      const g = audioCtx.createGain(); g.gain.value = 0;
+      osc.connect(g); g.connect(out.input);
+      for (let t = 0; t < dur; t += period) {
+        const s = Math.sin(Math.PI * t / dur);          // fade in-out per sesi
+        for (let k = 0; k < pulses; k++) {
+          const ts = t0 + t + k * (pLen + pGap);
+          g.gain.setValueAtTime(0, ts);
+          g.gain.linearRampToValueAtTime(s, ts + 0.005);
+          g.gain.linearRampToValueAtTime(s, ts + pLen * 0.7);
+          g.gain.linearRampToValueAtTime(0, ts + pLen);
+        }
+      }
+      osc.start(t0); osc.stop(t0 + dur + period + 0.1);
+      track(osc, out);
+    }
+    if (CRICKET_VOLUME > 0) loop(cricketSession, [6000, 20000], rand(2000, 6000));
+
+    // ---------- Kodok ----------
+    function frogSession() {
+      const t0 = audioCtx.currentTime + 0.05;
+      const croaks = 2 + Math.floor(Math.random() * 4);
+      const f0 = rand(110, 170);
+      const out = envOut(rand(-0.9, 0.9), FROG_VOLUME);
+      const osc = audioCtx.createOscillator();
+      osc.type = "sawtooth";
+      const bp = audioCtx.createBiquadFilter();
+      bp.type = "bandpass"; bp.frequency.value = rand(350, 550); bp.Q.value = 1.5;
+      const g = audioCtx.createGain(); g.gain.value = 0;
+      osc.connect(bp); bp.connect(g); g.connect(out.input);
+      let end = t0;
+      for (let c = 0; c < croaks; c++) {
+        const ts = t0 + c * rand(0.38, 0.5);
+        const len = rand(0.22, 0.32);
+        osc.frequency.setValueAtTime(f0 * 1.25, ts);
+        osc.frequency.exponentialRampToValueAtTime(f0 * 0.9, ts + len);
+        const pulseP = 0.034;                            // ~29 Hz pulse train
+        for (let t = 0; t < len; t += pulseP) {
+          const bell = Math.sin(Math.PI * t / len);
+          const tp = ts + t;
+          g.gain.setValueAtTime(0, tp);
+          g.gain.linearRampToValueAtTime(bell, tp + 0.008);
+          g.gain.linearRampToValueAtTime(0, tp + pulseP * 0.9);
+        }
+        end = ts + len + 0.05;
+      }
+      osc.start(t0); osc.stop(end + 0.1);
+      track(osc, out);
+    }
+    if (FROG_VOLUME > 0) loop(frogSession, [12000, 40000], rand(5000, 15000));
+
+    ambientStopFn = () => {
+      running = false;
+      timers.forEach(clearTimeout);
+      liveOscs.forEach(s => { try { s.stop(); } catch {} });
+      try {
+        const t = audioCtx.currentTime;
+        master.gain.setValueAtTime(Math.max(master.gain.value, 0.0001), t);
+        master.gain.exponentialRampToValueAtTime(0.0001, t + 0.5);
+        setTimeout(() => {
+          try {
+            node.port.postMessage("stop");
+            node.disconnect(); hp.disconnect(); lp.disconnect();
+            dry.disconnect(); wet.disconnect(); verb.disconnect(); master.disconnect();
+          } catch {}
+        }, 550);
+      } catch {}
+    };
+    isAmbientPlaying = true;
+  }
+
+  const btn = document.getElementById("ambientBtn");
+  const txt = document.getElementById("ambientTxt");
+  if (btn && txt) {
+    btn.style.background = isAmbientPlaying ? "rgba(162,228,245,.25)" : "rgba(255,255,255,.1)";
+    txt.textContent = isAmbientPlaying ? "Rain On" : "Rain";
+  }
+}
 
     // ================= MASTER VOLUME CONTROL =================
     let sysVol = 50;
@@ -1671,50 +2162,124 @@
       img.src = dataUrl;
     }
 
+    let lyricFetchToken = 0;
+
+    function cleanSongTitleForSearch(rawTitle) {
+      return String(rawTitle || "")
+        .replace(/\(.*?(official|lyric|video|audio|visualizer|mv|remaster|feat|ft\.|live|ver\.|version).*?\)/gi, "")
+        .replace(/\[.*?(official|lyric|video|audio|visualizer|mv|remaster|feat|ft\.|live|hd|4k).*?\]/gi, "")
+        .replace(/\b(official\s*(music\s*)?video|lyric\s*video|official\s*audio|remastered(\s*\d{4})?)\b/gi, "")
+        .replace(/\s*[-|]\s*(official|lyrics?|video|audio|remastered).*$/gi, "")
+        .replace(/\s+(feat\.?|ft\.?)\s+.*$/gi, "")
+        .replace(/\s+/g, " ")
+        .trim();
+    }
+
+    function cleanArtistForSearch(rawArtist) {
+      return String(rawArtist || "")
+        .replace(/-\s*Topic$/i, "")
+        .replace(/VEVO$/i, "")
+        .replace(/\b(official|channel|music)\b/gi, "")
+        .split(/[,&/;]/)[0]
+        .replace(/\s+/g, " ")
+        .trim();
+    }
+
+    function pickBestLyricMatch(list, targetDur) {
+      if (!Array.isArray(list) || !list.length) return null;
+      const withSynced = list.filter(item => item && item.syncedLyrics);
+      if (withSynced.length > 0) {
+        if (targetDur > 5) {
+          withSynced.sort((a, b) => Math.abs((a.duration || 0) - targetDur) - Math.abs((b.duration || 0) - targetDur));
+        }
+        return withSynced[0];
+      }
+      const withPlain = list.filter(item => item && item.plainLyrics);
+      return withPlain.length > 0 ? withPlain[0] : null;
+    }
+
     async function fetchLyricsLRCLIB(title, artist) {
+      const myToken = ++lyricFetchToken;
       const lyrList = document.getElementById("lyrList");
       lyrList.innerHTML = `<li class="on">${NOTE_SVG}</li><li>Mencari lirik...</li>`;
       setIdleLyricPlain("Mencari lirik...");
       parsedLyrics = [];
       lastActiveLyrIdx = -1;
-      updateDynamicLyricsWidth("");
+      updateDynamicLyricsWidth("", "");
 
-      const cleanTitle = title.replace(/\(.*?\)|\[.*?\]/g, "").trim();
-      const cleanArtist = artist.replace(/- Topic/i, "").trim();
+      const cleanTitle = cleanSongTitleForSearch(title) || title.trim();
+      const cleanArtist = cleanArtistForSearch(artist);
 
-      try {
-        const q = new URLSearchParams({ track_name: cleanTitle, artist_name: cleanArtist });
-        const res = await fetch(`https://lrclib.net/api/search?${q}`);
-        const list = await res.json();
-        const best = Array.isArray(list) ? list.find(item => item.syncedLyrics) : null;
-
-        if (!best || !best.syncedLyrics) {
-          lyrList.innerHTML = `<li class="on">${NOTE_SVG}</li><li>Lirik belum tersedia</li>`;
-          setIdleLyricFallbackTitle(title);
-          return;
+      // Susun kandidat query bertingkat agar lagu dari YouTube / Browser / Spotify selalu ketemu
+      const searchAttempts = [];
+      if (cleanTitle && cleanArtist) {
+        searchAttempts.push(`track_name=${encodeURIComponent(cleanTitle)}&artist_name=${encodeURIComponent(cleanArtist)}`);
+        searchAttempts.push(`q=${encodeURIComponent(cleanTitle + " " + cleanArtist)}`);
+      }
+      // Jika judul mengandung "Artis - Judul Lagu" (umum di YouTube/Browser)
+      if (cleanTitle.includes(" - ") || cleanTitle.includes(" – ")) {
+        const parts = cleanTitle.split(/\s+[-–]\s+/);
+        if (parts.length >= 2) {
+          const pArtist = parts[0].trim();
+          const pTrack = parts.slice(1).join(" ").trim();
+          searchAttempts.push(`track_name=${encodeURIComponent(pTrack)}&artist_name=${encodeURIComponent(pArtist)}`);
+          searchAttempts.push(`q=${encodeURIComponent(pArtist + " " + pTrack)}`);
+          searchAttempts.push(`q=${encodeURIComponent(pTrack)}`);
         }
+      }
+      if (cleanTitle) {
+        searchAttempts.push(`q=${encodeURIComponent(cleanTitle)}`);
+      }
 
-        if (curDur <= 1 && best.duration > 0) curDur = best.duration;
+      let best = null;
+      for (const queryStr of searchAttempts) {
+        if (myToken !== lyricFetchToken) return;
+        try {
+          const res = await fetch(`https://lrclib.net/api/search?${queryStr}`);
+          if (!res.ok) continue;
+          const list = await res.json();
+          best = pickBestLyricMatch(list, curDur);
+          if (best && best.syncedLyrics) break;
+        } catch {}
+      }
 
-        parsedLyrics.push({ time: 0, text: "♪", isNote: true });
+      if (myToken !== lyricFetchToken) return;
+
+      if (!best || (!best.syncedLyrics && !best.plainLyrics)) {
+        lyrList.innerHTML = `<li class="on">${NOTE_SVG}</li><li>Lirik belum tersedia</li>`;
+        setIdleLyricFallbackTitle(title);
+        return;
+      }
+
+      if (curDur <= 1 && best.duration > 0) curDur = best.duration;
+
+      parsedLyrics.push({ time: 0, text: "♪", isNote: true });
+
+      if (best.syncedLyrics) {
         const regex = /\[(\d{2}):(\d{2})\.(\d{2,3})\](.*)/;
         best.syncedLyrics.split("\n").forEach(line => {
           const m = line.match(regex);
           if (m) {
-            const t = parseInt(m[1]) * 60 + parseInt(m[2]) + parseInt(m[3].padEnd(3, "0")) / 1000;
+            const t = parseInt(m[1], 10) * 60 + parseInt(m[2], 10) + parseInt(m[3].padEnd(3, "0"), 10) / 1000;
             const rawTxt = m[4].trim();
             parsedLyrics.push({ time: t, text: rawTxt || "♪", isNote: !rawTxt });
           }
         });
-
-        lyrList.innerHTML = parsedLyrics.map((l, i) =>
-          `<li onclick="seekToSec(${l.time})" data-idx="${i}">${l.isNote ? NOTE_SVG : esc(l.text)}</li>`
-        ).join("");
-        syncLyricScroll();
-      } catch {
-        lyrList.innerHTML = `<li class="on">${NOTE_SVG}</li><li>Gagal memuat lirik</li>`;
-        setIdleLyricFallbackTitle(title);
+      } else if (best.plainLyrics) {
+        // Fallback jika hanya ada plainLyrics: bagi rata timestamp sepanjang durasi lagu
+        const rawLines = best.plainLyrics.split("\n").map(s => s.trim()).filter(Boolean);
+        const effDur = curDur > 10 ? curDur : 180;
+        const stepSec = effDur / Math.max(1, rawLines.length + 1);
+        rawLines.forEach((lineTxt, idx) => {
+          parsedLyrics.push({ time: (idx + 1) * stepSec, text: lineTxt, isNote: false });
+        });
       }
+
+      lyrList.innerHTML = parsedLyrics.map((l, i) =>
+        `<li onclick="seekToSec(${l.time})" data-idx="${i}">${l.isNote ? NOTE_SVG : esc(l.text)}</li>`
+      ).join("");
+      lastActiveLyrIdx = -1;
+      syncLyricScroll();
     }
 
     function syncLyricScroll() {
@@ -1728,23 +2293,36 @@
 
       const activeLine = parsedLyrics[activeIdx];
       const lineStr = activeLine.isNote ? "Instrumental..." : activeLine.text;
+      const rawActiveTxt = activeLine.isNote ? "" : activeLine.text;
 
-      updateDynamicLyricsWidth(activeLine.isNote ? "" : activeLine.text);
+      updateDynamicLyricsWidth(rawActiveTxt);
 
       const lyrList = document.getElementById("lyrList");
       const items = lyrList.querySelectorAll("li");
-      items.forEach((li, i) => li.classList.toggle("on", i === activeIdx));
 
-      requestAnimationFrame(() => {
-        const activeEl = items[activeIdx];
-        if (activeEl) {
-          lyrList.style.transform = `translateY(${52 - activeEl.offsetTop - activeEl.offsetHeight / 2}px)`;
-        }
+      // Maksimal ruang teks lirik saat Notch melebar penuh (1060px - 282px - 24px margin = 754px)
+      const maxAvailTextPx = 754;
+      const measuredPx = rawActiveTxt
+        ? measureTextPx(rawActiveTxt, '700 14.5px "Segoe UI Variable Text", "Segoe UI", sans-serif')
+        : 0;
+      const fittedFontSize = (measuredPx > maxAvailTextPx)
+        ? Math.max(11, (14.5 * (maxAvailTextPx / measuredPx))).toFixed(1) + "px"
+        : "";
+
+      items.forEach((li, i) => {
+        const isCurrent = (i === activeIdx);
+        li.classList.toggle("on", isCurrent);
+        li.style.fontSize = isCurrent ? fittedFontSize : "";
       });
+
+      // Karena setiap <li> kini dikunci setinggi 28px (1 baris), posisi Y selalu akurat 100%
+      // dan tidak pernah terpengaruh oleh animasi lebar Notch
+      const rowHeight = 28;
+      const centerOffset = 52 - (activeIdx * rowHeight) - (rowHeight / 2);
+      lyrList.style.transform = `translateY(${centerOffset}px)`;
 
       setIdleLyricPlain(lineStr);
     }
-
     function updateMediaUI() {
       document.querySelectorAll(".js-pos").forEach(e => e.textContent = fmtTime(curPos));
       const rem = curDur > 0 ? Math.max(0, curDur - curPos) : 0;
@@ -1875,7 +2453,10 @@
 
       document.getElementById("waterCurr").textContent = (waterCurr / 1000).toFixed(2);
       document.getElementById("waterGoalTxt").textContent = `/ ${(waterGoal / 1000).toFixed(1)} L`;
-      document.getElementById("waterSubTxt").textContent = `${drunkCups} dari ${totalCups} gelas hari ini`;
+      document.getElementById("waterSubTxt").textContent =
+      appLanguage === "en"
+        ? `${drunkCups} of ${totalCups} glasses today`
+        : `${drunkCups} dari ${totalCups} gelas hari ini`;
       document.getElementById("drinkBtn").textContent = `${waterCup} ml`;
       document.getElementById("waterPctBig").textContent = pct + "%";
       document.getElementById("waterWave").style.height = pct + "%";
@@ -1921,7 +2502,9 @@
           showCustomPeek(
             `<svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:#A2E4F5"><path d="M12 2.8s6 6.5 6 11.2a6 6 0 0 1-12 0c0-4.7 6-11.2 6-11.2z"/></svg>`,
             "Water Reminder",
-            `Waktunya minum ${waterCup} ml air!`,
+            appLanguage === "en"
+            ? `Time to drink ${waterCup} ml of water!`
+            : `Waktunya minum ${waterCup} ml air!`,
             pct + "%",
             "#A2E4F5",
             pct
@@ -1942,51 +2525,116 @@
     let lastDragEnd = 0;
     let lastClickIdx = -1;
 
-    function renderShelf() {
-      if (!filesOnShelf.length) {
-        shelfZone.style.display = "flex";
-        shelfItems.style.display = "none";
-        shelfClearBtn.style.display = "none";
-        if (shelfAllBtn) shelfAllBtn.style.display = "none";
-        return;
-      }
-      shelfZone.style.display = "none";
-      shelfItems.style.display = "flex";
-      shelfClearBtn.style.display = "flex";
+    
+function renderShelf() {
+  const isEnglish = appLanguage === "en";
 
-      const allSelected = filesOnShelf.every(f => f.selected !== false);
-      if (shelfAllBtn) {
-        shelfAllBtn.style.display = "flex";
-        shelfAllBtn.classList.toggle("on", allSelected);
-      }
+  if (!filesOnShelf.length) {
+    shelfZone.style.display = "flex";
+    shelfItems.style.display = "none";
+    shelfClearBtn.style.display = "none";
 
-      const keepScroll = shelfItems.scrollLeft;
-      shelfItems.innerHTML = filesOnShelf.map((f, i) => {
-        const isSel = f.selected !== false;
-        return `
-        <div class="sh-card ${isSel ? 'selected' : ''}"
-             title="${esc(f.name)}${f.size_str ? ' (' + esc(f.size_str) + ')' : ''}"
-             onmousedown="onCardMouseDown(event, ${i})"
-             onclick="onCardClick(event, ${i})"
-             ondblclick="onCardDblClick(event, ${i})"
-             oncontextmenu="revealShelfItem(event, ${i})">
-          <span class="sh-sel" onmousedown="event.stopPropagation()" title="Klik untuk pilih / batal pilih">
-            <svg viewBox="0 0 10 10"><path d="M2 5l2.2 2.2L8 2.5"/></svg>
-          </span>
-          <span class="sh-del" onmousedown="event.stopPropagation()" ondblclick="event.stopPropagation()" onclick="removeShelfItem(event, ${i})" title="Hapus">
-            <svg viewBox="0 0 10 10"><path d="M2 2l6 6M8 2L2 8"/></svg>
-          </span>
-          ${f.thumb_b64
-            ? `<img class="sh-thumb" src="${f.thumb_b64}" alt="">`
-            : `<svg class="f-ico" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>`
-          }
-          <span class="sh-name">${esc(f.name)}</span>
-          <span class="sh-ext">${esc(f.size_str || f.ext || 'FILE')}</span>
-        </div>`;
-      }).join("");
-      shelfItems.scrollTo({ left: keepScroll, behavior: "instant" });
-      updateShelfCount();
+    if (shelfAllBtn) {
+      shelfAllBtn.style.display = "none";
     }
+
+    // Terjemahkan petunjuk drop file jika elemen tersedia.
+    const zoneText = shelfZone.querySelector(
+      "[data-i18n='shelf-empty']"
+    );
+
+    if (zoneText) {
+      zoneText.textContent = isEnglish
+        ? "Drop files here to add them to your shelf"
+        : "Jatuhkan file di sini untuk menambahkannya ke shelf";
+    }
+
+    return;
+  }
+
+  shelfZone.style.display = "none";
+  shelfItems.style.display = "flex";
+  shelfClearBtn.style.display = "flex";
+
+  const allSelected = filesOnShelf.every(
+    f => f.selected !== false
+  );
+
+  if (shelfAllBtn) {
+    shelfAllBtn.style.display = "flex";
+    shelfAllBtn.classList.toggle("on", allSelected);
+    shelfAllBtn.title = isEnglish
+      ? "Select / deselect all files"
+      : "Pilih / batal pilih semua file";
+  }
+
+  const keepScroll = shelfItems.scrollLeft;
+
+  shelfItems.innerHTML = filesOnShelf.map((f, i) => {
+    const isSel = f.selected !== false;
+
+    const fileTitle =
+      `${esc(f.name)}${f.size_str
+        ? " (" + esc(f.size_str) + ")"
+        : ""}`;
+
+    return `
+      <div class="sh-card ${isSel ? "selected" : ""}"
+           title="${fileTitle}"
+           onmousedown="onCardMouseDown(event, ${i})"
+           onclick="onCardClick(event, ${i})"
+           ondblclick="onCardDblClick(event, ${i})"
+           oncontextmenu="revealShelfItem(event, ${i})">
+
+        <span class="sh-sel"
+              onmousedown="event.stopPropagation()"
+              title="${isEnglish
+                ? "Click to select / deselect"
+                : "Klik untuk pilih / batal pilih"}">
+          <svg viewBox="0 0 10 10">
+            <path d="M2 5l2.2 2.2L8 2.5"/>
+          </svg>
+        </span>
+
+        <span class="sh-del"
+              onmousedown="event.stopPropagation()"
+              ondblclick="event.stopPropagation()"
+              onclick="removeShelfItem(event, ${i})"
+              title="${isEnglish ? "Remove file" : "Hapus file"}">
+          <svg viewBox="0 0 10 10">
+            <path d="M2 2l6 6M8 2L2 8"/>
+          </svg>
+        </span>
+
+        ${f.thumb_b64
+          ? `<img class="sh-thumb"
+                  src="${f.thumb_b64}"
+                  alt="">`
+          : `<svg class="f-ico" viewBox="0 0 24 24">
+               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+               <path d="M14 2v6h6"/>
+             </svg>`
+        }
+
+        <span class="sh-name">${esc(f.name)}</span>
+        <span class="sh-ext">${esc(f.size_str || f.ext || "FILE")}</span>
+      </div>`;
+  }).join("");
+
+  shelfItems.scrollTo({
+    left: keepScroll,
+    behavior: "instant"
+  });
+
+  updateShelfCount();
+
+  if (shelfClearBtn) {
+    shelfClearBtn.title = isEnglish
+      ? "Remove all files from shelf"
+      : "Hapus semua file dari shelf";
+  }
+}
+
 
     function updateShelfCount() {
       if (!shelfAllBtn) return;
@@ -2182,20 +2830,40 @@
       listEl.classList.toggle("horiz", todoStyle === "horizontal");
 
       if (!todos.length) {
-        listEl.innerHTML = `<div class="dim" style="font-size:11px;margin:auto 0;text-align:center;grid-column:1/-1">Belum ada tugas hari ini</div>`;
+        listEl.innerHTML = `
+          <div class="dim"
+              style="font-size:11px;margin:auto 0;text-align:center;grid-column:1/-1">
+            ${appLanguage === "en"
+              ? "No tasks for today"
+              : "Belum ada tugas hari ini"}
+          </div>`;
         return;
       }
       listEl.innerHTML = todos.map((t, i) => `
         <div class="trow ${t.done ? 'done' : ''}" onclick="toggleTodo(${i}, event)">
           <div class="trow-left">
             <span class="chk"><svg viewBox="0 0 10 10"><path d="M2 5l2.2 2.2L8 2.5"/></svg></span>
-            <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(t.text)}</span>
+            <span class="trow-txt mq-box js-todo-txt" data-maxw="132" data-font="400 11.5px Segoe UI">${esc(t.text)}</span>
           </div>
           <span class="tdel" onclick="deleteTodo(event, ${i})">
             <svg viewBox="0 0 10 10"><path d="M2 2l6 6M8 2L2 8"/></svg>
           </span>
         </div>
       `).join("");
+
+      listEl.querySelectorAll(".js-todo-txt").forEach((el, idx) => {
+        if (todos[idx]) {
+          delete el.dataset.rawText;
+          const raw = todos[idx].text;
+          const maxW = parseFloat(el.dataset.maxw || "132");
+          const textW = measureTextPx(raw, "400 11.5px Segoe UI");
+          if (textW > maxW) {
+            const dur = Math.max(5.5, (textW + 32) / 26).toFixed(1) + "s";
+            el.classList.add("is-marquee");
+            el.innerHTML = `<span class="mq-track" style="--mq-dur:${dur}"><span>${esc(raw)}</span><span class="mq-gap">•</span><span>${esc(raw)}</span><span class="mq-gap">•</span></span>`;
+          }
+        }
+      });
     }
     function toggleTodo(i, ev) {
       if (ev) ev.stopPropagation();
@@ -2246,6 +2914,7 @@
     });
 
     function applyConfigData(cfg) {
+      applyLanguage(cfg.language === "en" ? "en" : "id");
       const prevStyle = mascotStyle;
       const prevPomoMin = pomoDefaultMin;
       const prevBreakMin = pomoBreakMin;

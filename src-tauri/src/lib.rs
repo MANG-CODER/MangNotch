@@ -610,6 +610,7 @@ pub struct VolumePayload {
 #[derive(Clone, Serialize, Deserialize, Debug)]
 #[serde(default)]
 pub struct AppConfig {
+    pub language: String,
     pub use_primary_monitor: bool,
     pub selected_monitor_index: usize,
     pub hide_on_fullscreen: bool,
@@ -642,6 +643,7 @@ pub struct AppConfig {
 impl Default for AppConfig {
     fn default() -> Self {
         Self {
+            language: "id".to_string(),
             use_primary_monitor: true,
             selected_monitor_index: 0,
             hide_on_fullscreen: true,
@@ -712,6 +714,9 @@ fn load_config_from_disk() -> AppConfig {
             cfg.active_width = 155;
             cfg.active_height = 32;
             cfg.resting_width = 155;
+            if cfg.language != "id" && cfg.language != "en" {
+                cfg.language = "id".to_string();
+            }
             if cfg.interaction_mode != "click" && cfg.interaction_mode != "hover" {
                 cfg.interaction_mode = "hover".to_string();
             }
@@ -1250,7 +1255,9 @@ unsafe fn check_window_obstruction(
 
     let is_browser = class_name.contains("Chrome_WidgetWin") || class_name.contains("Mozilla");
     if !is_browser {
-        return false;
+        // Semua aplikasi non-browser (Video Player, Media Player, dll.) yang di-maximize
+        // langsung memicu Smart Proximity agar Notch mengecil menjadi garis minimalis
+        return true;
     }
 
     let sample_ys = [mon_rect.top + 14, mon_rect.top + 22, mon_rect.top + 28];
@@ -2014,6 +2021,7 @@ pub fn run() {
                 let mut last_paste_down = false;
                 let mut hotkey_pinned_open = false;
                 let mut last_audio_peak: f32 = 0.0;
+                let mut drag_start_pt: Option<POINT> = None;
 
                 loop {
                     thread::sleep(Duration::from_millis(40));
@@ -2092,14 +2100,25 @@ pub fn run() {
                             }
                         }
 
-                        // 1. Deteksi Aplikasi Fullscreen Murni
+                        // 1. Deteksi Aplikasi Fullscreen Murni & Borderless Video Player
                         if cfg.hide_on_fullscreen {
                             if fg_is_same_mon && !is_desktop && fg != ctrl_win_hwnd {
                                 let m = mi.rcMonitor;
-                                let fullscreen = fg_rect.left == m.left
-                                    && fg_rect.top == m.top
-                                    && fg_rect.right == m.right
-                                    && fg_rect.bottom == m.bottom;
+                                let style = GetWindowLongPtrW(fg, GWL_STYLE) as u32;
+                                let has_caption = (style & 0x00C00000) != 0;
+
+                                let exact_fullscreen = (fg_rect.left - m.left).abs() <= 2
+                                    && (fg_rect.top - m.top).abs() <= 2
+                                    && (fg_rect.right - m.right).abs() <= 2
+                                    && (fg_rect.bottom - m.bottom).abs() <= 2;
+
+                                let borderless_fullscreen = !has_caption
+                                    && fg_rect.left <= m.left + 2
+                                    && fg_rect.top <= m.top + 2
+                                    && fg_rect.right >= m.right - 2
+                                    && fg_rect.bottom >= m.bottom - 2;
+
+                                let fullscreen = exact_fullscreen || borderless_fullscreen;
 
                                 if fullscreen && !is_hidden_by_fs {
                                     let _ = ShowWindow(hwnd, SW_HIDE);
@@ -2115,10 +2134,6 @@ pub fn run() {
                         } else if is_hidden_by_fs {
                             let _ = ShowWindow(hwnd, SW_SHOWNOACTIVATE);
                             is_hidden_by_fs = false;
-                        }
-
-                        if is_hidden_by_fs {
-                            continue;
                         }
 
                         // 2. Smart Proximity Auto-Shrink
@@ -2365,7 +2380,25 @@ pub fn run() {
                         // 4. Smart Hover, Safe-Zone Lebar & Proteksi Jendela Control Center
                         let mut pt = POINT::default();
                         if GetCursorPos(&mut pt).is_ok() {
-                            let is_mouse_dragging = (GetKeyState(0x01) as u16 & 0x8000) != 0;
+                            let lbutton_down = (GetKeyState(0x01) as u16 & 0x8000) != 0;
+                            if lbutton_down {
+                                if drag_start_pt.is_none() {
+                                    drag_start_pt = Some(pt);
+                                }
+                            } else {
+                                drag_start_pt = None;
+                            }
+
+                            let scale_px =
+                                |value: i32| (value as f64 * dpi_scale).round() as i32;
+
+                            // Hanya anggap drag file jika klik dimulai dari bawah area address bar (> 85px)
+                            // dan kursor sudah ditarik minimal 24px
+                            let is_mouse_dragging = drag_start_pt.map_or(false, |start| {
+                                start.y > win_rect.top + scale_px(85)
+                                    && ((pt.x - start.x).abs() + (pt.y - start.y).abs())
+                                        > scale_px(24)
+                            });
 
                             let effective_w = if is_hovered
                                 && (cfg.interaction_mode != "click"
@@ -2387,18 +2420,15 @@ pub fn run() {
                             };
 
                             let is_expanded = effective_h >= 100;
-                            let is_minimal =
-                                (is_obstructed || effective_h <= 12) && !is_mouse_dragging;
-
-                            let scale_px =
-                                |value: i32| (value as f64 * dpi_scale).round() as i32;
+                            let is_minimal = is_obstructed || effective_h <= 12;
 
                             let (half_w, hit_bottom) = if !is_hovered && is_minimal {
-                                (scale_px(65), win_rect.top + scale_px(6))
-                            } else if is_expanded || is_mouse_dragging {
+                                let top_zone = if is_mouse_dragging { 10 } else { 6 };
+                                (scale_px(65), win_rect.top + scale_px(top_zone))
+                            } else if is_expanded {
                                 (
-                                    scale_px(effective_w.max(240) / 2 + 55),
-                                    win_rect.top + scale_px(effective_h.max(48) + 40),
+                                    scale_px(effective_w / 2 + 55),
+                                    win_rect.top + scale_px(effective_h + 40),
                                 )
                             } else {
                                 (

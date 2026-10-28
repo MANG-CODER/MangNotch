@@ -610,7 +610,7 @@
         </div>
       </div>
             <div class="hdr-right">
-        <span class="ver-pill" id="hdrVerPill">v1.2.0</span>
+        <span class="ver-pill" id="hdrVerPill">v1.3.0</span>
         <button class="close-btn" id="closeBtn" title="Tutup">
           <svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg>
         </button>
@@ -665,6 +665,16 @@
             <svg viewBox="0 0 24 24"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4"/></svg>
             Perilaku Layar & Interaksi
           </div>
+        </div>
+        <div class="row">
+          <div class="lbl-wrap">
+            <b>Bahasa Aplikasi</b>
+            <small>Pilih bahasa antarmuka MangNotch</small>
+          </div>
+          <select id="languageSelect">
+            <option value="id">🇮🇩 Bahasa Indonesia</option>
+            <option value="en">🇺🇸 English</option>
+          </select>
         </div>
         <div class="row">
           <div class="lbl-wrap">
@@ -897,7 +907,7 @@
             <img class="js-app-logo" alt="MangNotch">
           </div>
           <div class="about-title">
-            <h2>MangNotch <span id="aboutVerTxt" style="font-size:12px;color:var(--pink);font-weight:600">v1.2.0</span></h2>
+            <h2>MangNotch <span id="aboutVerTxt" style="font-size:12px;color:var(--pink);font-weight:600">v1.3.0</span></h2>
             <p>Interactive Living Notch & Productivity Companion dengan sentuhan estetika editorial <i>MangNime</i>.</p>
             <div class="tag-list">
               <span class="tag">Rust Backend</span>
@@ -970,6 +980,7 @@
     const { invoke } = window.__TAURI__.core;
     const { listen } = window.__TAURI__.event;
 
+    const languageSelect = document.getElementById("languageSelect");
     const interactionSelect = document.getElementById("interactionSelect");
     const todoStyleSelect = document.getElementById("todoStyleSelect");
     const startWinChk = document.getElementById("startWinChk");
@@ -1010,10 +1021,77 @@
       const active = document.querySelector(`#mascotCards .m-card[data-m="${cfg.mascot_style}"] .m-preview`);
       document.getElementById("npMascot").innerHTML = active ? active.innerHTML : "";
     }
-    let APP_VERSION = "1.2.0";
+    let APP_VERSION = "1.3.0";
     const VERSION_MANIFEST_URL = "https://raw.githubusercontent.com/MANG-CODER/MangNotch/main/version.json";
     const customSelectRegistry = new Map();
     const esc = (s) => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+
+    const ID_TO_EN = {"Tutup": "Close", "Pembaruan Tersedia!": "Update Available!", "Versi terbaru siap diunduh.": "A new version is ready to download.", "Update Sekarang": "Update Now", "Pembaruan Wajib Diperlukan": "Required Update", "Versi MangNotch yang kamu gunakan sudah tidak didukung karena perbaikan penting. Silakan perbarui ke versi terbaru.": "Your version of MangNotch is no longer supported due to important fixes. Please update to the latest version.", "Perbarui MangNotch Sekarang": "Update MangNotch Now", "Produktivitas": "Productivity", "TAB 1: DISPLAY & SYSTEM": "TAB 1: DISPLAY & SYSTEM", "Perilaku Layar & Interaksi": "Display & Interaction", "Gaya Interaksi Membuka Notch": "Notch Interaction Mode", "Pilih melebar otomatis saat disentuh kursor atau harus diklik dulu": "Choose whether the notch expands on hover or only after clicking", "Hover Biasa (Default)": "Standard Hover (Default)", "Klik Dulu Baru Melebar": "Click to Expand", "Jalankan MangNotch otomatis di background saat komputer menyala": "Start MangNotch automatically in the background when Windows starts", "Monitor & Tampilan": "Monitor & Display", "Selalu di Primary Monitor": "Use Primary Monitor", "Ikuti layar utama Windows secara otomatis": "Automatically follow the primary Windows display", "Pilih Monitor Manual": "Choose Monitor Manually", "Pindahkan Notch ke layar eksternal tertentu": "Move the notch to a specific external display", "Auto-Hide Total saat Fullscreen": "Auto-hide in Fullscreen", "Sembunyikan Notch 100% saat bermain game atau video F11": "Completely hide the notch during games or fullscreen videos", "Otomatis mengecil ke garis minimalis saat tertutup tab browser/jendela": "Automatically shrink to a minimal line when covered by a browser tab or window", "Pop-up animasi Volume, Brightness, Bluetooth, Caps Lock & Charger": "Animated pop-ups for volume, brightness, Bluetooth, Caps Lock, and charging", "TAB 2: MASCOT & THEME": "TAB 2: MASCOT & THEME", "Pilih Karakter Maskot MangNotch": "Choose Your MangNotch Mascot", "Blob Imut": "Cute Blob", "Spirit Orbs": "Spirit Orbs", "Tampilan Notch Saat Idle": "Idle Notch Appearance", "Saat mode Lirik aktif, otomatis menampilkan 1 baris lirik": "When lyrics mode is active, automatically show one line of lyrics", "Jam & Equalizer": "Clock & Equalizer", "Minimalis (Garis Tipis)": "Minimal (Thin Line)", "Palet Warna Cahaya Notch": "Notch Glow Color Palette", "Termasuk palet MangNime Dark Dusk (Pink - Lavender - Ice Cyan)": "Includes the MangNime Dark Dusk palette (Pink - Lavender - Ice Cyan)", "TAB 3: POMODORO, WATER & TASKS": "TAB 3: POMODORO, WATER & TASKS", "Durasi Fokus & Short Break (Menit)": "Focus & Short Break Duration (Minutes)", "Waktu sesi fokus utama & jeda istirahat": "Main focus session and break duration", "Suara Chime Pomodoro": "Pomodoro Chime Sound", "Bunyikan chime saat waktu fokus selesai": "Play a chime when a focus session ends", "Water Tracker & Chime (Auto-Reset Harian)": "Water Tracker & Chime (Daily Auto-Reset)", "Target Harian & Ukuran Gelas (ml)": "Daily Goal & Cup Size (ml)", "Otomatis reset ke 0 ml setiap pergantian hari": "Automatically reset to 0 ml at the start of each day", "Aktifkan Pengingat Minum Berkala": "Enable Periodic Water Reminders", "Tampilkan pop-up notifikasi minum di Notch sesuai interval": "Show water reminder pop-ups on the notch at the selected interval", "Interval Pengingat Minum (Menit)": "Water Reminder Interval (Minutes)", "Jeda waktu antar pop-up pengingat minum": "Time between water reminder pop-ups", "Suara Chime Tap Pertakaran (+ Drink)": "Water Tap Chime Sound (+ Drink)", "Bunyikan chime saat menekan tombol tambah minum": "Play a chime when adding water", "Suara Chime Notifikasi Pengingat Minum": "Water Reminder Chime Sound", "Bunyikan chime saat pop-up pengingat minum berkala muncul": "Play a chime when a periodic water reminder appears", "Kelola Daftar Tugas (To-Do List)": "Manage To-Do List", "Gaya Tampilan To-Do List di Notch": "To-Do List Layout on the Notch", "Jika > 2 tugas, gulir ke samping (Horizontal) atau atas-bawah": "When there are more than 2 tasks, scroll horizontally or vertically", "Geser ke Samping (Horizontal)": "Horizontal Scrolling", "List Atas-Bawah (Vertikal)": "Vertical List", "Tambah": "Add", "TAB 4: ABOUT PAGE": "TAB 4: ABOUT PAGE", "Interactive Living Notch & Productivity Companion dengan sentuhan estetika editorial": "Interactive Living Notch & Productivity Companion with an editorial aesthetic", "Integrasi Windows GSMTC, kontrol master volume real-time, warna album, dan lirik.": "Windows GSMTC integration, real-time master volume control, album colors, and lyrics.", "Simpan file sementara via Drag-in dari Explorer & Drag-out langsung ke WhatsApp/Discord.": "Temporarily store files by dragging them in from Explorer and dragging them directly into WhatsApp/Discord.", "Timer Pomodoro kustom, pencatat hidrasi auto-reset harian, & To-Do List dual style.": "Custom Pomodoro timer, daily auto-reset hydration tracker, and two To-Do List layouts.", "Pop-up interaktif Volume, Brightness, Bluetooth, Caps Lock, Charger & auto-shrink.": "Interactive pop-ups for volume, brightness, Bluetooth, Caps Lock, charging, and auto-shrink.", "Pengembang, Landing Page & Open Source": "Developer, Landing Page & Open Source", "Kunjungi halaman resmi MangNotch & repositori kode sumber": "Visit the official MangNotch page and source repository", "Data & Konfigurasi Lokal": "Local Data & Configuration", "Tersimpan otomatis di %AppData%\\MangNotch\\config.json": "Automatically saved to %AppData%\\MangNotch\\config.json", "Buka Folder Data": "Open Data Folder", "Tersimpan ✓": "Saved ✓", "Belum ada tugas hari ini.": "No tasks for today yet.", "Hapus Tugas": "Delete Task", "Bahasa Aplikasi": "App Language", "Pilih bahasa antarmuka MangNotch": "Choose the MangNotch interface language", "Bahasa Indonesia": "Indonesian", "English": "English", "Sistem": "System", "Maskot": "Mascot", "Tentang": "About", "Ketik tugas baru untuk ditampilkan di Notch...":
+  "Enter a new task to display on the Notch...",
+"Kelola Daftar Tugas (To-Do List)":
+  "Manage To-Do List",
+"Gaya Tampilan To-Do List di Notch":
+  "To-Do List Layout on the Notch",
+"Belum ada tugas hari ini.":
+  "No tasks for today yet.",
+"Hapus Tugas":
+  "Delete Task",
+"Tambah":
+  "Add",
+"Pelacak Air":
+  "Water Tracker",
+"Rak File":
+  "File Shelf",
+"Daftar Tugas":
+  "Todo List",};
+    const EN_TO_ID = Object.fromEntries(Object.entries(ID_TO_EN).map(([id, en]) => [en, id]));
+    let appLanguage = "id";
+    const i18nOriginalText = new WeakMap();
+    const i18nOriginalAttrs = new WeakMap();
+    function translateValue(value, lang) {
+      const dict = lang === "en" ? ID_TO_EN : EN_TO_ID;
+      return Object.prototype.hasOwnProperty.call(dict, value) ? dict[value] : value;
+    }
+    function translateTextNode(node) {
+      if (!node || !node.parentElement || node.parentElement.closest("script,style,noscript")) return;
+      let original = i18nOriginalText.get(node);
+      if (original === undefined) { original = node.nodeValue; i18nOriginalText.set(node, original); }
+      const trimmed = original.trim();
+      if (!trimmed) return;
+      const translated = translateValue(trimmed, appLanguage);
+      const nextValue = original.replace(trimmed, translated);
+      if (node.nodeValue !== nextValue) node.nodeValue = nextValue;
+    }
+    function applyLanguage(lang) {
+      appLanguage = lang === "en" ? "en" : "id";
+      document.documentElement.lang = appLanguage;
+      document.querySelectorAll("body *").forEach(el => {
+        for (const attr of ["title", "placeholder", "aria-label", "alt", "data-name"]) {
+          if (!el.hasAttribute(attr)) continue;
+          let attrs = i18nOriginalAttrs.get(el);
+          if (!attrs) { attrs = {}; i18nOriginalAttrs.set(el, attrs); }
+          if (!(attr in attrs)) attrs[attr] = el.getAttribute(attr);
+          const original = attrs[attr];
+          el.setAttribute(attr, translateValue(original, appLanguage));
+        }
+        el.childNodes.forEach(child => { if (child.nodeType === Node.TEXT_NODE) translateTextNode(child); });
+      });
+      if (typeof refreshAllCustomSelects === "function") refreshAllCustomSelects();
+    }
+    const i18nObserver = new MutationObserver(records => {
+      for (const record of records) {
+        if (record.type === "characterData") translateTextNode(record.target);
+        record.addedNodes && record.addedNodes.forEach(node => {
+          if (node.nodeType === Node.TEXT_NODE) translateTextNode(node);
+          else if (node.nodeType === Node.ELEMENT_NODE && !node.closest("script,style,noscript")) {
+            node.querySelectorAll("*").forEach(el => el.childNodes.forEach(ch => { if (ch.nodeType === Node.TEXT_NODE) translateTextNode(ch); }));
+            node.childNodes.forEach(ch => { if (ch.nodeType === Node.TEXT_NODE) translateTextNode(ch); });
+          }
+        });
+      }
+    });
+    i18nObserver.observe(document.documentElement, {subtree:true, childList:true, characterData:true});
 
     function setupCustomSelect(selectEl) {
       selectEl.classList.add("native-hidden");
@@ -1095,7 +1173,7 @@
     }
 
     async function initControl() {
-      [interactionSelect, todoStyleSelect, restSelect, monSelect].forEach(setupCustomSelect);
+      [languageSelect, interactionSelect, todoStyleSelect, restSelect, monSelect].forEach(setupCustomSelect);
 
       try {
         APP_VERSION = await invoke("get_app_version");
@@ -1115,6 +1193,8 @@
 
     function populateUI(cfg) {
       currentCfg = cfg;
+      languageSelect.value = cfg.language === "en" ? "en" : "id";
+      applyLanguage(languageSelect.value);
       if (cfg.mascot_style === "visor") cfg.mascot_style = "mochi";
       interactionSelect.value = cfg.interaction_mode || "hover";
       todoStyleSelect.value = cfg.todo_style || "horizontal";
@@ -1201,6 +1281,7 @@
       monSelect.disabled = primaryChk.checked;
       waterInterval.disabled = !waterRemindEnableChk.checked;
 
+      currentCfg.language = languageSelect.value === "en" ? "en" : "id";
       currentCfg.interaction_mode = interactionSelect.value;
       currentCfg.todo_style = todoStyleSelect.value;
       currentCfg.start_with_windows = startWinChk.checked;
@@ -1305,10 +1386,10 @@
     }
 
     [
-      interactionSelect, todoStyleSelect, startWinChk, primaryChk, monSelect, fsChk, proxChk, peekChk,
+      languageSelect, interactionSelect, todoStyleSelect, startWinChk, primaryChk, monSelect, fsChk, proxChk, peekChk,
       soundChk, waterRemindEnableChk, waterTapSoundChk, waterRemSoundChk, restSelect,
     ].forEach(el => {
-      el.addEventListener("change", saveAll);
+      el.addEventListener("change", () => { if (el === languageSelect) applyLanguage(languageSelect.value); saveAll(); });
       el.addEventListener("input", saveAll);
     });
     [waterGoal, waterCup, waterInterval, pomoMin, pomoBreakMin].forEach(el => {
