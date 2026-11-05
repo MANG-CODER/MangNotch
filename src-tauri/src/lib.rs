@@ -8,6 +8,8 @@ use std::sync::{
 };
 use std::thread;
 use std::time::Duration;
+
+static SHELF_FILE_DRAG_ACTIVE: AtomicBool = AtomicBool::new(false);
 use tauri::{
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
@@ -45,8 +47,11 @@ use windows::{
             Power::{GetSystemPowerStatus, SYSTEM_POWER_STATUS},
             Threading::CreateMutexW,
         },
-        UI::{
-            Input::KeyboardAndMouse::{GetAsyncKeyState, GetKeyState, ReleaseCapture},
+                UI::{
+            Input::KeyboardAndMouse::{
+                keybd_event, GetAsyncKeyState, GetKeyState, ReleaseCapture, KEYEVENTF_KEYUP,
+                VK_MEDIA_NEXT_TRACK, VK_MEDIA_PLAY_PAUSE, VK_MEDIA_PREV_TRACK,
+            },
             Shell::{
                 BHID_DataObject, FileOpenDialog, IFileOpenDialog, IShellItemArray, SHDoDragDrop,
                 ShellExecuteW, FOS_ALLOWMULTISELECT, FOS_FILEMUSTEXIST, FOS_FORCEFILESYSTEM,
@@ -210,6 +215,15 @@ extern "system" {
 }
 
 #[cfg(windows)]
+#[repr(C)]
+struct DwmMargins {
+    cx_left_width: i32,
+    cx_right_width: i32,
+    cy_top_height: i32,
+    cy_bottom_height: i32,
+}
+
+#[cfg(windows)]
 #[link(name = "dwmapi")]
 extern "system" {
     fn DwmSetWindowAttribute(
@@ -218,6 +232,7 @@ extern "system" {
         pv_attribute: *const std::ffi::c_void,
         cb_attribute: u32,
     ) -> i32;
+    fn DwmExtendFrameIntoClientArea(hwnd: isize, p_mar_inset: *const DwmMargins) -> i32;
 }
 
 #[cfg(windows)]
@@ -617,12 +632,29 @@ pub struct AppConfig {
     pub smart_proximity: bool,
     pub start_with_windows: bool,
     pub interaction_mode: String,
+    pub hover_close_speed: String,
+    pub enable_hotkey: bool,
     pub todo_style: String,
     pub resting_mode: String,
     pub mascot_style: String,
     pub theme_preset: String,
+    pub album_art_glow: bool,
+    pub lyrics_pinned_open: bool,
+    pub glass_fill: f32,
+    pub glass_blur: f32,
+    pub glass_rim: f32,
+    pub enable_audio_visualizer: bool,
+    pub ambient_volume: u32,
     pub enable_peeks: bool,
+    pub peek_duration_ms: u32,
+    pub peek_volume: bool,
+    pub peek_brightness: bool,
+    pub peek_mic: bool,
+    pub peek_charging: bool,
+    pub peek_bluetooth: bool,
+    pub peek_capslock: bool,
     pub enable_sound: bool,
+    pub pomo_auto_break: bool,
     pub water_reminder_enabled: bool,
     pub water_tap_sound: bool,
     pub water_reminder_sound: bool,
@@ -650,12 +682,29 @@ impl Default for AppConfig {
             smart_proximity: true,
             start_with_windows: false,
             interaction_mode: "hover".to_string(),
+            hover_close_speed: "normal".to_string(),
+            enable_hotkey: true,
             todo_style: "horizontal".to_string(),
             resting_mode: "pet".to_string(),
             mascot_style: "neko".to_string(),
             theme_preset: "dusk".to_string(),
+            album_art_glow: true,
+            lyrics_pinned_open: false,
+            glass_fill: 0.045,
+            glass_blur: 6.0,
+            glass_rim: 0.07,
+            enable_audio_visualizer: true,
+            ambient_volume: 55,
             enable_peeks: true,
+            peek_duration_ms: 2400,
+            peek_volume: true,
+            peek_brightness: true,
+            peek_mic: true,
+            peek_charging: true,
+            peek_bluetooth: true,
+            peek_capslock: true,
             enable_sound: true,
+            pomo_auto_break: false,
             water_reminder_enabled: true,
             water_tap_sound: true,
             water_reminder_sound: true,
@@ -703,6 +752,37 @@ fn get_config_dir() -> PathBuf {
     dir
 }
 
+pub struct TrayMenuState {
+    pub show_item: MenuItem<tauri::Wry>,
+    pub quit_item: MenuItem<tauri::Wry>,
+    pub tray_icon: tauri::tray::TrayIcon<tauri::Wry>,
+}
+
+fn apply_tray_language(app: &AppHandle, lang: &str) {
+    if let Some(tray_state) = app.try_state::<TrayMenuState>() {
+        let is_en = lang == "en";
+        let show_txt = if is_en {
+            "Open MangNotch Control"
+        } else {
+            "Buka MangNotch Control"
+        };
+        let quit_txt = if is_en {
+            "Quit MangNotch"
+        } else {
+            "Keluar dari MangNotch"
+        };
+        let tooltip_txt = if is_en {
+            "MangNotch - Click to open Control Center"
+        } else {
+            "MangNotch - Klik untuk membuka Control Center"
+        };
+
+        let _ = tray_state.show_item.set_text(show_txt);
+        let _ = tray_state.quit_item.set_text(quit_txt);
+        let _ = tray_state.tray_icon.set_tooltip(Some(tooltip_txt));
+    }
+}
+
 fn get_config_path() -> PathBuf {
     get_config_dir().join("config.json")
 }
@@ -723,6 +803,9 @@ fn load_config_from_disk() -> AppConfig {
             if cfg.todo_style != "horizontal" && cfg.todo_style != "vertical" {
                 cfg.todo_style = "horizontal".to_string();
             }
+            cfg.glass_fill = cfg.glass_fill.clamp(0.0, 0.20);
+            cfg.glass_blur = cfg.glass_blur.clamp(0.0, 24.0);
+            cfg.glass_rim = cfg.glass_rim.clamp(0.0, 0.20);
             return cfg;
         }
     }
@@ -741,40 +824,114 @@ fn unblock_file_motw(path: &str) {
     let _ = fs::remove_file(ads_path);
 }
 
+const RUN_SUBKEY: &str = "Software\\Microsoft\\Windows\\CurrentVersion\\Run";
+const RUN_VALUE: &str = "MangNotch";
+const STARTUP_TASK_ID: &str = "MangNotchStartup";
+
+#[cfg(windows)]
+fn wide(s: &str) -> Vec<u16> {
+    s.encode_utf16().chain(std::iter::once(0)).collect()
+}
+
+/// True kalau app jalan sebagai MSIX/Store (path-nya di dalam WindowsApps).
+#[cfg(windows)]
+fn is_packaged_app() -> bool {
+    std::env::current_exe()
+        .map(|p| p.to_string_lossy().contains("WindowsApps"))
+        .unwrap_or(false)
+}
+
+#[cfg(windows)]
+fn run_key_delete() {
+    let (k, v) = (wide(RUN_SUBKEY), wide(RUN_VALUE));
+    unsafe {
+        let _ = RegDeleteKeyValueW(HKEY_CURRENT_USER, k.as_ptr(), v.as_ptr());
+    }
+}
+
+#[cfg(windows)]
+fn run_key_set() {
+    let Ok(exe_path) = std::env::current_exe() else {
+        return;
+    };
+    let cmd = wide(&format!("\"{}\"", exe_path.to_string_lossy()));
+    let (k, v) = (wide(RUN_SUBKEY), wide(RUN_VALUE));
+    unsafe {
+        let _ = RegSetKeyValueW(
+            HKEY_CURRENT_USER,
+            k.as_ptr(),
+            v.as_ptr(),
+            REG_SZ,
+            cmd.as_ptr() as *const std::ffi::c_void,
+            (cmd.len() * 2) as u32,
+        );
+    }
+}
+
+/// MSIX: autostart HARUS lewat StartupTask (sesuai Package.appxmanifest).
+/// Registry HKCU\...\Run dari dalam MSIX itu di-virtualisasi, jadi nggak dibaca Windows
+/// saat boot dan nggak bisa menghapus entry "asli" yang ditulis versi non-MSIX.
+#[cfg(windows)]
+fn set_packaged_startup(enable: bool) {
+    // thread terpisah: RequestEnableAsync bisa memunculkan dialog persetujuan,
+    // jangan sampai nge-freeze main thread.
+    std::thread::spawn(move || unsafe {
+        use windows::core::HSTRING;
+        use windows::ApplicationModel::{StartupTask, StartupTaskState};
+        let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
+        let Ok(task) = StartupTask::GetAsync(&HSTRING::from(STARTUP_TASK_ID)).and_then(|op| op.get())
+        else {
+            return;
+        };
+        if enable {
+            if task.State().map(|s| s == StartupTaskState::Disabled).unwrap_or(false) {
+                let _ = task.RequestEnableAsync().and_then(|op| op.get());
+            }
+            // DisabledByUser / DisabledByPolicy: cuma user yang bisa nyalain lewat
+            // Settings > Apps > Startup. Nggak bisa dipaksa dari kode.
+        } else {
+            let _ = task.Disable();
+        }
+    });
+}
+
+/// Status startup MSIX yang sebenarnya menurut Windows (source of truth).
+#[cfg(windows)]
+fn query_packaged_startup() -> Option<bool> {
+    std::thread::spawn(|| unsafe {
+        use windows::core::HSTRING;
+        use windows::ApplicationModel::{StartupTask, StartupTaskState};
+        let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
+        let task = StartupTask::GetAsync(&HSTRING::from(STARTUP_TASK_ID))
+            .and_then(|op| op.get())
+            .ok()?;
+        let st = task.State().ok()?;
+        Some(st == StartupTaskState::Enabled || st == StartupTaskState::EnabledByPolicy)
+    })
+    .join()
+    .ok()
+    .flatten()
+}
+
 fn apply_autostart(enable: bool) {
     #[cfg(windows)]
-    unsafe {
-        let sub_key: Vec<u16> = "Software\\Microsoft\\Windows\\CurrentVersion\\Run\0"
-            .encode_utf16()
-            .collect();
-        let val_name: Vec<u16> = "MangNotch\0".encode_utf16().collect();
-
-        if enable {
-            if let Ok(exe_path) = std::env::current_exe() {
-                let exe_str = exe_path.to_string_lossy().to_string();
-                let launch_cmd = if exe_str.contains("WindowsApps") {
-                    "explorer.exe shell:AppsFolder\\vestiapani.MangNotch_33rhz9prkc4x8!mangNotch"
-                        .to_string()
-                } else {
-                    format!("\"{}\"", exe_str)
-                };
-                let data_wide: Vec<u16> = launch_cmd
-                    .encode_utf16()
-                    .chain(std::iter::once(0))
-                    .collect();
-                let _ = RegSetKeyValueW(
-                    HKEY_CURRENT_USER,
-                    sub_key.as_ptr(),
-                    val_name.as_ptr(),
-                    REG_SZ,
-                    data_wide.as_ptr() as *const std::ffi::c_void,
-                    (data_wide.len() * 2) as u32,
-                );
+    {
+        if is_packaged_app() {
+            run_key_delete(); // bersihin sisa lama kalau bisa (best effort)
+            set_packaged_startup(enable);
+        } else if enable {
+            // build debug jangan daftarin exe dev ke autostart
+            if !cfg!(debug_assertions) {
+                run_key_set();
             }
         } else {
-            let _ = RegDeleteKeyValueW(HKEY_CURRENT_USER, sub_key.as_ptr(), val_name.as_ptr());
+            // BUG LAMA: dulu `return` di debug build, jadi toggle OFF nggak pernah
+            // menghapus entry. Sekarang hapus selalu jalan.
+            run_key_delete();
         }
     }
+    #[cfg(not(windows))]
+    let _ = enable;
 }
 
 fn show_control_center_safe(app: &AppHandle) {
@@ -1463,6 +1620,7 @@ fn save_full_config(app: AppHandle, state: State<'_, SharedState>, new_cfg: AppC
     cfg.resting_width = resting_w;
 
     apply_autostart(cfg.start_with_windows);
+    apply_tray_language(&app, &cfg.language);
     save_config_to_disk(&cfg);
 
     if NOTCH_POSITIONED.load(Ordering::SeqCst) {
@@ -1497,6 +1655,14 @@ fn sync_widget_data(
         }
     }
     cfg.shelf = shelf;
+    save_config_to_disk(&cfg);
+    let _ = app.emit("config-updated", cfg.clone());
+}
+
+#[tauri::command]
+fn set_lyrics_pinned(app: AppHandle, state: State<'_, SharedState>, pinned: bool) {
+    let mut cfg = state.0.lock().unwrap();
+    cfg.lyrics_pinned_open = pinned;
     save_config_to_disk(&cfg);
     let _ = app.emit("config-updated", cfg.clone());
 }
@@ -1811,22 +1977,30 @@ fn notch_ready(app: AppHandle, state: State<'_, SharedState>) {
 fn media_action(action: String) {
     #[cfg(windows)]
     {
+        let mut handled = false;
         if let Ok(manager) = GlobalSystemMediaTransportControlsSessionManager::RequestAsync()
             .and_then(|op| op.get())
         {
             if let Ok(session) = manager.GetCurrentSession() {
-                match action.as_str() {
-                    "play_pause" => {
-                        let _ = session.TryTogglePlayPauseAsync();
-                    }
-                    "next" => {
-                        let _ = session.TrySkipNextAsync();
-                    }
-                    "prev" => {
-                        let _ = session.TrySkipPreviousAsync();
-                    }
-                    _ => {}
-                }
+                let res = match action.as_str() {
+                    "play_pause" => session.TryTogglePlayPauseAsync().and_then(|op| op.get()),
+                    "next" => session.TrySkipNextAsync().and_then(|op| op.get()),
+                    "prev" => session.TrySkipPreviousAsync().and_then(|op| op.get()),
+                    _ => Ok(true),
+                };
+                handled = matches!(res, Ok(true));
+            }
+        }
+        if !handled {
+            let vk = match action.as_str() {
+                "play_pause" => VK_MEDIA_PLAY_PAUSE,
+                "next" => VK_MEDIA_NEXT_TRACK,
+                "prev" => VK_MEDIA_PREV_TRACK,
+                _ => return,
+            };
+            unsafe {
+                keybd_event(vk.0 as u8, 0, Default::default(), 0);
+                keybd_event(vk.0 as u8, 0, KEYEVENTF_KEYUP, 0);
             }
         }
     }
@@ -1848,6 +2022,83 @@ fn media_seek(position_sec: f64) {
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
+#[derive(serde::Serialize)]
+struct LyricsHttpResp {
+    status: u16,
+    body: String,
+}
+
+/// GET https ke penyedia lirik tertentu (allowlist) menggunakan HTTP bawaan Windows (WinRT).
+#[tauri::command]
+async fn lyrics_http_get(url: String) -> Result<LyricsHttpResp, String> {
+    const ALLOWED: [&str; 8] = [
+        "lrclib.net",
+        "lyricsplus.binimum.org",
+        "lyricsplus.prjktla.my.id",
+        "lyrics.paxsenix.org",
+        "lyrics-api.boidu.dev",
+        "api-lyrics.simpmusic.org",
+        "lyrics.kugou.com",
+        "mobileservice.kugou.com",
+    ];
+    let host = url
+        .strip_prefix("https://")
+        .and_then(|rest| rest.split(&['/', '?', '#'][..]).next())
+        .ok_or_else(|| "hanya https yang diizinkan".to_string())?;
+    if !ALLOWED.contains(&host) {
+        return Err(format!("host tidak diizinkan: {host}"));
+    }
+
+    tauri::async_runtime::spawn_blocking(move || {
+        #[cfg(windows)]
+        unsafe {
+            use windows::{
+                core::HSTRING,
+                Foundation::Uri,
+                Web::Http::HttpClient,
+            };
+
+            let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
+            let uri = Uri::CreateUri(&HSTRING::from(url.as_str()))
+                .map_err(|e| e.to_string())?;
+            let client = HttpClient::new().map_err(|e| e.to_string())?;
+
+            if let Ok(headers) = client.DefaultRequestHeaders() {
+                if let Ok(ua) = headers.UserAgent() {
+                    let _ = ua.TryParseAdd(&HSTRING::from("MangNotch/1.3 (lyrics)"));
+                }
+                if let Ok(acc) = headers.Accept() {
+                    let _ = acc.TryParseAdd(&HSTRING::from("application/json"));
+                }
+            }
+
+            let resp = client
+                .GetAsync(&uri)
+                .map_err(|e| e.to_string())?
+                .get()
+                .map_err(|e| e.to_string())?;
+
+            let status = resp.StatusCode().map(|s| s.0 as u16).unwrap_or(500);
+            let body = match resp.Content() {
+                Ok(content) => content
+                    .ReadAsStringAsync()
+                    .and_then(|op| op.get())
+                    .map(|s| s.to_string())
+                    .unwrap_or_default(),
+                Err(_) => String::new(),
+            };
+
+            Ok(LyricsHttpResp { status, body })
+        }
+        #[cfg(not(windows))]
+        {
+            Err("hanya didukung di Windows".to_string())
+        }
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 pub fn run() {
     let mut show_ctrl_event: isize = 0;
     #[cfg(windows)]
@@ -1874,9 +2125,22 @@ pub fn run() {
     }
 
     std::env::set_var("SEE_MASK_NOZONECHECKS", "1");
-    let initial_cfg = load_config_from_disk();
-    if initial_cfg.start_with_windows {
-        apply_autostart(true);
+    let mut initial_cfg = load_config_from_disk();
+    #[cfg(windows)]
+    {
+        if is_packaged_app() {
+            // MSIX: status asli ada di Windows (user bisa matiin lewat Settings/Task Manager),
+            // jadi config ngikut OS, bukan sebaliknya.
+            if let Some(on) = query_packaged_startup() {
+                if on != initial_cfg.start_with_windows {
+                    initial_cfg.start_with_windows = on;
+                    save_config_to_disk(&initial_cfg);
+                }
+            }
+        } else {
+            // non-MSIX: sinkronkan Run key dengan config tiap launch (nyalain ATAU hapus sisa lama)
+            apply_autostart(initial_cfg.start_with_windows);
+        }
     }
 
     let shared_cfg = Arc::new(Mutex::new(initial_cfg));
@@ -1896,6 +2160,7 @@ pub fn run() {
                     let state = app.state::<SharedState>();
                     match drag_ev {
                         DragDropEvent::Enter { paths, .. } => {
+                            SHELF_FILE_DRAG_ACTIVE.store(true, Ordering::SeqCst);
                             if let Ok(mut c) = state.0.lock() {
                                 c.active_width = c.active_width.max(420);
                                 c.active_height = c.active_height.max(140);
@@ -1907,6 +2172,7 @@ pub fn run() {
                             let _ = app.emit("shelf-drag-enter", str_paths);
                         }
                         DragDropEvent::Drop { paths, .. } => {
+                            SHELF_FILE_DRAG_ACTIVE.store(false, Ordering::SeqCst);
                             let str_paths: Vec<String> = paths
                                 .iter()
                                 .map(|p| p.to_string_lossy().to_string())
@@ -1914,6 +2180,7 @@ pub fn run() {
                             let _ = app.emit("shelf-drag-drop", str_paths);
                         }
                         DragDropEvent::Leave => {
+                            SHELF_FILE_DRAG_ACTIVE.store(false, Ordering::SeqCst);
                             let _ = app.emit("shelf-drag-leave", ());
                         }
                         _ => {}
@@ -1954,7 +2221,15 @@ pub fn run() {
             if let Some(icon) = app.default_window_icon() {
                 tray_builder = tray_builder.icon(icon.clone());
             }
-            let _ = tray_builder.build(app)?;
+            let tray_icon = tray_builder.build(app)?;
+            app.manage(TrayMenuState {
+                show_item: show_item.clone(),
+                quit_item: quit_item.clone(),
+                tray_icon,
+            });
+
+            let init_cfg_snapshot = bg_cfg.lock().unwrap().clone();
+            apply_tray_language(app.handle(), &init_cfg_snapshot.language);
 
             let notch_win = app.get_webview_window("notch").unwrap();
             let notch_hwnd = get_hwnd(&notch_win).unwrap();
@@ -1964,6 +2239,37 @@ pub fn run() {
                 .and_then(|w| get_hwnd(&w))
                 .unwrap_or_default();
 
+            #[cfg(windows)]
+            if !ctrl_hwnd.0.is_null() {
+                unsafe {
+                    // Perluas frame kaca ke seluruh area jendela agar tembus pandang ke wallpaper
+                    let margins = DwmMargins {
+                        cx_left_width: -1,
+                        cx_right_width: -1,
+                        cy_top_height: -1,
+                        cy_bottom_height: -1,
+                    };
+                    let _ = DwmExtendFrameIntoClientArea(ctrl_hwnd.0 as isize, &margins);
+
+                    // Sudut membulat halus native Windows 11 (DWMWCP_ROUND = 2)
+                    let round: u32 = 2;
+                    let _ = DwmSetWindowAttribute(
+                        ctrl_hwnd.0 as isize,
+                        DWMWA_WINDOW_CORNER_PREFERENCE,
+                        &round as *const _ as *const std::ffi::c_void,
+                        4,
+                    );
+
+                    // Efek Acrylic Blur native Windows 11 (DWMWA_SYSTEMBACKDROP_TYPE = 38, Acrylic = 3)
+                    let acrylic: u32 = 3;
+                    let _ = DwmSetWindowAttribute(
+                        ctrl_hwnd.0 as isize,
+                        38,
+                        &acrylic as *const _ as *const std::ffi::c_void,
+                        4,
+                    );
+                }
+            }
             let init_cfg_snapshot = bg_cfg.lock().unwrap().clone();
 
             // 1. Pasang WndProc hook + Cloak + matikan border DWM + parkir di atas layar
@@ -2165,7 +2471,7 @@ pub fn run() {
                         let caps_now = (GetKeyState(0x14) & 1) != 0;
                         if caps_now != last_caps {
                             last_caps = caps_now;
-                            if cfg.enable_peeks {
+                            if cfg.enable_peeks && cfg.peek_capslock {
                                 let _ = app_handle.emit(
                                     "system-peek",
                                     SystemPeekPayload {
@@ -2189,7 +2495,7 @@ pub fn run() {
                                 last_vol = cur_vol.volume;
                                 last_muted = cur_vol.muted;
                                 let _ = app_handle.emit("volume-sync", cur_vol.clone());
-                                if cfg.enable_peeks {
+                                if cfg.enable_peeks && cfg.peek_volume {
                                     let _ = app_handle.emit(
                                         "system-peek",
                                         SystemPeekPayload {
@@ -2215,7 +2521,7 @@ pub fn run() {
                         if tick_counter % 5 == 0 {
                             if let Some(br) = read_screen_brightness() {
                                 if let Some(prev_br) = last_brightness {
-                                    if br != prev_br && cfg.enable_peeks {
+                                    if br != prev_br && cfg.enable_peeks && cfg.peek_brightness {
                                         let _ = app_handle.emit(
                                             "system-peek",
                                             SystemPeekPayload {
@@ -2241,7 +2547,7 @@ pub fn run() {
                                     100
                                 };
                                 let ac = sps.ACLineStatus;
-                                if last_ac != 255 && ac != last_ac && cfg.enable_peeks {
+                                if last_ac != 255 && ac != last_ac && cfg.enable_peeks && cfg.peek_charging {
                                     let _ = app_handle.emit(
                                         "system-peek",
                                         SystemPeekPayload {
@@ -2278,7 +2584,7 @@ pub fn run() {
                                     .map(|c| c != bt.connected_count)
                                     .unwrap_or(false);
 
-                                if (radio_changed || conn_changed) && cfg.enable_peeks {
+                                if (radio_changed || conn_changed) && cfg.enable_peeks && cfg.peek_bluetooth {
                                     let label = if !bt.radio_on {
                                         "Adapter Turned Off".to_string()
                                     } else if bt.connected_count > 0 && !bt.device_name.is_empty() {
@@ -2306,7 +2612,8 @@ pub fn run() {
                         }
 
                         // 3F. Real-Time Audio Peak Meter
-                        if tick_counter % 2 == 0 {
+                        if cfg.enable_audio_visualizer && tick_counter % 2 == 0 {
+                            
                             let peak = read_audio_peak();
                             if (peak - last_audio_peak).abs() > 0.025
                                 || (peak == 0.0 && last_audio_peak > 0.0)
@@ -2322,7 +2629,7 @@ pub fn run() {
                                 if let Some(prev_mic) = last_mic_muted {
                                     if mic_muted != prev_mic {
                                         let _ = app_handle.emit("mic-sync", mic_muted);
-                                        if cfg.enable_peeks {
+                                        if cfg.enable_peeks && cfg.peek_mic {
                                             let _ = app_handle.emit(
                                                 "system-peek",
                                                 SystemPeekPayload {
@@ -2347,7 +2654,7 @@ pub fn run() {
                         let alt_down = (GetAsyncKeyState(0x12) as u16 & 0x8000) != 0;
                         let n_down = (GetAsyncKeyState(0x4E) as u16 & 0x8000) != 0;
                         let hotkey_now = alt_down && n_down;
-                        if hotkey_now && !last_hotkey_down {
+                        if cfg.enable_hotkey && hotkey_now && !last_hotkey_down {
                             hotkey_pinned_open = !hotkey_pinned_open;
                             is_hovered = hotkey_pinned_open;
                             outside_ticks = 0;
@@ -2380,6 +2687,11 @@ pub fn run() {
                         // 4. Smart Hover, Safe-Zone Lebar & Proteksi Jendela Control Center
                         let mut pt = POINT::default();
                         if GetCursorPos(&mut pt).is_ok() {
+                            if SHELF_FILE_DRAG_ACTIVE.load(Ordering::SeqCst) {
+                                let local_x = ((pt.x - win_rect.left) as f64 / dpi_scale).round();
+                                let local_y = ((pt.y - win_rect.top) as f64 / dpi_scale).round();
+                                let _ = app_handle.emit("shelf-drag-position", serde_json::json!({"x": local_x, "y": local_y}));
+                            }
                             let lbutton_down = (GetKeyState(0x01) as u16 & 0x8000) != 0;
                             if lbutton_down {
                                 if drag_start_pt.is_none() {
@@ -2480,7 +2792,12 @@ pub fn run() {
                                 && !NOTCH_TEXT_INPUT.load(Ordering::SeqCst)
                             {
                                 outside_ticks += 1;
-                                let required_ticks = if is_expanded { 7 } else { 3 };
+                                let base_exp_ticks = match cfg.hover_close_speed.as_str() {
+                                    "fast" => 4,
+                                    "relaxed" => 13,
+                                    _ => 7,
+                                };
+                                let required_ticks = if is_expanded { base_exp_ticks } else { 3 };
                                 if outside_ticks >= required_ticks {
                                     is_hovered = false;
                                     outside_ticks = 0;
@@ -2544,7 +2861,9 @@ pub fn run() {
             set_notch_text_input,
             notch_ready,
             media_action,
-            media_seek
+            media_seek,
+            lyrics_http_get,
+            set_lyrics_pinned,
         ])
         .run(tauri::generate_context!())
         .expect("error while running MangNotch");

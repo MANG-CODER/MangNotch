@@ -2,63 +2,145 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<meta name="color-scheme" content="dark">
 <style>
+  @property --spec { syntax: "<number>"; inherits: false; initial-value: 0; }
+
   :root {
     --c1: #FFB7C5; --c2: #E2D1F9; --c3: #A2E4F5;
     --glow: linear-gradient(90deg, var(--c1), var(--c2) 55%, var(--c3));
     --lyr-glow: linear-gradient(90deg, #2b1d38, #4a2d5e 50%, #1f2a44);
-    --ui: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
-    --spring: cubic-bezier(0.34, 1.32, 0.5, 1);
     --dyn-lyr-w: 520px;
     --dyn-idle-lyr-w: 340px;
+
+    --ink: #f7f3fa;
+    --ink-2: rgba(247, 243, 250, .68);
+    --ink-3: rgba(247, 243, 250, .48);
+    --on-accent: #140d1c;
+    --ok: #33e07a;
+    --danger: #ff7b8b;
+
+    --hy-ink: #1b1222;
+    --hy-ink-soft: rgba(27, 18, 34, .58);
+    --hy-ink-accent: color-mix(in srgb, var(--c1) 45%, #4a1430);
+
+    --ui: -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+    --ui-display: -apple-system, BlinkMacSystemFont, "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+
+    --spring: cubic-bezier(0.28, 1.18, 0.38, 1);
+    --spring-pop: cubic-bezier(0.32, 1.28, 0.42, 1);
+    --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+    --ease-fluid: cubic-bezier(.22, 1, .36, 1);
+    --ease-inout: cubic-bezier(.65, 0, .35, 1);
+    --spring-soft: cubic-bezier(.28, 1.14, .4, 1);
+
+    --notch-base: #0c0914;
+    --track: rgba(255, 255, 255, 0.16);
+
+    --lg-flat: rgba(255, 255, 255, .05);
+    --lg-flat-hover: rgba(255, 255, 255, .09);
+    --lg-flat-active: rgba(255, 255, 255, .065);
+
+    --hy-rim: linear-gradient(150deg, rgba(255,255,255,.48) 0%, rgba(255,255,255,.11) 28%, rgba(255,255,255,.04) 58%, rgba(255,255,255,.27) 100%);
+    --hy-milk: linear-gradient(160deg, color-mix(in srgb, var(--c1) 12%, rgba(255,255,255,.95)) 0%, color-mix(in srgb, var(--c2) 18%, rgba(255,255,255,.86)) 100%);
+    --hy-milk-c3: linear-gradient(160deg, color-mix(in srgb, var(--c3) 16%, rgba(255,255,255,.95)) 0%, color-mix(in srgb, var(--c2) 14%, rgba(255,255,255,.86)) 100%);
+    --sl-surface-sheen: linear-gradient(180deg, rgba(255,255,255,.035), rgba(255,255,255,0) 70%);
+    --nf: drop-shadow(0 7px 10px rgba(0,0,0,.32)) drop-shadow(0 0 0 transparent);
   }
+
   * { box-sizing: border-box; user-select: none; }
   html, body {
     margin: 0; padding: 0;
     background: transparent !important;
     overflow: hidden;
     font-family: var(--ui);
+    -webkit-font-smoothing: antialiased;
   }
   .holder {
     display: flex; justify-content: center; align-items: flex-start;
     width: 100vw; height: 100vh;
   }
+
+  /* ==========================================================================
+     1. SHELL UTAMA (.mn) — Satu Siluet Utuh & Ringan di GPU
+     ========================================================================== */
   .mn {
     --w: 155px; --h: 30px; --r: 14px; --e: 10px;
-    position: relative; width: var(--w); height: var(--h);
-    background: #08060c; border-radius: 0 0 var(--r) var(--r);
-    transition: width .52s var(--spring), height .56s var(--spring), border-radius .4s ease, box-shadow .25s ease;
-    color: #f6f2f8; font-size: 13px; line-height: 1;
+    position: relative;
+    width: var(--w); height: var(--h);
+    background: var(--notch-base);
+    border-radius: 0 0 var(--r) var(--r);
+    color: var(--ink); font-size: 13px; line-height: 1;
+    filter: var(--nf);
+    isolation: isolate;
+    transform: translateZ(0);
+    will-change: width, height, border-radius;
+    backface-visibility: hidden;
+    transition:
+      width .40s var(--spring),
+      height .42s var(--spring),
+      border-radius .34s var(--ease-out),
+      filter .3s ease;
   }
   .mn.click-ready {
     cursor: pointer;
-    box-shadow: 0 2px 14px rgba(255, 183, 197, 0.22);
+    filter: drop-shadow(0 7px 10px rgba(0,0,0,.32)) drop-shadow(0 0 10px rgba(255,183,197,.20));
   }
+  .mn.drop-ready {
+    filter: drop-shadow(0 7px 10px rgba(0,0,0,.32)) drop-shadow(0 0 16px color-mix(in srgb, var(--c1) 40%, transparent));
+  }
+  .mn.landed {
+    animation: notchLanded .95s var(--ease-fluid);
+  }
+  @keyframes notchLanded {
+    0%, 100% { filter: drop-shadow(0 7px 10px rgba(0,0,0,.32)) drop-shadow(0 0 0 transparent); }
+    30%      { filter: drop-shadow(0 7px 10px rgba(0,0,0,.32)) drop-shadow(0 0 18px color-mix(in srgb, var(--c1) 50%, transparent)); }
+  }
+
   .mn::before, .mn::after {
     content: ""; position: absolute; top: 0;
     width: var(--e); height: var(--e);
-    transition: width .4s, height .4s;
     pointer-events: none;
+    transition: width .36s var(--ease-out), height .36s var(--ease-out);
   }
-  .mn::before { right: 100%; background: radial-gradient(circle at 0 100%, transparent calc(var(--e) - .5px), #08060c var(--e)); }
-  .mn::after  { left: 100%;  background: radial-gradient(circle at 100% 100%, transparent calc(var(--e) - .5px), #08060c var(--e)); }
+  .mn::before {
+    right: 100%;
+    background: radial-gradient(circle at 0 100%, transparent calc(var(--e) - 0.65px), var(--notch-base) var(--e));
+  }
+  .mn::after {
+    left: 100%;
+    background: radial-gradient(circle at 100% 100%, transparent calc(var(--e) - 0.65px), var(--notch-base) var(--e));
+  }
 
-  .mn[data-s="boot"]        { --w: 44px;  --h: 4px;  --r: 3px;  --e: 2px; }
-  .mn[data-s="intro"]       {
-    --w: 284px; --h: 64px; --r: 22px; --e: 14px;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.75), 0 0 22px rgba(255, 183, 197, 0.22);
-  }
-  .mn[data-s="minimal"]     { --w: 130px; --h: 6px;  --r: 5px;  --e: 4px; }
+  .mn[data-s="boot"]        { --w: 44px;  --h: 4px;  --r: 3px;  --e: 2px; filter: none; }
+  .mn[data-s="intro"]       { --w: 284px; --h: 64px; --r: 22px; --e: 14px; }
+  .mn[data-s="minimal"]     { --w: 130px; --h: 6px;  --r: 5px;  --e: 4px; filter: none; }
   .mn[data-s="idle-lyrics"] { --w: var(--dyn-idle-lyr-w, 340px); --h: 32px; --r: 15px; --e: 10px; }
   .mn[data-s="peek"]        { --w: 320px; --h: 62px; --r: 19px; --e: 13px; }
   .mn[data-s="music"], .mn[data-s="pomo"], .mn[data-s="water"], .mn[data-s="shelf"], .mn[data-s="todo"] {
-    --w: 420px; --h: 140px; --r: 32px; --e: 22px;
+    --w: 420px; --h: 140px; --r: 32px; --e: 20px;
   }
   .mn[data-s="lyrics"] {
-    --w: var(--dyn-lyr-w, 520px); --h: 140px; --r: 32px; --e: 22px;
+    --w: var(--dyn-lyr-w, 520px); --h: 140px; --r: 32px; --e: 20px;
   }
 
-  .ly { position: absolute; inset: 0; overflow: hidden; border-radius: inherit; opacity: 0; transition: opacity .18s ease; pointer-events: none; }
+  /* ==========================================================================
+     2. LAYERS (.ly) & AMBIENT LIGHTING
+     ========================================================================== */
+  .ly {
+    position: absolute; inset: 0;
+    overflow: hidden;
+    border-radius: 0 0 var(--r) var(--r);
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(2px);
+    will-change: opacity, transform;
+    pointer-events: none;
+    transition:
+      opacity .20s var(--ease-fluid) 0s,
+      transform .22s var(--ease-fluid) 0s,
+      visibility 0s linear .20s;
+  }
   .mn[data-s="intro"] .l-intro,
   .mn[data-s="minimal"] .l-min,
   .mn[data-s="pet"] .l-pet,
@@ -72,9 +154,16 @@
   .mn[data-s="shelf"] .l-shelf,
   .mn[data-s="todo"] .l-todo,
   .mn:is([data-s="music"], [data-s="pomo"], [data-s="water"], [data-s="shelf"], [data-s="todo"]) :is(.l-hdr, .l-dots) {
-    opacity: 1; transition: opacity .28s ease .14s; pointer-events: auto;
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+    transition:
+      opacity .22s var(--ease-fluid) 0s,
+      transform .24s var(--ease-fluid) 0s,
+      visibility 0s linear 0s;
+    pointer-events: auto;
   }
-  .l-hdr, .l-dots { pointer-events: none !important; }
+  .l-hdr, .l-dots { pointer-events: none !important; transform: none !important; }
 
   .ly:not(.l-dots) * { pointer-events: none; }
   .mn[data-s="music"] .l-music *,
@@ -88,245 +177,150 @@
     pointer-events: auto;
   }
 
-  .a { position: absolute; }
+  .a  { position: absolute !important; }
   .vc { transform: translateY(-50%); }
-  .c { transform: translate(-50%, -50%); }
-  .dim { color: rgba(246,242,248,.52); }
+  .c  { transform: translate(-50%, -50%); }
+  .dim { color: var(--ink-3); }
   .sb { font-weight: 600; }
-  .b { font-weight: 700; }
+  .b  { font-weight: 700; }
 
-  /* Running Text / Marquee untuk Judul & Artis */
-  .mq-box {
-    overflow: hidden;
-    white-space: nowrap;
-    display: block;
+  .ambient {
+    position: absolute; inset: 0; height: 100%; pointer-events: none;
+    background: var(--glow);
+    opacity: .24;
+    -webkit-mask:
+      radial-gradient(95% 90% at 50% 100%, #000 0%, rgba(0,0,0,.45) 55%, transparent 88%),
+      linear-gradient(90deg, transparent 0%, #000 14%, #000 86%, transparent 100%);
+    -webkit-mask-composite: source-in;
+    mask:
+      radial-gradient(95% 90% at 50% 100%, #000 0%, rgba(0,0,0,.45) 55%, transparent 88%),
+      linear-gradient(90deg, transparent 0%, #000 14%, #000 86%, transparent 100%);
+    mask-composite: intersect;
   }
+  .l-music .ambient { background: var(--lyr-glow); opacity: .28; transition: background 0.6s ease; }
+  .l-lyrics .ambient, .l-idle-lyrics .ambient { background: var(--lyr-glow); height: 100%; opacity: .38; transition: background 0.6s ease; }
+
+  .l-music::before, .l-lyrics::before, .l-pomo::before, .l-water::before,
+  .l-shelf::before, .l-todo::before, .l-idle-lyrics::before {
+    content: ""; position: absolute; inset: 0; z-index: 0; pointer-events: none;
+    background:
+      radial-gradient(52% 68% at 22% 28%, color-mix(in srgb, var(--c1) 16%, transparent), transparent 72%),
+      radial-gradient(56% 72% at 78% 76%, color-mix(in srgb, var(--c3) 14%, transparent), transparent 74%),
+      linear-gradient(180deg, rgba(255, 255, 255, .028) 0%, transparent 45%);
+    -webkit-mask: linear-gradient(90deg, transparent 0%, #000 12%, #000 88%, transparent 100%);
+    mask: linear-gradient(90deg, transparent 0%, #000 12%, #000 88%, transparent 100%);
+  }
+
+  .mq-box { overflow: hidden; white-space: nowrap; display: block; }
   .mq-box.is-marquee {
     -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 5%, #000 95%, transparent 100%);
     mask-image: linear-gradient(90deg, transparent 0%, #000 5%, #000 95%, transparent 100%);
   }
   .mq-track {
-    display: inline-flex;
-    align-items: center;
-    white-space: nowrap;
-    will-change: transform;
-    animation: marqueeRun var(--mq-dur, 8s) linear infinite;
+    display: inline-flex; align-items: center; white-space: nowrap;
+    will-change: transform; animation: marqueeRun var(--mq-dur, 8s) linear infinite;
   }
-  .mq-gap {
-    padding: 0 18px;
-    color: var(--c1);
-    opacity: 0.7;
-    font-size: 0.85em;
+  .mq-gap { padding: 0 18px; color: var(--c1); opacity: 0.7; font-size: 0.85em; }
+  @keyframes marqueeRun { 0%, 18% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
+
+  /* ==========================================================================
+     3. SOFT LIGHT GLASS CONTROLS (2D FLAT + 1PX RIM + SUSU AKTIF)
+     ========================================================================== */
+  .arw, .pill, .wbtn, .vol-wrap, .sh-card, .trow, .peek-ico, .intro-orb {
+    --mx: 24%; --my: 20%; --spec: 0;
+    background-color: var(--lg-flat);
+    background-image:
+      radial-gradient(72px circle at var(--mx) var(--my), rgba(255, 255, 255, calc(.02 + .08 * var(--spec))), transparent 72%),
+      var(--sl-surface-sheen);
+    box-shadow: none;
+    transform-origin: center center;
   }
-  @keyframes marqueeRun {
-    0%, 18% { transform: translateX(0); }
-    100% { transform: translateX(-50%); }
+  .arw::before, .pill::before, .wbtn::before, .vol-wrap::before,
+  .sh-card::before, .trow::before, .peek-ico::before, .intro-orb::before {
+    content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1px;
+    background:
+      radial-gradient(54px circle at var(--mx) var(--my), rgba(255, 255, 255, calc(.05 + .30 * var(--spec))), transparent 70%),
+      var(--hy-rim);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor; mask-composite: exclude;
+    pointer-events: none; z-index: 2;
+  }
+  .arw:hover, .pill:hover, .wbtn:hover, .vol-wrap:hover, .vol-wrap.active, .sh-card:hover, .trow:hover {
+    --spec: .75;
+    background-color: var(--lg-flat-hover);
+  }
+  .arw:active, .pill:active, .wbtn:active, .sh-card:active {
+    --spec: 1;
+    background-color: var(--lg-flat-active);
   }
 
-  /* Opening Intro Animation Card */
+  /* ==========================================================================
+     4. INTRO, MINIMAL, IDLE, PEEK & MASCOTS
+     ========================================================================== */
   .intro-wrap {
-    position: relative; z-index: 2; width: 100%; height: 100%;
+    position: absolute; left: 50%; top: 0; transform: translateX(-50%);
+    width: 284px; height: 64px; z-index: 2;
     display: flex; align-items: center; padding: 0 18px; gap: 13px;
   }
   .intro-orb {
-    width: 36px; height: 36px; border-radius: 12px;
-    background: rgba(255, 255, 255, 0.06);
-    border: 1px solid rgba(255, 183, 197, 0.35);
+    position: relative; width: 36px; height: 36px; border-radius: 12px; flex-shrink: 0;
     display: flex; align-items: center; justify-content: center; gap: 6px;
-    box-shadow: 0 0 14px rgba(255, 183, 197, 0.25);
-    flex-shrink: 0;
   }
-  .intro-eye {
-    width: 6px; height: 8px; background: #fff;
-    border-radius: 2px 6px 2px 6px;
-    box-shadow: 0 0 8px var(--c1);
-    animation: introWake .6s var(--spring) forwards;
-  }
+  .intro-eye { width: 6px; height: 8px; background: #fff; border-radius: 2px 6px 2px 6px; box-shadow: 0 0 8px var(--c1); }
   .intro-eye:last-child { border-radius: 6px 2px 6px 2px; }
-  @keyframes introWake {
-    0% { transform: scaleY(0.1); opacity: 0.3; }
-    100% { transform: scaleY(1); opacity: 1; }
-  }
   .intro-text { flex: 1; overflow: hidden; }
-  .intro-title { font-size: 13.5px; font-weight: 700; letter-spacing: -0.01em; color: #fff; }
+  .intro-title { font: 700 13.5px var(--ui-display); letter-spacing: -.01em; color: #fff; }
   .intro-title span { color: var(--c1); }
-  .intro-sub { font-size: 10px; color: rgba(246, 242, 248, 0.62); margin-top: 3px; }
-  .intro-bar {
-    width: 100%; height: 3px; border-radius: 2px;
-    background: rgba(255, 255, 255, 0.14);
-    margin-top: 6px; overflow: hidden;
-  }
-  .intro-bar i {
-    display: block; height: 100%; width: 0%;
-    background: var(--glow); border-radius: 2px;
-    transition: width 0.65s cubic-bezier(0.22, 1, 0.36, 1);
-  }
-  .intro-badge {
-    font-size: 9px; font-weight: 700; letter-spacing: 0.08em;
-    padding: 3px 7px; border-radius: 6px;
-    background: rgba(255, 183, 197, 0.15);
-    border: 1px solid rgba(255, 183, 197, 0.35);
-    color: var(--c1); flex-shrink: 0;
-  }
+  .intro-sub { font-size: 10px; color: var(--ink-2); margin-top: 3px; }
+  .intro-bar { width: 100%; height: 3px; border-radius: 2px; background: var(--track); margin-top: 6px; overflow: hidden; }
+  .intro-bar i { display: block; height: 100%; width: 100%; background: var(--glow); border-radius: 2px; transform-origin: left center; transform: scaleX(0); transition: transform 0.62s var(--ease-out); }
+  .intro-badge { font-size: 9px; font-weight: 700; letter-spacing: .08em; padding: 3px 7px; border-radius: 6px; flex-shrink: 0; color: var(--c1); background: color-mix(in srgb, var(--c1) 16%, transparent); }
 
-  .ambient {
-    position: absolute; inset: auto 0 0 0; height: 92%; pointer-events: none;
-    background: var(--glow);
-    -webkit-mask: linear-gradient(to top, #000, rgba(0,0,0,.55) 35%, rgba(0,0,0,.12) 75%, transparent);
-    mask: linear-gradient(to top, #000, rgba(0,0,0,.55) 35%, rgba(0,0,0,.12) 75%, transparent);
-  }
-  .l-lyrics .ambient, .l-idle-lyrics .ambient {
-    background: var(--lyr-glow); height: 88%; opacity: 0.95; transition: background 0.8s ease;
-  }
-  .min-pill {
-    position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
-    width: 48px; height: 2.5px; border-radius: 2px; background: var(--glow); opacity: .75;
-  }
+  .min-pill { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 48px; height: 2.5px; border-radius: 2px; background: var(--glow); opacity: .8; }
 
-  /* Compact Idle Lyrics Bar (Dynamic Width untuk Lirik, Default + Marquee untuk Judul) */
-  .idle-lyr-row {
-    position: relative; z-index: 2; width: 100%; height: 100%;
-    display: flex; align-items: center; padding: 0 14px; gap: 10px;
-  }
+  .idle-lyr-row { position: relative; z-index: 2; width: 100%; height: 100%; display: flex; align-items: center; padding: 0 14px; gap: 10px; }
   .idle-lyr-left { display: flex; align-items: center; gap: 7px; width: 135px; flex-shrink: 0; overflow: hidden; }
-  .idle-mini-art {
-    width: 19px; height: 19px; border-radius: 5px; background-size: cover; background-position: center;
-    background-image: linear-gradient(135deg, #2b5876, #4e4376); flex-shrink: 0;
-  }
-  .idle-lyr-title {
-    font-size: 11.5px; font-weight: 600; color: rgba(255,255,255,.88);
-    width: 108px;
-  }
-  .idle-lyr-sep { width: 1px; height: 14px; background: rgba(255,255,255,.22); flex-shrink: 0; }
+  .idle-mini-art { width: 19px; height: 19px; border-radius: 5px; flex-shrink: 0; background: linear-gradient(135deg, #2b5876, #4e4376) center / cover no-repeat; }
+  .idle-lyr-title { font-size: 11.5px; font-weight: 600; color: rgba(255,255,255,.9); width: 108px; }
+  .idle-lyr-sep { width: 1px; height: 14px; background: var(--track); flex-shrink: 0; }
   .idle-lyr-right { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; overflow: hidden; }
-  .idle-lyr-text {
-    font-size: 12px; font-weight: 700; color: #fff;
-    white-space: nowrap; flex: 1; min-width: 0;
-  }
+  .idle-lyr-text { font-size: 12px; font-weight: 700; color: #fff; white-space: nowrap; flex: 1; min-width: 0; }
 
-  /* Animated System Peek Bar */
-  .peek-bar-wrap {
-    position: absolute; left: 60px; right: 20px; bottom: 10px; height: 4px;
-    border-radius: 3px; background: rgba(255,255,255,.14); overflow: hidden;
-    display: none;
-  }
-  .peek-bar-fill {
-    height: 100%; width: 0%; border-radius: 3px;
-    background: var(--c1); transition: width .18s ease, background .2s ease;
-  }
+  .peek-ico { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; }
+  #peekIcon.pop { animation: icoPop .42s var(--spring-soft); }
+  @keyframes icoPop { 0% { scale: .7; opacity: .4; } 60% { scale: 1.08; opacity: 1; } 100% { scale: 1; } }
+  .peek-bar-wrap { position: absolute; left: 60px; right: 20px; bottom: 10px; height: 4px; border-radius: 3px; background: var(--track); overflow: hidden; display: none; }
+  .peek-bar-fill { height: 100%; width: 0%; border-radius: 3px; background: var(--c1); transition: width .18s ease, background .2s ease; }
 
-  /* Mascots */
   .mascot-box { position: absolute; inset: 0; display: flex; justify-content: center; align-items: center; }
-  .neko-stage {
-    position: relative; width: 76px; height: 28px;
-    display: flex; justify-content: center; align-items: center; gap: 16px;
-    animation: nekoFloat 3.2s ease-in-out infinite;
-  }
-  .neko-ear {
-    position: absolute; top: 2px; width: 10px; height: 9px;
-    background: var(--c1);
-    clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
-    opacity: .85; filter: drop-shadow(0 0 5px var(--c1));
-  }
+  .neko-stage { position: relative; width: 76px; height: 28px; display: flex; justify-content: center; align-items: center; gap: 16px; animation: nekoFloat 3.2s ease-in-out infinite; }
+  .neko-ear { position: absolute; top: 2px; width: 10px; height: 9px; background: var(--c1); clip-path: polygon(50% 0%, 0% 100%, 100% 100%); opacity: .85; filter: drop-shadow(0 0 5px var(--c1)); }
   .neko-ear.left { left: 6px; transform-origin: bottom center; animation: earTwitchL 5s ease-in-out infinite; }
   .neko-ear.right { right: 6px; transform-origin: bottom center; animation: earTwitchR 5s ease-in-out infinite; }
-  .neko-eye-wrap {
-    display: flex; gap: 15px; align-items: center;
-    animation: nekoLookAround 7s ease-in-out infinite;
-  }
-  .neko-eye {
-    width: 11px; height: 11px; background: #fff;
-    border-radius: 3px 10px 3px 10px;
-    box-shadow: 0 0 8px var(--c1), 0 0 15px var(--c2);
-    transform-origin: center center;
-    animation: nekoBlinkLive 4.2s infinite;
-    transition: all .25s ease;
-  }
+  .neko-eye-wrap { display: flex; gap: 15px; align-items: center; animation: nekoLookAround 7s ease-in-out infinite; }
+  .neko-eye { width: 11px; height: 11px; background: #fff; border-radius: 3px 10px 3px 10px; box-shadow: 0 0 8px var(--c1), 0 0 15px var(--c2); transform-origin: center center; animation: nekoBlinkLive 4.2s infinite; transition: all .25s ease; }
   .neko-eye.right { border-radius: 10px 3px 10px 3px; }
-  .neko-stage.happy .neko-eye,
-  .neko-stage.party .neko-eye {
-    height: 7px; width: 12px; background: transparent;
-    border-top: 3px solid #fff; border-radius: 50% 50% 0 0;
-    box-shadow: none; filter: drop-shadow(0 0 6px var(--c1));
-    animation: nekoGroove .75s ease-in-out infinite alternate;
-  }
+  .neko-stage.happy .neko-eye, .neko-stage.party .neko-eye { height: 7px; width: 12px; background: transparent; border-top: 3px solid #fff; border-radius: 50% 50% 0 0; box-shadow: none; filter: drop-shadow(0 0 6px var(--c1)); animation: nekoGroove .75s ease-in-out infinite alternate; }
   @keyframes nekoFloat { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-1.8px); } }
-  @keyframes nekoLookAround {
-    0%, 18%, 100% { transform: translate(0, 0); }
-    24%, 38% { transform: translate(-4.5px, -0.5px); }
-    44%, 56% { transform: translate(0, 0); }
-    62%, 78% { transform: translate(4.5px, -0.5px); }
-    84%, 92% { transform: translate(0, 1px); }
-  }
-  @keyframes nekoBlinkLive {
-    0%, 44%, 48%, 90%, 94%, 98%, 100% { transform: scaleY(1) scaleX(1); }
-    46%, 92%, 96% { transform: scaleY(0.08) scaleX(1.12); }
-  }
-  @keyframes earTwitchL {
-    0%, 82%, 90%, 100% { transform: rotate(-20deg); }
-    85% { transform: rotate(-36deg) scale(1.08); }
-    88% { transform: rotate(-12deg); }
-  }
-  @keyframes earTwitchR {
-    0%, 36%, 44%, 100% { transform: rotate(20deg); }
-    39% { transform: rotate(36deg) scale(1.08); }
-    42% { transform: rotate(12deg); }
-  }
+  @keyframes nekoLookAround { 0%, 18%, 100% { transform: translate(0, 0); } 24%, 38% { transform: translate(-4.5px, -0.5px); } 44%, 56% { transform: translate(0, 0); } 62%, 78% { transform: translate(4.5px, -0.5px); } 84%, 92% { transform: translate(0, 1px); } }
+  @keyframes nekoBlinkLive { 0%, 44%, 48%, 90%, 94%, 98%, 100% { transform: scaleY(1) scaleX(1); } 46%, 92%, 96% { transform: scaleY(0.08) scaleX(1.12); } }
+  @keyframes earTwitchL { 0%, 82%, 90%, 100% { transform: rotate(-20deg); } 85% { transform: rotate(-36deg) scale(1.08); } 88% { transform: rotate(-12deg); } }
+  @keyframes earTwitchR { 0%, 36%, 44%, 100% { transform: rotate(20deg); } 39% { transform: rotate(36deg) scale(1.08); } 42% { transform: rotate(12deg); } }
   @keyframes nekoGroove { from { transform: translateY(1px) scale(0.96); } to { transform: translateY(-1.5px) scale(1.05); } }
 
-  /* Mochi — maskot blob lucu */
-  .mochi-stage {
-    position: relative; width: 44px; height: 25px;
-    display: flex; align-items: flex-end; justify-content: center;
-    transform-origin: 50% 100%;
-    animation: mochiHop 2.9s ease-in-out infinite;
-  }
-  .mochi-body {
-    position: relative; width: 34px; height: 21px;
-    border-radius: 52% 52% 44% 44% / 62% 62% 38% 38%;
-    background: radial-gradient(circle at 34% 28%, #fff 0%, var(--c2) 58%, var(--c1) 135%);
-    box-shadow: 0 0 12px color-mix(in srgb, var(--c1) 55%, transparent), inset 0 -3px 5px rgba(255,140,175,.28);
-    transform-origin: 50% 100%;
-    transform: scale(calc(1 + var(--beat, 0) * .12), calc(1 - var(--beat, 0) * .1));
-    transition: transform .08s linear;
-  }
+  .mochi-stage { position: relative; width: 44px; height: 25px; display: flex; align-items: flex-end; justify-content: center; transform-origin: 50% 100%; animation: mochiHop 2.9s ease-in-out infinite; }
+  .mochi-body { position: relative; width: 34px; height: 21px; border-radius: 52% 52% 44% 44% / 62% 62% 38% 38%; background: radial-gradient(circle at 34% 28%, #fff 0%, var(--c2) 58%, var(--c1) 135%); box-shadow: 0 0 12px color-mix(in srgb, var(--c1) 55%, transparent), inset 0 -3px 5px rgba(255,140,175,.28); transform-origin: 50% 100%; transform: scale(calc(1 + var(--beat, 0) * .12), calc(1 - var(--beat, 0) * .1)); transition: transform .08s linear; }
   .mochi-face { position: absolute; inset: 0; animation: mochiLook 7s ease-in-out infinite; }
-  .mochi-eye {
-    position: absolute; top: 7px; width: 4px; height: 6px; border-radius: 50%;
-    background: #2a1c33; transform-origin: center; animation: nekoBlinkLive 4.4s infinite;
-  }
+  .mochi-eye { position: absolute; top: 7px; width: 4px; height: 6px; border-radius: 50%; background: #2a1c33; transform-origin: center; animation: nekoBlinkLive 4.4s infinite; }
   .mochi-eye.l { left: 9px; } .mochi-eye.r { right: 9px; }
-  .mochi-blush {
-    position: absolute; top: 12px; width: 6px; height: 3px; border-radius: 50%;
-    background: #ff8fb0; opacity: .6; filter: blur(.4px);
-  }
+  .mochi-blush { position: absolute; top: 12px; width: 6px; height: 3px; border-radius: 50%; background: #ff8fb0; opacity: .6; filter: blur(.4px); }
   .mochi-blush.l { left: 3px; } .mochi-blush.r { right: 3px; }
-  .mochi-mouth {
-    position: absolute; left: 50%; top: 12px; width: 5px; height: 3px; margin-left: -2.5px;
-    border-bottom: 1.5px solid #2a1c33; border-radius: 0 0 5px 5px;
-    transition: all .2s ease;
-  }
-  .mochi-stage.happy .mochi-eye,
-  .mochi-stage.party .mochi-eye {
-    height: 3px; width: 5px; background: transparent; animation: none;
-    border-top: 2px solid #2a1c33; border-radius: 50% 50% 0 0;
-  }
-  .mochi-stage.happy .mochi-mouth,
-  .mochi-stage.party .mochi-mouth { width: 6px; height: 4px; margin-left: -3px; border: 0; background: #c94d78; }
-  @keyframes mochiHop {
-    0%, 100% { transform: translateY(0) scale(1.04, .94); }
-    45% { transform: translateY(-2.5px) scale(.96, 1.05); }
-    62% { transform: translateY(0) scale(1.05, .93); }
-    78% { transform: translateY(0) scale(1, 1); }
-  }
-  @keyframes mochiLook {
-    0%, 20%, 100% { transform: translateX(0); }
-    30%, 42% { transform: translateX(-2.5px); }
-    55%, 66% { transform: translateX(0); }
-    74%, 86% { transform: translateX(2.5px); }
-  }
+  .mochi-mouth { position: absolute; left: 50%; top: 12px; width: 5px; height: 3px; margin-left: -2.5px; border-bottom: 1.5px solid #2a1c33; border-radius: 0 0 5px 5px; transition: all .2s ease; }
+  .mochi-stage.happy .mochi-eye, .mochi-stage.party .mochi-eye { height: 3px; width: 5px; background: transparent; animation: none; border-top: 2px solid #2a1c33; border-radius: 50% 50% 0 0; }
+  .mochi-stage.happy .mochi-mouth, .mochi-stage.party .mochi-mouth { width: 6px; height: 4px; margin-left: -3px; border: 0; background: #c94d78; }
+  @keyframes mochiHop { 0%, 100% { transform: translateY(0) scale(1.04, .94); } 45% { transform: translateY(-2.5px) scale(.96, 1.05); } 62% { transform: translateY(0) scale(1.05, .93); } 78% { transform: translateY(0) scale(1, 1); } }
+  @keyframes mochiLook { 0%, 20%, 100% { transform: translateX(0); } 30%, 42% { transform: translateX(-2.5px); } 55%, 66% { transform: translateX(0); } 74%, 86% { transform: translateX(2.5px); } }
 
-  /* Mood maskot: surprised / party / sleepy (happy sudah ada) */
   .kitsune-wrap, .neko-stage, .mochi-stage { position: relative; }
   .mochi-stage.surprised .mochi-eye { width: 5px; height: 8px; top: 6px; animation: none; }
   .mochi-stage.surprised .mochi-mouth { width: 4px; height: 4px; margin-left: -2px; border: 1.5px solid #2a1c33; border-radius: 50%; }
@@ -346,102 +340,42 @@
   .kitsune-wrap.sleepy { animation: none; }
   .kitsune-wrap.sleepy .kit-eye { animation: none; transform: scaleY(.1); }
   .mochi-stage.party, .neko-stage.party, .kitsune-wrap.party { animation: mascotParty .45s ease-in-out infinite; }
-  .mochi-stage.sleepy::after, .neko-stage.sleepy::after, .kitsune-wrap.sleepy::after {
-    content: "z"; position: absolute; right: -9px; top: -2px;
-    font: 700 8px var(--ui, "Segoe UI"); color: var(--c2); animation: zzz 2.4s ease-in-out infinite;
-  }
-  @keyframes mascotParty {
-    0%, 100% { transform: translateY(0) rotate(-4deg) scale(1.05, .93); }
-    50% { transform: translateY(-4px) rotate(4deg) scale(.96, 1.06); }
-  }
+  .mochi-stage.sleepy::after, .neko-stage.sleepy::after, .kitsune-wrap.sleepy::after { content: "z"; position: absolute; right: -9px; top: -2px; font: 700 8px var(--ui, "Segoe UI"); color: var(--c2); animation: zzz 2.4s ease-in-out infinite; }
+  @keyframes mascotParty { 0%, 100% { transform: translateY(0) rotate(-4deg) scale(1.05, .93); } 50% { transform: translateY(-4px) rotate(4deg) scale(.96, 1.06); } }
   @keyframes mochiSleep { 0%, 100% { transform: scale(1.04, .95); } 50% { transform: scale(.98, 1.02); } }
-  @keyframes zzz {
-    0% { opacity: 0; transform: translate(0, 4px); } 40% { opacity: .9; }
-    100% { opacity: 0; transform: translate(4px, -6px); }
-  }
-
-  /* Reaksi Maskot saat Headpat / Klik & Mode Fokus */
-  .mascot-box.pat .neko-eye,
-  .mascot-box.pat .kit-eye,
-  .mascot-box.pat .mochi-eye {
-    transform: scaleY(0.28) scaleX(1.18) !important;
-    filter: drop-shadow(0 0 12px #fff) !important;
-  }
-
-  /* Thumbnail Gambar & Size Badge di File Shelf 2.0 */
-  .sh-thumb {
-    width: 34px; height: 34px; border-radius: 7px; object-fit: cover;
-    margin-bottom: 4px; border: 1px solid rgba(255,255,255,0.18); pointer-events: none;
-  }
-  .sh-act-row {
-    left: 86px; top: 19px; display: flex; align-items: center; gap: 4px; z-index: 25;
-  }
-  .sh-act-btn {
-    height: 19px; padding: 0 7px; border-radius: 9px;
-    background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.18);
-    color: #fff; font-size: 9.5px; font-weight: 700;
-    display: inline-flex; align-items: center; gap: 3.5px; cursor: pointer;
-    transition: background .18s, border-color .18s;
-  }
-  .sh-act-btn:hover { background: rgba(255,183,197,.25); border-color: var(--c1); color: var(--c1); }
-  .sh-act-btn svg { width: 9.5px; height: 9.5px; stroke: currentColor; fill: none; stroke-width: 2.2; }
+  @keyframes zzz { 0% { opacity: 0; transform: translate(0, 4px); } 40% { opacity: .9; } 100% { opacity: 0; transform: translate(4px, -6px); } }
+  .mascot-box.pat .neko-eye, .mascot-box.pat .kit-eye, .mascot-box.pat .mochi-eye { transform: scaleY(0.28) scaleX(1.18) !important; filter: drop-shadow(0 0 12px #fff) !important; }
   .kitsune-wrap { display: flex; gap: 18px; align-items: center; animation: nekoLookAround 6s ease-in-out infinite; }
   .kit-eye { width: 9px; height: 12px; background: #fff; clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%); filter: drop-shadow(0 0 6px var(--c1)); animation: nekoBlinkLive 4s infinite; }
 
-  /* Thumbnail album (music & lyrics) */
+  /* ==========================================================================
+     5. MEDIA, VOLUME PILL & LYRICS
+     ========================================================================== */
   .art {
-    border-radius: 14px;
+    border-radius: 14px; overflow: hidden;
     background: linear-gradient(135deg, #2b5876, #4e4376) center / cover no-repeat;
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.55);
-    overflow: hidden;
+    box-shadow: 0 6px 12px -8px rgba(0, 0, 0, .5);
   }
+  .js-art.art-in { animation: artIn .45s var(--ease-fluid); }
+  @keyframes artIn { from { opacity: .35; scale: .95; } }
+  .js-title.txt-in, .js-artist.txt-in { animation: txtIn .34s var(--ease-fluid); }
+  @keyframes txtIn { from { opacity: 0; translate: 0 4px; } }
 
-  /* Progress bar lagu */
-  .js-pos, .js-rem {
-    font-size: 11px; font-variant-numeric: tabular-nums;
-    color: rgba(246, 242, 248, 0.6);
-  }
-  .prog {
-    height: 5px; border-radius: 99px;
-    background: rgba(255, 255, 255, 0.18);
-    cursor: pointer;
-    transition: height .15s ease;
-  }
-  .prog::before {               /* area klik lebih lebar biar gampang di-seek */
-    content: ""; position: absolute; left: 0; right: 0; top: -8px; bottom: -8px;
-  }
+  .js-pos, .js-rem { font-size: 11px; font-variant-numeric: tabular-nums; color: var(--ink-3); }
+  .prog { height: 5px; border-radius: 99px; background: var(--track); cursor: pointer; transition: height .15s ease; }
+  .prog::before { content: ""; position: absolute; left: 0; right: 0; top: -8px; bottom: -8px; }
   .prog:hover { height: 7px; }
-  .prog i {
-    display: block; height: 100%; width: 0%;
-    border-radius: inherit;
-    background: var(--glow);
-    box-shadow: 0 0 8px rgba(255, 183, 197, 0.35);
-    pointer-events: none;
-  }
+  .prog i { display: block; height: 100%; width: 0%; border-radius: inherit; background: var(--glow); pointer-events: none; }
 
-  /* Dot indikator halaman */
-  .dots {
-    left: 50%; bottom: 5px; transform: translateX(-50%);
-    display: flex; align-items: center; gap: 6px; z-index: 40;
-  }
-  .dots i {
-    position: relative; display: block;
-    width: 5px; height: 5px; border-radius: 99px;
-    background: rgba(255, 255, 255, 0.28);
-    cursor: pointer;
-    transition: width .3s var(--spring), background .25s ease, box-shadow .25s ease;
-  }
+  .dots { left: 50%; bottom: 5px; transform: translateX(-50%); display: flex; align-items: center; gap: 6px; z-index: 40; }
+  .dots i { position: relative; display: block; width: 5px; height: 5px; border-radius: 99px; background: rgba(255,255,255,.26); cursor: pointer; transition: width .28s var(--spring-pop), background .22s ease; }
   .dots i::after { content: ""; position: absolute; inset: -5px -3px; }
-  .dots i:hover { background: rgba(255, 255, 255, 0.6); }
-  .dots i.on {
-    width: 14px; background: var(--c1);
-    box-shadow: 0 0 6px var(--c1);
-  }
+  .dots i:hover { background: rgba(255,255,255,.6); }
+  .dots i.on { width: 14px; background: var(--c1); }
 
   .ring {
     width: 15px; height: 15px; border-radius: 50%;
-    background: conic-gradient(#33e07a 0 var(--bat, 85%), rgba(51,224,122,.25) 0);
+    background: conic-gradient(var(--ok) 0 var(--bat, 85%), color-mix(in srgb, var(--ok) 24%, transparent) 0);
     -webkit-mask: radial-gradient(circle, transparent 4.6px, #000 5px);
     mask: radial-gradient(circle, transparent 4.6px, #000 5px);
   }
@@ -451,304 +385,545 @@
   .bars i:nth-child(2) { animation-delay: -.3s; } .bars i:nth-child(3) { animation-delay: -.6s; }
   .bars i:nth-child(4) { animation-delay: -.15s; } .bars i:nth-child(5) { animation-delay: -.45s; }
   @keyframes eq { to { height: 100%; } }
-  .ttl { left: 16px; top: 19px; font-size: 14.5px; font-weight: 700; }
+  .ttl { left: 16px; top: 19px; font: 700 14.5px var(--ui-display); letter-spacing: -.01em; }
 
- /* Tombol Panah Navigasi < > Kontras Tinggi */
   .arw {
-    width: 26px; height: 26px; border-radius: 50%;
-    background: rgba(14, 11, 22, 0.88);
-    border: 1px solid rgba(255, 183, 197, 0.35);
-    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.8);
-    display: grid; place-items: center; cursor: pointer; z-index: 30;
-    transition: background .18s, transform .18s, border-color .18s;
+    width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; cursor: pointer; z-index: 30;
+    transition: scale .22s var(--ease-fluid), background-color .18s ease, --spec .24s ease;
   }
-  .arw::after {
-    content: ""; position: absolute; inset: -6px; border-radius: 50%;
-  }
-  .arw:hover {
-    background: rgba(255, 183, 197, 0.32);
-    border-color: var(--c1);
-    transform: translate(-50%, -50%) scale(1.12);
-  }
-  .arw:active { transform: translate(-50%, -50%) scale(0.95); }
+  .arw::after { content: ""; position: absolute; inset: -6px; border-radius: 50%; }
+  .arw:hover  { scale: 1.05; }
+  .arw:active { scale: .94; }
   .arw svg { width: 10px; height: 10px; stroke: #fff; stroke-width: 2.5; fill: none; stroke-linecap: round; stroke-linejoin: round; pointer-events: none !important; }
 
-  svg.ctl {
-    width: 28px; height: 28px; padding: 4px; fill: #fff; cursor: pointer;
-    border-radius: 50%; z-index: 30;
-    transition: transform .15s, background .15s;
-  }
+  svg.ctl { width: 28px; height: 28px; padding: 4px; fill: #fff; cursor: pointer; border-radius: 50%; z-index: 30; transition: scale .2s var(--spring-pop), background .18s ease; }
   svg.ctl path, svg.ctl circle { pointer-events: none !important; }
-  svg.ctl:hover { transform: translate(-50%, -50%) scale(1.16); background: rgba(255, 183, 197, 0.22); }
-  svg.ctl:active { transform: translate(-50%, -50%) scale(0.94); }
+  svg.ctl:hover  { scale: 1.08; background: var(--lg-flat-hover); }
+  svg.ctl:active { scale: .92; }
 
-  .bub {
-    width: 30px; height: 28px; padding: 5px; border-radius: 8px;
-    cursor: pointer; z-index: 30;
-    transition: transform .15s, background .15s;
-  }
+  .bub { width: 30px; height: 28px; padding: 5px; border-radius: 9px; cursor: pointer; z-index: 30; transition: scale .2s var(--spring-pop), background .18s ease; }
   .bub path, .bub circle { pointer-events: none !important; }
-  .bub:hover { transform: translate(-50%, -50%) scale(1.14); background: rgba(255, 183, 197, 0.2); }
-  .bub:active { transform: translate(-50%, -50%) scale(0.95); }
+  .bub:hover  { scale: 1.06; background: var(--lg-flat-hover); }
+  .bub:active { scale: .94; }
 
-  /* Master Volume Capsule Ala YouTube Modern */
+  /* Volume Capsule & Pill Ramping (Garis Tengah Terlihat Tajam saat Di-hold) */
   .vol-wrap {
-    left: 254px; top: 115px; transform: translateY(-50%);
-    display: inline-flex; align-items: center;
-    height: 28px; padding: 0 6px; border-radius: 99px;
-    background: rgba(255, 255, 255, 0.06);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    z-index: 28;
-    transition: background .22s ease, border-color .22s ease, padding .28s var(--spring), box-shadow .22s ease;
+    left: 254px; top: 115px; transform: translateY(-50%) translateZ(0);
+    backface-visibility: hidden; contain: layout style;
+    display: inline-flex; align-items: center; height: 28px; padding: 0 6px; border-radius: 99px; z-index: 28;
+    transition: background-color .20s ease, padding .26s var(--ease-fluid), --spec .24s ease;
   }
-  .vol-wrap:hover, .vol-wrap.active {
-    background: rgba(18, 14, 26, 0.92);
-    border-color: rgba(255, 183, 197, 0.28);
-    padding: 0 10px 0 8px;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.55);
-  }
-  .vol-btn {
-    width: 18px; height: 18px; display: grid; place-items: center;
-    cursor: pointer; flex-shrink: 0;
-  }
-  .vol-ico {
-    width: 15px; height: 15px; stroke: rgba(255,255,255,.92); fill: none;
-    stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
-    transition: stroke .15s, transform .15s;
-  }
+  .vol-wrap:hover, .vol-wrap.active { padding: 0 10px 0 8px; }
+  .vol-btn { width: 18px; height: 18px; display: grid; place-items: center; cursor: pointer; flex-shrink: 0; }
+  .vol-ico { width: 15px; height: 15px; stroke: rgba(255,255,255,.92); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; transition: stroke .15s, transform .15s; }
   .vol-btn:hover .vol-ico { stroke: var(--c1); transform: scale(1.1); }
-  .vol-wrap.muted .vol-ico { stroke: #ff7b7b; }
-
+  .vol-wrap.muted .vol-ico { stroke: var(--danger); }
   .vol-drawer {
-    display: flex; align-items: center; gap: 8px;
-    width: 0; opacity: 0; overflow: hidden; pointer-events: none;
-    margin-left: 0;
-    transition: width .32s var(--spring), opacity .2s ease, margin-left .28s var(--spring);
+    display: flex; align-items: center; gap: 8px; width: 0; opacity: 0; overflow: hidden; pointer-events: none; margin-left: 0;
+    transform: translateZ(0);
+    transition: width .28s var(--ease-fluid), opacity .18s ease, margin-left .26s var(--ease-fluid);
   }
-  .vol-wrap:hover .vol-drawer, .vol-wrap.active .vol-drawer {
-    width: 98px; opacity: 1; pointer-events: auto;
-    margin-left: 7px;
-  }
-  .vol-slider-box {
-    position: relative; width: 62px; height: 22px;
-    display: flex; align-items: center; flex-shrink: 0;
-  }
-  .vol-track {
-    width: 100%; height: 4px; border-radius: 99px;
-    background: rgba(255, 255, 255, 0.18);
-    position: relative; pointer-events: none;
-  }
-  .vol-fill {
-    height: 100%; width: var(--vol-pct, 50%);
-    background: var(--glow); border-radius: 99px;
-    position: relative; transition: width .06s linear;
-  }
+  .vol-wrap:hover .vol-drawer, .vol-wrap.active .vol-drawer { width: 98px; opacity: 1; pointer-events: auto; margin-left: 7px; }
+  .vol-slider-box { position: relative; width: 62px; height: 22px; display: flex; align-items: center; flex-shrink: 0; }
+  .vol-track { width: 100%; height: 3.5px; border-radius: 99px; background: var(--track); position: relative; pointer-events: none; }
+  .vol-fill { height: 100%; width: var(--vol-pct, 50%); background: var(--glow); border-radius: 99px; position: relative; transition: width .06s linear; }
   .vol-thumb {
-    position: absolute; right: -5px; top: 50%;
-    transform: translateY(-50%) scale(0.85);
-    width: 10px; height: 10px; border-radius: 50%;
-    background: #fff;
-    box-shadow: 0 0 8px var(--c1);
-    transition: transform .15s var(--spring);
+    position: absolute; right: -6.5px; top: 50%; width: 13px; height: 8px; border-radius: 99px;
+    transform: translateY(-50%); scale: 1;
+    background-color: rgba(255,255,255,.94); background-image: var(--hy-milk);
+    box-shadow: 0 1px 3px rgba(0,0,0,.45);
+    transition: scale .26s var(--spring-soft), background-color .18s ease, box-shadow .2s ease;
   }
-  .vol-slider-box:hover .vol-thumb {
-    transform: translateY(-50%) scale(1.12);
+  .vol-slider-box:hover .vol-thumb { transform: translateY(-50%); scale: 1.08; }
+  .vol-slider-box:active .vol-thumb {
+    transform: translateY(-50%); scale: 1.18 1.35;
+    background-color: rgba(255,255,255,.10); background-image: none;
+    -webkit-backdrop-filter: brightness(1.08) saturate(130%);
+    backdrop-filter: brightness(1.08) saturate(130%);
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.55), 0 4px 10px -4px rgba(0,0,0,.55);
   }
-  .vol-input {
-    position: absolute; inset: 0; width: 100%; height: 100%;
-    margin: 0; opacity: 0; cursor: pointer;
-  }
-  .vol-pct {
-    font-size: 10px; font-weight: 700; color: rgba(255,255,255,.88);
-    font-variant-numeric: tabular-nums;
-    width: 28px; text-align: right; flex-shrink: 0;
-  }
-  .vol-wrap.muted .vol-pct { color: #ff7b7b; }
+  .vol-input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+  .vol-pct { font-size: 10px; font-weight: 700; color: rgba(255,255,255,.9); font-variant-numeric: tabular-nums; width: 28px; text-align: right; flex-shrink: 0; }
+  .vol-wrap.muted .vol-pct { color: var(--danger); }
 
-  /* Dynamic Lyrics Panel (Tinggi Baris Terkunci & Anti-Lompat) */
   .lyr {
     left: 264px; right: 18px; top: 14px; bottom: 8px; overflow: hidden;
     -webkit-mask: linear-gradient(transparent, #000 20%, #000 80%, transparent);
     mask: linear-gradient(transparent, #000 20%, #000 80%, transparent);
   }
-  .lyr ol {
-    list-style: none; margin: 0; padding: 0;
-    transition: transform .48s var(--spring);
-    will-change: transform;
-  }
+  .lyr ol { list-style: none; margin: 0; padding: 0; transition: transform .42s var(--spring); will-change: transform; }
   .lyr li {
-    height: 28px; line-height: 28px; padding: 0 6px 0 0;
-    display: flex; align-items: center;
-    font-weight: 700; font-size: 14.5px;
-    color: rgba(255,255,255,.32);
+    height: 28px; line-height: 28px; padding: 0 6px 0 0; display: flex; align-items: center;
+    font-weight: 700; font-size: 14.5px; color: rgba(255,255,255,.32);
     transform: scale(.94); transform-origin: left center;
-    transition: color .3s, transform .3s, font-size .2s;
-    cursor: pointer;
+    transition: color .25s, transform .25s, font-size .2s; cursor: pointer;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
   .lyr li:hover { color: rgba(255,255,255,.7); }
-  .lyr li.on {
-    color: #fff; transform: scale(1);
-    overflow: visible; text-overflow: clip;
-  }
+  .lyr li.on { color: #fff; transform: scale(1); overflow: visible; text-overflow: clip; }
   .music-note-svg { width: 13px; height: 13px; fill: currentColor; display: inline-block; vertical-align: middle; }
 
+  /* ==========================================================================
+     6. POMODORO, WATER, FILE SHELF (NAMEDROP RIPPLE) & TO-DO
+     ========================================================================== */
   .pomo-wrap { left: 82px; top: 76px; width: 72px; height: 72px; transform: translate(-50%, -50%); display: grid; place-items: center; }
-  .pill {
-    height: 27px; border-radius: 14px; background: rgba(255,255,255,.11);
-    display: flex; align-items: center; justify-content: center; gap: 5px; font-size: 11.5px; font-weight: 600; cursor: pointer; transition: background .2s;
+  #pomoTime { font-family: var(--ui-display); font-variant-numeric: tabular-nums; }
+  #pomoRingArc { transition: stroke-dashoffset .8s linear, stroke .4s ease !important; }
+
+  .pill, .wbtn {
+    height: 27px; padding: 0 12px; border-radius: 99px; gap: 5px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11.5px; font-weight: 600; color: #fff; cursor: pointer; white-space: nowrap;
+    transition: scale .22s var(--ease-fluid), background-color .18s ease, box-shadow .18s ease, --spec .24s ease;
   }
-  .pill:hover { background: rgba(255,255,255,.22); }
-  .pill svg { width: 13px; height: 13px; stroke: #fff; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .pill svg, .wbtn svg { width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .pill:hover, .wbtn:hover { scale: 1.025; }
+  .pill:active, .wbtn:active { scale: .96; }
+
+  .pill.primary, .wbtn.primary, #ambientBtn.on {
+    color: var(--hy-ink); font-weight: 700;
+    background-color: rgba(255,255,255,.9);
+    background-image: var(--hy-milk);
+    box-shadow: 0 3px 10px -4px rgba(0,0,0,.45);
+  }
+  .wbtn.primary, #ambientBtn.on { background-image: var(--hy-milk-c3); }
+  .pill.primary:hover, .wbtn.primary:hover, #ambientBtn.on:hover {
+    background-color: #fff;
+    box-shadow: 0 5px 14px -5px rgba(0,0,0,.5);
+  }
+  .pill.primary::before, .wbtn.primary::before, #ambientBtn.on::before { display: none; }
+  .pill.primary svg, .wbtn.primary svg { fill: var(--hy-ink); stroke: none; }
+  #ambientBtn.on svg { stroke: var(--hy-ink); }
 
   .wtank {
-    left: 222px; top: 34px; width: 154px; height: 82px; border-radius: 16px;
-    background: rgba(162, 228, 245, 0.08); border: 1px solid rgba(162, 228, 245, 0.25);
-    overflow: hidden; position: absolute;
+    left: 222px; top: 34px; width: 154px; height: 82px; border-radius: 16px; position: absolute; overflow: hidden;
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, .045) 0%, rgba(255, 255, 255, .01) 100%),
+      color-mix(in srgb, var(--c3) 9%, rgba(255, 255, 255, .03));
   }
   .wwave {
     position: absolute; left: -20%; right: -20%; bottom: 0; height: 0%;
-    background: linear-gradient(180deg, rgba(162,228,245,.75), rgba(45,115,210,.9));
+    background: linear-gradient(180deg, color-mix(in srgb, var(--c3) 72%, transparent), color-mix(in srgb, var(--c3) 38%, #2d73d2 62%));
     border-radius: 38% 42% 0 0 / 12px 12px 0 0;
-    transition: height .6s var(--spring);
-    animation: slosh 3s ease-in-out infinite alternate;
+    transition: height .7s var(--ease-fluid); animation: slosh 3s ease-in-out infinite alternate;
+  }
+  .wwave::after {
+    content: ""; position: absolute; inset: 0 0 auto 0; height: 42%;
+    background: linear-gradient(180deg, rgba(255, 255, 255, .16), transparent); pointer-events: none;
   }
   @keyframes slosh { from { transform: translateX(-6px) rotate(-1deg); } to { transform: translateX(6px) rotate(1deg); } }
   .wtank-info { position: relative; z-index: 2; padding: 10px 12px; display: flex; flex-direction: column; justify-content: space-between; height: 100%; }
   .cups-row { display: flex; gap: 4px; flex-wrap: wrap; }
   .cup-dot { width: 11px; height: 14px; border-radius: 2px 2px 5px 5px; border: 1.4px solid rgba(255,255,255,.4); transition: background .3s, border-color .3s; }
-  .cup-dot.filled { background: #A2E4F5; border-color: #fff; box-shadow: 0 0 6px rgba(162,228,245,.6); }
-  .wbtn { height: 27px; border-radius: 14px; display: flex; align-items: center; gap: 5px; padding: 0 11px; font-size: 11.5px; font-weight: 600; cursor: pointer; }
-  .wbtn svg { width: 13px; height: 13px; }
+  .cup-dot.filled { background: var(--c3); border-color: #fff; box-shadow: 0 0 8px -1px var(--c3); }
+  .cup-dot.pop { animation: cupPop .45s var(--spring-soft); }
+  @keyframes cupPop { 0% { scale: .65; } 55% { scale: 1.2; } 100% { scale: 1; } }
 
+  /* File Shelf + NameDrop Ripple */
+  .sh-act-row { left: 86px; top: 19px; display: flex; align-items: center; gap: 4px; z-index: 25; }
   .sh-clear {
-    height: 19px; padding: 0 6px; border-radius: 9px; flex-shrink: 0;
-    background: rgba(255,183,197,.15); border: 1px solid rgba(255,183,197,.3);
-    color: #FFB7C5; font-size: 9.5px; font-weight: 700;
-    display: none; align-items: center; gap: 3px; cursor: pointer; z-index: 25;
-    transition: background .2s;
+    height: 19px; padding: 0 7px; border-radius: 99px; flex-shrink: 0; display: none; align-items: center; gap: 3px; cursor: pointer; z-index: 25;
+    font-size: 9.5px; font-weight: 700; color: var(--c1);
+    background: color-mix(in srgb, var(--c1) 14%, rgba(255,255,255,.04));
+    transition: background .18s ease, color .18s ease;
   }
-  .sh-clear:hover { background: rgba(255,100,120,.35); color: #fff; }
+  .sh-clear:hover { background: color-mix(in srgb, var(--danger) 34%, rgba(255,255,255,.06)); color: #fff; }
   .sh-clear svg { width: 9.5px; height: 9.5px; stroke: currentColor; fill: none; stroke-width: 2.2; }
-  .sh-all {
-    background: rgba(162,228,245,.12); border-color: rgba(162,228,245,.3); color: #A2E4F5;
-  }
-  .sh-all:hover { background: rgba(162,228,245,.3); color: #fff; }
-  .sh-all.on { background: #A2E4F5; border-color: #A2E4F5; color: #120F16; }
+  .sh-all { color: var(--c3); background: color-mix(in srgb, var(--c3) 14%, rgba(255,255,255,.04)); }
+  .sh-all:hover { background: color-mix(in srgb, var(--c3) 32%, rgba(255,255,255,.06)); color: #fff; }
+  .sh-all.on { background: var(--c3); color: var(--on-accent); }
 
-  .sh-card.selected {
-    background: rgba(255, 183, 197, 0.22);
-    border-color: var(--c1);
-    box-shadow: 0 0 10px rgba(255, 183, 197, 0.28);
+  .zone {
+    left: 44px; top: 34px; width: 332px; height: 86px; border-radius: 16px; overflow: hidden;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px;
+    background: rgba(255,255,255,.04); border: 1px dashed rgba(255,255,255,.16);
+    transition: background .35s var(--ease-fluid), border-color .3s ease, scale .34s var(--ease-fluid), box-shadow .35s ease;
   }
-  .sh-sel-dot {
-    position: absolute; top: 3px; left: 3px; width: 13px; height: 13px;
-    border-radius: 50%; background: rgba(0,0,0,.55);
-    border: 1.2px solid rgba(255,255,255,.45);
-    display: grid; place-items: center; pointer-events: none;
+  .zone > * { position: relative; z-index: 1; }
+  .zone:hover, .zone.dragover {
+    border-style: solid; border-color: rgba(255,255,255,.12);
+    background: color-mix(in srgb, var(--c1) 8%, rgba(255,255,255,.06));
+    box-shadow: inset 0 0 30px -12px color-mix(in srgb, var(--c1) 42%, transparent);
+    scale: 1.012;
   }
-  .sh-card.selected .sh-sel-dot {
-    background: var(--c1); border-color: var(--c1);
-  }
-  .sh-sel-dot svg { width: 8px; height: 8px; stroke: #120F16; stroke-width: 3; fill: none; opacity: 0; }
-  .sh-card.selected .sh-sel-dot svg { opacity: 1; }
+  .zone.dragover { scale: 1.025; }
 
-  .zone { left: 44px; top: 34px; width: 332px; height: 86px; border-radius: 16px; border: 1.4px dashed rgba(226,209,249,.28); background: rgba(255,255,255,.03); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; transition: border-color .2s, background .2s; }
-  .zone.dragover { border-color: var(--c1); background: rgba(255,183,197,.1); }
+  /* Native Explorer drag: cursor-following liquid glass, source point is the cursor. */
+  .zone.file-drag-active {
+    --drag-x: 50%; --drag-y: 50%; --drag-power: .18;
+    border-style: solid; border-color: color-mix(in srgb, var(--c1) 48%, rgba(255,255,255,.2));
+    background: radial-gradient(ellipse 105px 72px at var(--drag-x) var(--drag-y),
+      color-mix(in srgb, var(--c1) calc(18% + var(--drag-power) * 42%), transparent),
+      rgba(255,255,255,.035) 72%);
+    box-shadow: inset 0 0 34px -10px color-mix(in srgb, var(--c1) calc(35% + var(--drag-power) * 35%), transparent),
+      0 0 24px -14px color-mix(in srgb, var(--c1) 48%, transparent);
+    transform: scale(1.018);
+    transition: border-color .18s ease, box-shadow .18s ease, transform .2s cubic-bezier(.2,.8,.2,1);
+  }
+  .zone.file-drag-active::before {
+    content:""; position:absolute; inset:-18px; pointer-events:none; border-radius:inherit;
+    background: radial-gradient(ellipse 120px 86px at var(--drag-x) var(--drag-y),
+      rgba(255,255,255,calc(.06 + var(--drag-power) * .16)), transparent 72%);
+    filter: blur(8px); opacity:.9;
+  }
+  .zone.file-drag-active > * { transform: translate3d(0,0,0); transition: transform .22s ease; }
+
+
   .shelf-items { left: 44px; top: 34px; width: 332px; height: 86px; display: none; gap: 8px; align-items: center; overflow-x: auto; padding: 4px 6px; scroll-behavior: smooth; }
   .shelf-items::-webkit-scrollbar { height: 3px; }
   .shelf-items::-webkit-scrollbar-thumb { background: rgba(255,255,255,.3); border-radius: 2px; }
   .sh-card {
-    width: 74px; height: 74px; border-radius: 12px; background: rgba(255,255,255,.08);
-    border: 1px solid rgba(255,255,255,.12); display: flex; flex-direction: column;
-    align-items: center; justify-content: center; padding: 6px; position: relative;
-    cursor: pointer; flex-shrink: 0; transition: transform .15s, background .15s, border-color .15s;
+    position: relative; width: 74px; height: 74px; border-radius: 12px; padding: 6px; flex-shrink: 0;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer;
+    transition: translate .20s var(--ease-fluid), scale .22s var(--ease-fluid), background-color .18s ease, --spec .24s ease;
   }
-  .sh-card:active { cursor: grabbing; transform: scale(0.95); }
-  .sh-card:hover { background: rgba(255,255,255,.16); }
+  .sh-card:hover  { translate: 0 -1.5px; scale: 1.02; }
+  .sh-card:active { cursor: grabbing; translate: 0 0; scale: .97; }
+  .sh-card.selected { background-color: rgba(255,255,255,.9); background-image: var(--hy-milk); box-shadow: 0 4px 12px -6px rgba(0,0,0,.5); }
+  .sh-card.selected::before { display: none; }
+  .sh-card.selected .sh-name { color: var(--hy-ink); }
+  .sh-card.selected .sh-ext { color: var(--hy-ink-soft); }
+  .sh-card.selected svg.f-ico { stroke: var(--hy-ink-accent); }
+  .sh-card.selected .sh-sel { background: var(--hy-ink-accent); box-shadow: none; }
+  .sh-card.selected .sh-sel svg { stroke: #fff; }
   .sh-card svg.f-ico { width: 24px; height: 24px; stroke: var(--c1); fill: none; stroke-width: 1.8; margin-bottom: 5px; pointer-events: none; }
+  .sh-thumb { width: 32px; height: 32px; border-radius: 7px; object-fit: cover; margin-bottom: 4px; box-shadow: 0 3px 8px -4px rgba(0,0,0,.45); pointer-events: none !important; }
   .sh-name { font-size: 10px; font-weight: 600; max-width: 62px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; pointer-events: none; }
-  .sh-ext { font-size: 8.5px; color: rgba(255,255,255,.45); text-transform: uppercase; margin-top: 2px; pointer-events: none; }
-  .sh-del { position: absolute; top: 3px; right: 3px; width: 15px; height: 15px; border-radius: 50%; background: rgba(0,0,0,.65); display: grid; place-items: center; opacity: 0; transition: opacity .15s; cursor: pointer; }
+  .sh-ext { font-size: 8.5px; color: var(--ink-3); text-transform: uppercase; margin-top: 2px; pointer-events: none; }
+  .sh-del { position: absolute; top: 3px; right: 3px; width: 15px; height: 15px; border-radius: 50%; display: grid; place-items: center; background: rgba(0,0,0,.6); opacity: 0; transition: opacity .15s; cursor: pointer; }
   .sh-card:hover .sh-del { opacity: 1; }
-  .sh-del svg { width: 8px; height: 8px; stroke: #ff7b7b; stroke-width: 2.5; }
-  .sh-card.selected {
-    border-color: rgba(255, 183, 197, 0.65);
-    background: rgba(255, 183, 197, 0.14);
-  }
+  .sh-del svg { width: 8px; height: 8px; stroke: var(--danger); stroke-width: 2.5; fill: none; }
   .sh-sel {
-    position: absolute; top: 3px; left: 3px; width: 19px; height: 19px;
-    border-radius: 50%; background: rgba(0,0,0,.55);
-    border: 1.4px solid rgba(255,255,255,.5);
-    display: grid; place-items: center; cursor: pointer; z-index: 5;
-    transition: background .15s, border-color .15s;
-  }
-  .sh-card.selected .sh-sel {
-    background: var(--c1); border-color: var(--c1);
+    position: absolute; top: 3px; left: 3px; width: 19px; height: 19px; border-radius: 50%; z-index: 5;
+    display: grid; place-items: center; cursor: pointer;
+    background: rgba(10,7,16,.55); box-shadow: inset 0 0 0 1.4px rgba(255,255,255,.5);
+    transition: background .15s ease, box-shadow .15s ease;
   }
   .sh-sel::after { content: ""; position: absolute; inset: -6px; border-radius: 50%; }
-  .sh-sel svg { width: 11px; height: 11px; stroke: #120F16; stroke-width: 3; fill: none; opacity: 0; pointer-events: none !important; }
+  .sh-sel svg { width: 11px; height: 11px; stroke: var(--on-accent); stroke-width: 3; fill: none; opacity: 0; pointer-events: none !important; }
   .sh-card.selected .sh-sel svg { opacity: 1; }
-  .sh-thumb {
-    width: 32px; height: 32px; border-radius: 6px; object-fit: cover;
-    margin-bottom: 4px; border: 1px solid rgba(255,255,255,0.18); pointer-events: none !important;
-  }
+  .sh-card.sh-enter { animation: shIn .38s var(--spring-soft) backwards; animation-delay: calc(var(--k, 0) * 45ms); }
+  @keyframes shIn { from { opacity: 0; scale: .88; translate: 0 6px; } }
+  .sh-card.sh-leave { animation: shOut .18s var(--ease-inout) forwards; }
+  @keyframes shOut { to { opacity: 0; scale: .88; translate: 0 -4px; } }
 
-  /* To-Do List Dual Style: Vertical List vs Horizontal Flow */
-  .tlist {
-    left: 178px; top: 32px; width: 200px; height: 90px;
-    display: flex; flex-direction: column; gap: 5px;
-    overflow-y: auto; overflow-x: hidden; padding-right: 3px;
-    scroll-behavior: smooth; z-index: 20;
+  .nd-layer { position: absolute; inset: 0; border-radius: inherit; overflow: hidden; z-index: 2; pointer-events: none !important; }
+  .nd-layer, .nd-layer * { pointer-events: none !important; }
+  .nd-ring {
+    position: absolute; display: block; border-radius: 50%;
+    width: var(--sz, 140px); height: var(--sz, 140px);
+    margin: calc(var(--sz, 140px) / -2) 0 0 calc(var(--sz, 140px) / -2);
+    background: radial-gradient(closest-side, transparent 62%, color-mix(in srgb, var(--c1) 22%, rgba(255,255,255,.14)) 74%, rgba(255,255,255,.08) 85%, color-mix(in srgb, var(--c3) 12%, transparent) 94%, transparent 100%);
+    -webkit-mask: radial-gradient(closest-side, transparent 56%, #000 70%, #000 88%, transparent 100%);
+    mask: radial-gradient(closest-side, transparent 56%, #000 70%, #000 88%, transparent 100%);
+    -webkit-backdrop-filter: blur(2px) brightness(1.07); backdrop-filter: blur(2px) brightness(1.07);
+    opacity: 0; scale: .1; animation: ndWave 1.9s cubic-bezier(.12,.8,.26,1) var(--d, 0ms) both;
   }
-  .tlist.horiz {
-    display: grid;
-    grid-template-rows: repeat(2, 38px);
-    grid-auto-flow: column;
-    grid-auto-columns: 192px;
-    gap: 6px;
-    overflow-x: auto;
-    overflow-y: hidden;
-    padding-right: 0;
-    padding-bottom: 4px;
-    align-content: start;
+  @keyframes ndWave { 0% { scale: .08; opacity: 0; } 10% { opacity: var(--a, .7); } 100% { scale: 1.6; opacity: 0; } }
+  .nd-core {
+    position: absolute; display: block; border-radius: 50%; pointer-events: none !important;
+    width: var(--sz, 200px); height: var(--sz, 200px);
+    margin: calc(var(--sz, 200px) / -2) 0 0 calc(var(--sz, 200px) / -2);
+    background: radial-gradient(closest-side, rgba(255,255,255,.26), color-mix(in srgb, var(--c1) 20%, transparent) 42%, transparent 100%);
+    opacity: 0; scale: .15; animation: ndCore 1.1s var(--ease-fluid) both;
   }
+  @keyframes ndCore { 0% { scale: .15; opacity: 0; } 18% { opacity: 1; } 100% { scale: .95; opacity: 0; } }
+  .nd-bump { animation: ndBump .8s var(--ease-fluid) var(--bd, 0ms) both; }
+  @keyframes ndBump { 0% { translate: 0 0; } 35% { translate: 0 calc(var(--ba, 2px) * -1); } 100% { translate: 0 0; } }
+
+  /* To-Do */
+  .tlist { left: 178px; top: 32px; width: 200px; height: 90px; display: flex; flex-direction: column; gap: 5px; overflow-y: auto; overflow-x: hidden; padding-right: 3px; scroll-behavior: smooth; z-index: 20; }
+  .tlist.horiz { display: grid; grid-template-rows: repeat(2, 38px); grid-auto-flow: column; grid-auto-columns: 192px; gap: 6px; overflow-x: auto; overflow-y: hidden; padding-right: 0; padding-bottom: 4px; align-content: start; }
   .tlist::-webkit-scrollbar { width: 3px; height: 3px; }
   .tlist::-webkit-scrollbar-track { background: rgba(255,255,255,.05); border-radius: 3px; }
   .tlist::-webkit-scrollbar-thumb { background: var(--c1); border-radius: 3px; }
-
   .trow {
-    height: 27px; border-radius: 8px; background: rgba(255,255,255,.08);
-    border: 1px solid rgba(255,255,255,.07);
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 0 8px; font-size: 11.5px; cursor: pointer; flex-shrink: 0;
-    transition: background .15s, border-color .15s;
+    position: relative; height: 27px; border-radius: 9px; padding: 0 8px; font-size: 11.5px; cursor: pointer; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: space-between; transition: background .16s ease;
   }
-  .tlist.horiz .trow {
-    height: 38px;
-    border-radius: 10px;
-    padding: 0 10px;
-  }
-  .trow:hover {
-    background: rgba(255,255,255,.14);
-    border-color: rgba(255,183,197,.28);
-  }
+  .tlist.horiz .trow { height: 38px; border-radius: 11px; padding: 0 10px; }
   .trow-left { display: flex; align-items: center; gap: 7px; overflow: hidden; flex: 1; min-width: 0; margin-right: 4px; }
   .trow-txt { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; display: block; }
-  .trow.done { background: rgba(40,120,60,.35); color: rgba(255,255,255,.6); text-decoration: line-through; }
-  .chk { width: 14px; height: 14px; border-radius: 50%; border: 1.5px solid rgba(255,255,255,.5); display: grid; place-items: center; flex: none; }
-  .trow.done .chk { background: #2fd06b; border-color: #2fd06b; }
-  .chk svg { width: 8px; height: 8px; stroke: #fff; stroke-width: 2.8; fill: none; opacity: 0; }
+  .trow.done { color: var(--ink-3); text-decoration: line-through; background: color-mix(in srgb, var(--ok) 16%, rgba(255,255,255,.04)); }
+  .chk { width: 14px; height: 14px; border-radius: 50%; display: grid; place-items: center; flex: none; box-shadow: inset 0 0 0 1.5px rgba(255,255,255,.5); }
+  .trow.done .chk { background: var(--ok); box-shadow: none; }
+  .chk svg { width: 8px; height: 8px; stroke: var(--on-accent); stroke-width: 2.8; fill: none; opacity: 0; }
   .trow.done .chk svg { opacity: 1; }
-  .tdel { width: 16px; height: 16px; display: grid; place-items: center; opacity: .65; flex-shrink: 0; }
+  .tdel { width: 16px; height: 16px; display: grid; place-items: center; opacity: .6; flex-shrink: 0; transition: opacity .15s; }
   .tdel:hover { opacity: 1; }
-  .tdel svg { width: 10px; height: 10px; stroke: #ff7b7b; stroke-width: 2.2; }
+  .tdel svg { width: 10px; height: 10px; stroke: var(--danger); stroke-width: 2.2; fill: none; }
+  .trow.t-enter { animation: rowIn .34s var(--ease-fluid) backwards; animation-delay: calc(var(--k, 0) * 35ms); }
+  @keyframes rowIn { from { opacity: 0; translate: -7px 0; } }
+  .trow.t-leave { animation: rowOut .18s var(--ease-inout) forwards; }
+  @keyframes rowOut { to { opacity: 0; translate: 12px 0; } }
+  .trow.t-done .chk { animation: chkPop .4s var(--spring-soft); }
+  @keyframes chkPop { 0% { scale: .6; } 55% { scale: 1.18; } 100% { scale: 1; } }
+
   .todo-input-box {
     user-select: text; -webkit-user-select: text;
-    left: 42px; top: 92px; width: 130px; height: 27px; border-radius: 14px;
-    background: rgba(255,255,255,.14); border: 1px solid var(--c1);
-    color: #fff; padding: 0 10px; font-size: 11px; outline: none; display: none; z-index: 25;
+    left: 42px; top: 92px; width: 130px; height: 27px; border-radius: 99px; padding: 0 10px; font: 11px var(--ui); color: #fff;
+    background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.08); outline: none; display: none; z-index: 25;
   }
+  .todo-input-box::placeholder { color: var(--ink-3); }
+
+  .mn-tip {
+    position: fixed; left: 0; top: 0; z-index: 99999; max-width: 240px;
+    padding: 6px 10px; border-radius: 10px; pointer-events: none;
+    font: 500 11px/1.35 var(--ui, system-ui, sans-serif); color: #fff;
+    background: rgba(24, 19, 34, .90);
+    -webkit-backdrop-filter: blur(14px) saturate(140%); backdrop-filter: blur(14px) saturate(140%);
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, .07), 0 10px 22px -10px rgba(0, 0, 0, .55);
+    opacity: 0; scale: .95; translate: 0 -3px; transform-origin: 50% 0;
+    transition: opacity .12s ease, scale .14s var(--ease-fluid), translate .14s var(--ease-fluid);
+  }
+  .mn-tip[data-side="t"] { transform-origin: 50% 100%; translate: 0 3px; }
+  .mn-tip.on { opacity: 1; scale: 1; translate: 0 0; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .sh-card.sh-enter, .trow.t-enter, .trow.t-done .chk, .cup-dot.pop,
+    .js-art.art-in, .js-title.txt-in, .js-artist.txt-in, #peekIcon.pop,
+    .nd-ring, .nd-core, .nd-bump { animation: none !important; }
+    .mn, .ly, .vol-wrap, .vol-drawer, .arw, .pill, .wbtn, .sh-card { transition-duration: .01ms !important; }
+  }
+
+/* ===== MM-LAYER: Mochy-style motion & material (patch) ===== */
+@property --c1 { syntax: "<color>"; inherits: true; initial-value: #FFB7C5; }
+@property --c2 { syntax: "<color>"; inherits: true; initial-value: #E2D1F9; }
+@property --c3 { syntax: "<color>"; inherits: true; initial-value: #A2E4F5; }
+:root { transition: --c1 .7s var(--ease-fluid), --c2 .7s var(--ease-fluid), --c3 .7s var(--ease-fluid); --mm-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .7 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url%28%23n%29'/%3E%3C/svg%3E"); }
+.mm-grain { position: absolute; inset: 0; border-radius: inherit; pointer-events: none; background: var(--mm-grain) 0 0 / 120px 120px; opacity: .045; }
+html.mm-paused *, html.mm-paused *::before, html.mm-paused *::after { animation-play-state: paused !important; }
+
+:root { --spring: linear(0.000, 0.015, 0.053, 0.110, 0.179, 0.256, 0.336, 0.418, 0.497, 0.574, 0.645, 0.710, 0.769, 0.822, 0.868, 0.907, 0.941, 0.968, 0.991, 1.009, 1.022, 1.032, 1.039, 1.043, 1.046, 1.046, 1.045, 1.043, 1.040, 1.037, 1.033, 1.030, 1.026, 1.022, 1.019, 1.016, 1.013, 1.010, 1.008, 1.006, 1); --spring-pop: linear(0.000, 0.025, 0.092, 0.187, 0.299, 0.420, 0.542, 0.658, 0.764, 0.857, 0.936, 1.000, 1.050, 1.086, 1.109, 1.122, 1.126, 1.123, 1.115, 1.103, 1.089, 1.074, 1.059, 1.044, 1.030, 1.019, 1.009, 1.000, 0.994, 0.989, 0.986, 0.985, 0.984, 0.984, 0.985, 0.987, 0.989, 0.991, 0.993, 0.994, 1); --spring-soft: linear(0.000, 0.016, 0.057, 0.115, 0.185, 0.262, 0.340, 0.419, 0.494, 0.565, 0.631, 0.691, 0.744, 0.792, 0.833, 0.869, 0.900, 0.925, 0.946, 0.964, 0.978, 0.989, 0.997, 1.004, 1.008, 1.012, 1.014, 1.015, 1.015, 1.015, 1.014, 1.014, 1.012, 1.011, 1.010, 1.009, 1.008, 1.007, 1.006, 1.005, 1); }
+.mm-grain { opacity: 0; transition: opacity .4s ease; }
+.mn:is([data-s="music"],[data-s="lyrics"],[data-s="pomo"],[data-s="water"],[data-s="shelf"],[data-s="todo"],[data-s="peek"]) .mm-grain { opacity: .045; }
+.ly { contain: layout paint; transition: opacity .12s var(--ease-fluid), transform .14s var(--ease-fluid), visibility 0s linear .12s; }
+@keyframes mmIn { from { opacity: 0; translate: 0 7px; } }
+.mn[data-s="music"] .l-music > .a, .mn[data-s="lyrics"] .l-lyrics > .a, .mn[data-s="pomo"] .l-pomo > .a,
+.mn[data-s="water"] .l-water > .a, .mn[data-s="shelf"] .l-shelf > .a, .mn[data-s="todo"] .l-todo > .a {
+  animation: mmIn .36s var(--ease-out) backwards; animation-delay: calc(var(--mi, 0) * 34ms); }
+.mn:is([data-s="idle"],[data-s="minimal"]) { will-change: auto; }
+.mn[data-s="minimal"] * { animation-play-state: paused !important; }
+@media (prefers-reduced-motion: reduce) { .ly > .a { animation: none !important; } :root { transition: none; } }
+
+/* ===== MM-LAYER-2: album backdrop, accent wash, lyric skeleton ===== */
+@supports (color: rgb(from red r g b)) {
+  :root { --lg-flat: rgb(from var(--c2) r g b / .075); --lg-flat-fill: rgb(from var(--c2) r g b / .07);
+          --lg-flat-hover: rgb(from var(--c2) r g b / .13); --lg-flat-active: rgb(from var(--c2) r g b / .095);
+          --card-bg: rgb(from var(--c2) r g b / .05); }
+}
+.mm-bd { position: absolute; inset: -34%; pointer-events: none; background: center / cover no-repeat;
+  filter: blur(30px) saturate(1.6) brightness(.85); opacity: 0; transition: opacity .7s var(--ease-out); }
+.mm-bd.on { opacity: .62; }
+.lyr ol { transition: transform .42s var(--spring), opacity .3s ease; }
+.lyr.mm-skel ol { opacity: 0; }
+.lyr.mm-skel::before { content: ""; position: absolute; left: 0; right: 6px; top: 50%; height: 76px; translate: 0 -50%;
+  background: linear-gradient(100deg, rgba(255,255,255,.08) 30%, rgba(255,255,255,.28) 50%, rgba(255,255,255,.08) 70%) 100% 0 / 250% 100%;
+  -webkit-mask: linear-gradient(#000 0 0) 0 0 / 76% 12px no-repeat, linear-gradient(#000 0 0) 0 32px / 92% 12px no-repeat, linear-gradient(#000 0 0) 0 64px / 58% 12px no-repeat;
+  mask: linear-gradient(#000 0 0) 0 0 / 76% 12px no-repeat, linear-gradient(#000 0 0) 0 32px / 92% 12px no-repeat, linear-gradient(#000 0 0) 0 64px / 58% 12px no-repeat;
+  animation: mmShim 1.3s linear infinite; }
+@keyframes mmShim { to { background-position: 0 0; } }
+@media (prefers-reduced-motion: reduce) { .lyr.mm-skel::before { animation: none; } .mm-bd { transition: none; } }
+
+/* ===== MM-LAYER-3: Style 1 word motion ===== */
+.lyr li .w { display: inline-block; white-space: pre; transition: opacity .22s var(--ease-out), translate .3s var(--spring-pop), scale .26s var(--spring-pop), text-shadow .3s ease; }
+.lyr li.on .w { opacity: .4; translate: 0 3px; }
+.lyr li.on .w.s { opacity: 1; translate: 0 0; }
+.lyr li.on .w.h { scale: 1.075; translate: 0 -2px; text-shadow: 0 0 14px rgba(255,255,255,.55); }
+@media (prefers-reduced-motion: reduce) { .lyr li .w { transition: none; } }
+
+/* ===== MM-LAYER-4: soft glass + backdrop blend ===== */
+@supports (color: rgb(from red r g b)) { :root { --lg-flat: rgb(from var(--c2) r g b / .045); --lg-flat-hover: rgb(from var(--c2) r g b / .08); --lg-flat-active: rgb(from var(--c2) r g b / .06); } }
+.mm-bd { inset: -24px;
+  -webkit-mask: linear-gradient(180deg, transparent 0 46px, #000 100px), linear-gradient(90deg, transparent 24px, #000 80px calc(100% - 80px), transparent calc(100% - 24px));
+  -webkit-mask-composite: source-in;
+  mask: linear-gradient(180deg, transparent 0 46px, #000 100px), linear-gradient(90deg, transparent 24px, #000 80px calc(100% - 80px), transparent calc(100% - 24px));
+  mask-composite: intersect; }
+.mm-bd.on { opacity: .5; }
+
+/* ===== MM-LAYER-5: glass vars, glass buttons, open mode, style-1 words ===== */
+:root { --mm-fill: .045; --mm-blur: 6px; }
+@supports (color: rgb(from red r g b)) { :root { --lg-flat: rgb(from var(--c2) r g b / var(--mm-fill)); --lg-flat-hover: rgb(from var(--c2) r g b / calc(var(--mm-fill) * 1.8));
+  --lg-flat-active: rgb(from var(--c2) r g b / calc(var(--mm-fill) * 1.35)); } }
+svg.ctl, .bub, .mmpin, .arw, .pill, .wbtn, .sh-card, .trow { -webkit-backdrop-filter: blur(var(--mm-blur)) saturate(118%); backdrop-filter: blur(var(--mm-blur)) saturate(118%); }
+svg.ctl, .bub, .mmpin { background: var(--lg-flat); box-shadow: inset 0 0 0 1px rgba(255,255,255,.07); }
+svg.ctl:active, .bub:active, .mmpin:active { background: var(--lg-flat-active); }
+.mmpin { width: 22px; height: 22px; display: grid; place-items: center; border-radius: 50%; cursor: pointer; z-index: 30; transition: scale .2s var(--spring-pop), background .18s ease; }
+.mmpin:hover { scale: 1.08; background: var(--lg-flat-hover); } .mmpin:active { scale: .92; }
+.mmpin svg { width: 12px; height: 12px; fill: #fff; opacity: .55; rotate: 45deg; transition: rotate .35s var(--spring-pop), opacity .2s; pointer-events: none; }
+.mn.mm-open .mmpin svg { opacity: 1; rotate: 0deg; }
+.mmsrc { font-size: 9.5px; letter-spacing: .02em; color: rgba(255,255,255,.34); pointer-events: none; white-space: nowrap; }
+.mn.mm-open[data-s="lyrics"] { --w: 600px; }
+.lyr li { transition: color .25s, transform .25s, font-size .2s, filter .35s ease, opacity .35s ease; }
+.lyr li[data-d="1"] { filter: blur(.5px); } .lyr li[data-d="2"] { filter: blur(1.3px); opacity: .75; } .lyr li[data-d="3"] { filter: blur(2.2px); opacity: .5; }
+.lyr li.on .w { opacity: .34; translate: 0 4px; }
+.lyr li.on .w.c { scale: 1.045; text-shadow: 0 0 12px rgba(255,255,255,.5); }
+.lyr li.on .w.h { scale: 1.08; translate: 0 -2px; text-shadow: 0 0 16px rgba(255,255,255,.62); }
+.lyr li.on .w.s { opacity: 1; translate: 0 0; }
+.lyr li.on .w.s.c, .lyr li.on .w.s.h { translate: 0 0; } .lyr li.on .w.s.h { translate: 0 -2px; }
+#idleLyrText .w { display: inline-block; white-space: pre; opacity: .4; translate: 0 2px; transition: opacity .22s var(--ease-out), translate .3s var(--spring-pop), scale .26s var(--spring-pop), text-shadow .3s ease; }
+#idleLyrText .w.s { opacity: 1; translate: 0 0; } #idleLyrText .w.c { scale: 1.04; text-shadow: 0 0 10px rgba(255,255,255,.45); }
+
+/* ===== MM-LAYER-6: smooth karaoke words, cascade, tooltip, buttons, water glass ===== */
+.lyr li.on .w, #idleLyrText .w { --p: 0; --g: 0; display: inline-block; white-space: pre; opacity: 1; transition: none;
+  background: linear-gradient(90deg, #fff calc(var(--p) * 116% - 16%), rgba(255,255,255,.34) calc(var(--p) * 116%));
+  -webkit-background-clip: text; background-clip: text; color: transparent; -webkit-text-fill-color: transparent;
+  translate: 0 calc((1 - var(--p)) * 3.5px); scale: calc(1 + var(--g) * .075);
+  filter: drop-shadow(0 0 calc(var(--g) * 9px) rgba(255,255,255,calc(var(--g) * .6))); }
+.lyr li { transition: color .25s, transform .25s, font-size .2s, filter .35s ease, opacity .35s ease, translate .6s var(--spring-soft) calc(var(--dd, 0) * 55ms); }
+.mmpin::after { content: attr(data-tip); position: absolute; right: 0; top: calc(100% + 7px); white-space: nowrap; padding: 5px 10px; border-radius: 9px;
+  font-size: 10.5px; font-weight: 600; color: rgba(255,255,255,.92); background: rgba(26,20,38,.7); -webkit-backdrop-filter: blur(var(--mm-blur)) saturate(118%); backdrop-filter: blur(var(--mm-blur)) saturate(118%);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.09); opacity: 0; translate: 0 -3px; transition: opacity .18s ease, translate .3s var(--spring-pop); pointer-events: none; }
+.mmpin:hover::after { opacity: 1; translate: 0 0; transition-delay: .3s; }
+svg.ctl, .bub { width: 30px; height: 30px; padding: 6px; background: rgb(255 255 255 / calc(var(--mm-fill) * 2)); stroke: #fff; stroke-width: 1.4; stroke-linejoin: round; stroke-linecap: round;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.15), inset 0 0 0 1px rgba(255,255,255,.06); }
+svg.ctl:hover, .bub:hover { background: rgb(255 255 255 / calc(var(--mm-fill) * 3)); }
+svg.ctl:active, .bub:active { background: rgb(255 255 255 / calc(var(--mm-fill) * 2.6)); }
+svg.ctl.js-play-icon { width: 38px; height: 38px; padding: 9px; margin: -4px; background: rgb(255 255 255 / calc(var(--mm-fill) * 3.6));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.22), inset 0 0 0 1px rgba(255,255,255,.09), 0 6px 14px rgba(0,0,0,.24); }
+.bub { width: 34px; border-radius: 11px; } .l-lyrics .bub { background: rgb(255 255 255 / calc(var(--mm-fill) * 3.6)); }
+.wtank { -webkit-backdrop-filter: blur(var(--mm-blur)) saturate(118%); backdrop-filter: blur(var(--mm-blur)) saturate(118%);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.09), inset 0 1px 0 rgba(255,255,255,.18), inset 0 -12px 18px -12px rgba(255,255,255,.1); }
+.wtank::after { content: ""; position: absolute; inset: 0; border-radius: inherit; z-index: 3; pointer-events: none; background: linear-gradient(135deg, rgba(255,255,255,.15), transparent 40%); }
+@media (prefers-reduced-motion: reduce) { .lyr li { transition-delay: 0s; } }
+
+/* ===== MM-LAYER-7/8/9: sistem desain glass beraksen --c2 (resep tombol Playback & Lirik) =====
+   Semua tombol = lapisan putih tipis + isi aksen --c2 + tepi --mm-edge (pendar --c2).
+   Tidak ada lapisan --c1 lagi supaya warna aksen tidak tercampur/kusam. */
+:root {
+  --mm-rim: .07;
+  --mm-edge:
+    inset 0 0 0 1px rgb(255 255 255 / var(--mm-rim)),
+    inset 0 1px calc(var(--mm-blur) * .5) rgb(255 255 255 / calc(var(--mm-rim) * 2.3)),
+    0 3px calc(var(--mm-blur) * 1.2) rgb(0 0 0 / .16);
+}
+@supports (color: rgb(from red r g b)) {
+  :root {
+    --lg-flat: rgb(from var(--c2) r g b / var(--mm-fill));
+    --lg-flat-hover: rgb(from var(--c2) r g b / calc(var(--mm-fill) * 1.8));
+    --lg-flat-active: rgb(from var(--c2) r g b / calc(var(--mm-fill) * 1.35));
+    --mm-edge:
+      inset 0 0 0 1px rgb(255 255 255 / var(--mm-rim)),
+      inset 0 1px calc(var(--mm-blur) * .5) rgb(255 255 255 / calc(var(--mm-rim) * 2.3)),
+      inset 0 0 calc(var(--mm-blur) * 1.4) rgb(from var(--c2) r g b / calc(var(--mm-fill) * 1.8)),
+      0 3px calc(var(--mm-blur) * 1.2) rgb(0 0 0 / .16);
+  }
+}
+
+/* Rim ::before statis dimatikan; tepi semua tombol = --mm-edge (ikut slider Garis Tepi) */
+.arw::before, .pill::before, .wbtn::before, .vol-wrap::before,
+.sh-card::before, .trow::before, .peek-ico::before, .intro-orb::before { display: none !important; }
+
+/* Blur background untuk SEMUA komponen kaca (sebelumnya Volume, peek-ico, intro-orb, sh-clear belum kebagian) */
+svg.ctl, .bub, .mmpin, .arw, .vol-wrap, .pill:not(.primary), .wbtn:not(.primary),
+.sh-card:not(.selected), .trow:not(.done), .sh-clear, .peek-ico, .intro-orb {
+  -webkit-backdrop-filter: blur(var(--mm-blur)) saturate(118%); backdrop-filter: blur(var(--mm-blur)) saturate(118%);
+}
+
+/* Material tombol (sama persis dengan Playback & Lirik) */
+svg.ctl, .bub, .mmpin, .arw, .vol-wrap, .pill:not(.primary), .wbtn:not(.primary),
+.sh-card:not(.selected), .trow:not(.done), .sh-clear:not(.on), .peek-ico, .intro-orb {
+  background: linear-gradient(rgb(255 255 255 / calc(var(--mm-fill) * 1.2)), transparent), linear-gradient(var(--lg-flat), var(--lg-flat));
+  box-shadow: var(--mm-edge);
+}
+svg.ctl:hover, .bub:hover, .mmpin:hover, .arw:hover, .vol-wrap:hover, .vol-wrap.active,
+.pill:not(.primary):hover, .wbtn:not(.primary):hover, .sh-card:not(.selected):hover, .trow:not(.done):hover {
+  background: linear-gradient(rgb(255 255 255 / calc(var(--mm-fill) * 1.8)), transparent), linear-gradient(var(--lg-flat-hover), var(--lg-flat-hover));
+  box-shadow: var(--mm-edge);
+}
+.sh-clear:hover { background: color-mix(in srgb, var(--danger) 34%, rgba(255,255,255,.06)); }
+svg.ctl:active, .bub:active, .mmpin:active { background: linear-gradient(var(--lg-flat-active), var(--lg-flat-active)); }
+
+svg.ctl, .bub { box-sizing: border-box; width: 28px; height: 28px; padding: 6px; border-radius: 50%; margin: 0; stroke: #fff; stroke-width: 1.2; stroke-linejoin: round; stroke-linecap: round; }
+svg.ctl:active, .bub:active, .arw:active, .wbtn:not(.primary):active, .pill:not(.primary):active { scale: .86; }
+
+/* Play/Pause: pill 46x28, margin 0 supaya tetap di tengah (tidak menabrak Prev) */
+svg.ctl.js-play-icon { width: 46px; height: 28px; border-radius: 99px; padding: 5px 14px; margin: 0 !important;
+  background: linear-gradient(rgb(255 255 255 / calc(var(--mm-fill) * 3.4)), rgb(255 255 255 / calc(var(--mm-fill) * 1.4))), linear-gradient(var(--lg-flat-hover), var(--lg-flat-hover)); }
+svg.ctl.js-play-icon:hover { scale: 1.04 1.08; } svg.ctl.js-play-icon:active { scale: .9 .96; }
+svg.ctl path { transition: translate .22s var(--spring-pop); }
+svg.ctl[onclick*="prev"]:active path { translate: -2.5px 0; }
+svg.ctl[onclick*="next"]:active path { translate: 2.5px 0; }
+svg.ctl.js-play-icon.pop { animation: mmPop .42s var(--spring-pop); }
+@keyframes mmPop { 0% { scale: .8; } 60% { scale: 1.07; } 100% { scale: 1; } }
+
+.bub { width: 32px; height: 28px; padding: 6px 7px; border-radius: 10px; }
+
+.l-lyrics .bub { background: linear-gradient(rgb(255 255 255 / calc(var(--mm-fill) * 2.4)), transparent), linear-gradient(var(--lg-flat-hover), var(--lg-flat-hover)); }
+
+.idle-lyr-right { padding: 7px 0; margin: -7px 0; }
+#idleLyrText { line-height: 1.5; padding: 8px 0; margin: -8px 0; }
+.mm-trk { display: inline-block; white-space: nowrap; }
+.lyr li.on .w, #idleLyrText .w { padding: .14em .03em; margin: -.14em -.03em; }
+
+/* ---- File Shelf · air halus v5: lensa pembias lembut + kilau (tanpa mix-blend/rotate/wrapper supaya backdrop-filter tidak terputus) ---- */
+.nd-water, .nd-sheen {
+  position: absolute; left: 0; top: 0; border-radius: 50%; pointer-events: none; --sz: 460px; --T: 1.6s;
+  width: var(--sz); height: var(--sz); margin: calc(var(--sz) / -2) 0 0 calc(var(--sz) / -2);
+}
+.nd-water {
+  z-index: 2;
+  -webkit-backdrop-filter: url(#mmWater); backdrop-filter: url(#mmWater);
+  -webkit-mask: radial-gradient(closest-side, #000 0, rgb(0 0 0 / .92) 30%, rgb(0 0 0 / .45) 60%, transparent 100%);
+  mask: radial-gradient(closest-side, #000 0, rgb(0 0 0 / .92) 30%, rgb(0 0 0 / .45) 60%, transparent 100%);
+  animation: ndSwell var(--T) cubic-bezier(.22,.7,.2,1) both;
+}
+.nd-water.b { z-index: 2; animation-name: ndSwellB; animation-delay: 190ms; }
+.nd-sheen {
+  z-index: 3;
+  background: radial-gradient(closest-side, rgb(255 255 255 / .12), color-mix(in srgb, var(--c2) 20%, transparent) 36%, color-mix(in srgb, var(--c1) 9%, transparent) 62%, transparent 100%);
+  animation: ndSheen var(--T) cubic-bezier(.22,.7,.2,1) both;
+}
+@keyframes ndSwell { from { scale: .2; opacity: 1; } to { scale: 1.18; opacity: 0; } }
+@keyframes ndSwellB { 0% { scale: .25; opacity: 0; } 14% { opacity: .6; } 100% { scale: 1.3; opacity: 0; } }
+@keyframes ndSheen { 0% { scale: .3; opacity: 0; } 22% { opacity: 1; } 100% { scale: 1.1; opacity: 0; } }
+.nd-bump { animation: ndBump 1.05s var(--ease-fluid) var(--bd, 0ms) both; }
+@keyframes ndBump {
+  0% { translate: 0 0; } 24% { translate: 0 calc(var(--ba, 2px) * -1); } 52% { translate: 0 calc(var(--ba, 2px) * .4); }
+  76% { translate: 0 calc(var(--ba, 2px) * -.14); } 100% { translate: 0 0; }
+}
+
+/* ---- To-Do · animasi detail ---- */
+.trow { transition: background .16s ease, color .25s ease, translate .28s var(--spring-soft), scale .2s var(--spring-soft); }
+.trow .trow-left { transition: translate .28s var(--spring-soft); }
+.trow:hover .trow-left { translate: 2px 0; }
+.trow:active { scale: .975; }
+.trow.done { text-decoration: none; }
+.trow-txt { text-decoration: line-through; text-decoration-color: transparent; }
+.trow.done .trow-txt { text-decoration-color: currentColor; }
+.chk { position: relative; }
+.chk svg path { stroke-dasharray: 10; stroke-dashoffset: 10; }
+.trow.done .chk svg path { stroke-dashoffset: 0; }
+.trow.t-new { animation: rowNew .52s var(--spring-soft) both; }
+.trow.t-new::after, .trow.t-done::after { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; }
+.trow.t-new::after { background: color-mix(in srgb, var(--c1) 36%, transparent); animation: rowFlash .9s ease-out both; }
+.trow.t-done::after {
+  background: linear-gradient(100deg, transparent 20%, color-mix(in srgb, var(--ok) 48%, transparent) 50%, transparent 80%) -120% 0 / 60% 100% no-repeat;
+  animation: rowSweep .75s var(--ease-fluid) both;
+}
+.trow.t-done .chk { animation: chkPop .45s var(--spring-soft); }
+.trow.t-done .chk svg path { animation: chkDraw .34s var(--ease-fluid) .08s both; }
+.trow.t-done .chk::after { content: ""; position: absolute; inset: -1px; border-radius: 50%; border: 1.5px solid var(--ok); pointer-events: none; animation: chkRing .6s ease-out both; }
+.trow.t-done .trow-txt { animation: strikeIn .38s ease both; }
+.trow.t-undone .chk { animation: chkOff .28s var(--ease-fluid); }
+.trow.t-leave { animation: rowOut .2s var(--ease-inout) forwards; pointer-events: none; }
+.tdel svg { transition: rotate .25s var(--spring-pop), scale .2s var(--spring-pop); }
+.tdel:hover svg { rotate: 90deg; scale: 1.2; }
+.cnt-pop { animation: cntPop .46s var(--spring-pop); }
+.tlist.tl-anim { scrollbar-width: none; }
+.tlist.tl-anim::-webkit-scrollbar { display: none; }
+@keyframes rowNew { from { opacity: 0; scale: .9; filter: blur(3px); } }
+@keyframes rowFlash { from { opacity: 1; } to { opacity: 0; } }
+@keyframes rowSweep { to { background-position: 220% 0; } }
+@keyframes rowOut { to { opacity: 0; scale: .9; filter: blur(2px); } }
+@keyframes chkDraw { from { stroke-dashoffset: 10; } to { stroke-dashoffset: 0; } }
+@keyframes chkRing { from { scale: 1; opacity: .9; } to { scale: 2.3; opacity: 0; } }
+@keyframes chkOff { 0% { scale: 1; } 40% { scale: .72; } 100% { scale: 1; } }
+@keyframes strikeIn { from { text-decoration-color: transparent; } }
+@keyframes cntPop { 0% { scale: 1; } 38% { scale: 1.22; } 100% { scale: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .trow, .trow *, .trow::after, .nd-water, .nd-sheen { animation: none !important; transition: none !important; }
+}
 </style>
 </head>
 <body>
@@ -790,7 +965,7 @@
         <span class="a bars c js-bars" style="left:134px;top:15px"><i></i><i></i><i></i><i></i><i></i></span>
       </div>
 
-      <!-- Mode Compact Idle Lyrics (Dynamic Width untuk Lirik, Default + Marquee untuk Judul) -->
+      <!-- Mode Compact Idle Lyrics -->
       <div class="ly l-idle-lyrics">
         <div class="ambient"></div>
         <div class="idle-lyr-row">
@@ -808,7 +983,7 @@
 
       <!-- Mode System Peek -->
       <div class="ly l-peek">
-        <span class="a c" id="peekIcon" style="left:32px;top:31px;width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,.11);display:grid;place-items:center"></span>
+        <span class="a c peek-ico" id="peekIcon" style="left:32px;top:31px"></span>
         <span class="a vc sb" id="peekTitle" style="left:58px;top:20px;font-size:13.5px">Volume</span>
         <span class="a vc dim" id="peekSub" style="left:58px;top:36px;font-size:11px;max-width:185px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">System Master Audio</span>
         <span class="a vc b" id="peekRight" style="right:20px;top:27px;font-size:16px;color:var(--c1)">50%</span>
@@ -835,6 +1010,7 @@
 
       <!-- HALAMAN 1: MUSIK -->
       <div class="ly l-music">
+        <div class="ambient"></div>
         <span class="a art js-art" style="left:46px;top:16px;width:56px;height:56px"></span>
         <span class="a vc sb mq-box js-title" data-maxw="252" data-font="600 15px Segoe UI" style="left:114px;top:44px;font-size:15px;width:252px">Tidak ada media</span>
         <span class="a vc dim mq-box js-artist" data-maxw="252" data-font="400 11.5px Segoe UI" style="left:114px;top:62px;font-size:11.5px;width:252px">Putar lagu di Spotify / Browser</span>
@@ -854,7 +1030,6 @@
         <svg class="a ctl c js-play-icon" onclick="mediaCmd('play_pause', event)" style="left:180px;top:113px" viewBox="0 0 24 24"><path d="M7 5h4v14H7zM13 5h4v14h-4z"/></svg>
         <svg class="a ctl c" onclick="mediaCmd('next', event)" style="left:224px;top:113px" viewBox="0 0 24 24"><path d="m13 6 8 6-8 6zM3 6l8 6-8 6z"/></svg>
 
-        <!-- Master Volume Capsule Ala YouTube (Expand on Speaker Hover) -->
         <div class="a vol-wrap" id="volWrap" onclick="event.stopPropagation()">
           <div class="vol-btn" onclick="toggleMuteVolume()">
             <svg class="vol-ico" id="volIcon" viewBox="0 0 24 24">
@@ -875,7 +1050,7 @@
         </div>
       </div>
 
-      <!-- HALAMAN 1B: LIRIK (Dynamic Width) -->
+      <!-- HALAMAN 1B: LIRIK -->
       <div class="ly l-lyrics">
         <div class="ambient"></div>
         <span class="a art js-art" style="left:22px;top:12px;width:62px;height:62px"></span>
@@ -890,12 +1065,14 @@
           <path d="M4 .8h10a3.2 3.2 0 0 1 3.2 3.2v4.6a3.2 3.2 0 0 1-3.2 3.2H8.4L4.6 15l.5-3.2H4A3.2 3.2 0 0 1 .8 8.6V4A3.2 3.2 0 0 1 4 .8z" fill="#fff"/>
           <circle cx="6.3" cy="5.4" r="1.3" fill="#000"/><circle cx="11.3" cy="5.4" r="1.3" fill="#000"/>
         </svg>
-        <svg class="a ctl c" onclick="mediaCmd('prev', event)" style="left:96px;top:118px" viewBox="0 0 24 24"><path d="M11 6 3 12l8 6zM21 6l-8 6 8 6z"/></svg>
+        <svg class="a ctl c" onclick="mediaCmd('prev', event)" style="left:92px;top:118px" viewBox="0 0 24 24"><path d="M11 6 3 12l8 6zM21 6l-8 6 8 6z"/></svg>
         <svg class="a ctl c js-play-icon" onclick="mediaCmd('play_pause', event)" style="left:136px;top:118px" viewBox="0 0 24 24"><path d="M7 5h4v14H7zM13 5h4v14h-4z"/></svg>
-        <svg class="a ctl c" onclick="mediaCmd('next', event)" style="left:176px;top:118px" viewBox="0 0 24 24"><path d="m13 6 8 6-8 6zM3 6l8 6-8 6z"/></svg>
+        <svg class="a ctl c" onclick="mediaCmd('next', event)" style="left:180px;top:118px" viewBox="0 0 24 24"><path d="m13 6 8 6-8 6zM3 6l8 6-8 6z"/></svg>
 
         <span class="a" style="left:252px;top:20px;width:1px;height:104px;background:rgba(255,255,255,.14)"></span>
-        <div class="a lyr">
+        <span class="a mmpin" onclick="mmToggleLyrOpen(event)" id="mmPin" data-tip="" onpointerenter="mmTip()" style="right:14px;top:7px"><svg viewBox="0 0 24 24"><path d="M16 9V4h1c.55 0 1-.45 1-1s-.45-1-1-1H7c-.55 0-1 .45-1 1s.45 1 1 1h1v5c0 1.66-1.34 3-3 3v2h5.97v7l1 1 1-1v-7H19v-2c-1.66 0-3-1.34-3-3z"/></svg></span>
+         <span class="a mmsrc" id="mmSrc" style="left:264px;bottom:1px"></span>
+         <div class="a lyr">
           <ol id="lyrList">
             <li class="on"><svg class="music-note-svg" viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg></li>
             <li>Menunggu lirik lagu...</li>
@@ -905,16 +1082,16 @@
 
       <!-- HALAMAN 2: POMODORO -->
       <div class="ly l-pomo">
-        <span class="a ttl vc">Pomodoro <span style="color:#FFB7C5">Timer</span></span>
+        <span class="a ttl vc">Pomodoro <span style="color:var(--c1)">Timer</span></span>
         <span class="a arw c" style="left:26px;top:70px" onclick="prevPage(event)"><svg viewBox="0 0 10 10"><path d="M6.5 1.5 3 5l3.5 3.5"/></svg></span>
         <span class="a arw c" style="left:394px;top:70px" onclick="nextPage(event)"><svg viewBox="0 0 10 10"><path d="M3.5 1.5 7 5l-3.5 3.5"/></svg></span>
 
         <div class="a pomo-wrap">
-          <svg viewBox="0 0 76 76" style="width:72px;height:72px;filter:drop-shadow(0 0 12px rgba(255,183,197,.3))">
-            <circle cx="38" cy="38" r="32" fill="none" stroke="rgba(255,183,197,.18)" stroke-width="5"/>
-            <circle id="pomoRingArc" cx="38" cy="38" r="32" fill="none" stroke="#FFB7C5" stroke-width="5" stroke-linecap="round" transform="rotate(-90 38 38)" stroke-dasharray="201" stroke-dashoffset="0" style="transition:stroke-dashoffset .5s linear"/>
-            <path d="M38 22 C26 22 20 30 20 40 C20 51 28 57 38 57 C48 57 56 51 56 40 C56 30 50 22 38 22 Z" fill="rgba(255,183,197,.18)" stroke="#FFB7C5" stroke-width="1.8"/>
-            <path d="M38 16 L38 23 M31 19 Q35 23 38 22 Q41 23 45 19 M28 23 Q33 24 38 22 Q43 24 48 23" fill="none" stroke="#A2E4F5" stroke-width="2.2" stroke-linecap="round"/>
+          <svg viewBox="0 0 76 76" style="width:72px;height:72px;filter:drop-shadow(0 0 12px color-mix(in srgb, var(--c1) 35%, transparent))">
+            <circle cx="38" cy="38" r="32" fill="none" style="stroke:color-mix(in srgb, var(--c1) 20%, transparent)" stroke-width="5"/>
+            <circle id="pomoRingArc" cx="38" cy="38" r="32" fill="none" stroke-width="5" stroke-linecap="round" transform="rotate(-90 38 38)" stroke-dasharray="201" stroke-dashoffset="0" style="stroke:var(--c1);transition:stroke-dashoffset .5s linear"/>
+            <path d="M38 22 C26 22 20 30 20 40 C20 51 28 57 38 57 C48 57 56 51 56 40 C56 30 50 22 38 22 Z" style="fill:color-mix(in srgb, var(--c1) 20%, transparent);stroke:var(--c1)" stroke-width="1.8"/>
+            <path d="M38 16 L38 23 M31 19 Q35 23 38 22 Q41 23 45 19 M28 23 Q33 24 38 22 Q43 24 48 23" fill="none" style="stroke:var(--c3)" stroke-width="2.2" stroke-linecap="round"/>
             <circle cx="38" cy="40" r="2" fill="#fff"/>
             <path d="M38 40 L38 31 M38 40 L44 43" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
           </svg>
@@ -923,7 +1100,7 @@
         <span class="a b c" id="pomoTime" style="left:236px;top:48px;font-size:30px;letter-spacing:-.5px">25:00</span>
         <span class="a c dim" id="pomoLabel" style="left:236px;top:73px;font-size:11.5px">Focus Session</span>
 
-        <span class="a pill c" id="ambientBtn" onclick="toggleAmbientNoise(event)" style="left:336px;top:52px;height:24px;padding:0 9px;font-size:10.5px;background:rgba(255,255,255,.1)">
+        <span class="a pill c" id="ambientBtn" onclick="toggleAmbientNoise(event)" style="left:336px;top:52px;height:24px;padding:0 9px;font-size:10.5px">
           <svg viewBox="0 0 24 24" style="width:12px;height:12px"><path d="M16 13v8M8 13v8M12 15v8M20 16.58A5 5 0 0 0 18 7h-1.26A8 8 0 1 0 4 15.25"/></svg>
           <span id="ambientTxt">Rain</span>
         </span>
@@ -931,8 +1108,8 @@
         <span class="a pill" onclick="setPomoMode(pomoBreakMin, 'Short Break')" style="left:138px;top:92px;width:84px">
           <svg viewBox="0 0 24 24"><path d="M5 9h11v5a5 5 0 0 1-5 5H10a5 5 0 0 1-5-5zM16 10h1.5a2.5 2.5 0 0 1 0 5H16M8 3v3M12 3v3"/></svg>Break
         </span>
-        <span class="a pill" onclick="togglePomo()" id="pomoBtn" style="left:228px;top:92px;width:58px;background:#FFB7C5">
-          <svg id="pomoPlaySvg" viewBox="0 0 24 24" style="fill:#120F16;stroke:none"><path d="M8 5v14l11-7z"/></svg>
+        <span class="a pill primary" onclick="togglePomo()" id="pomoBtn" style="left:228px;top:92px;width:58px">
+          <svg id="pomoPlaySvg" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
         </span>
         <span class="a pill" onclick="setPomoMode(pomoDefaultMin, 'Focus Session')" style="left:292px;top:92px;width:86px">
           <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2"/></svg>Focus
@@ -941,19 +1118,19 @@
 
       <!-- HALAMAN 3: WATER REMINDER -->
       <div class="ly l-water">
-        <span class="a ttl vc">Water <span style="color:#A2E4F5">Tracker</span></span>
+        <span class="a ttl vc">Water <span style="color:var(--c3)">Tracker</span></span>
         <span class="a arw c" style="left:26px;top:70px" onclick="prevPage(event)"><svg viewBox="0 0 10 10"><path d="M6.5 1.5 3 5l3.5 3.5"/></svg></span>
         <span class="a arw c" style="left:394px;top:70px" onclick="nextPage(event)"><svg viewBox="0 0 10 10"><path d="M3.5 1.5 7 5l-3.5 3.5"/></svg></span>
 
         <span class="a vc" style="left:44px;top:50px"><b id="waterCurr" style="font-size:29px">0.00</b> <span class="dim sb" id="waterGoalTxt" style="font-size:13px">/ 1.5 L</span></span>
         <span class="a vc dim" id="waterSubTxt" style="left:44px;top:75px;font-size:11.5px">0 dari 6 gelas hari ini</span>
 
-        <span class="a wbtn" onclick="drinkWater()" style="left:44px;top:94px;background:#A2E4F5;color:#120F16">
-          <svg viewBox="0 0 24 24" fill="#120F16"><path d="M12 2.8s6 6.5 6 11.2a6 6 0 0 1-12 0c0-4.7 6-11.2 6-11.2z"/></svg>
+        <span class="a wbtn primary" onclick="drinkWater()" style="left:44px;top:94px">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.8s6 6.5 6 11.2a6 6 0 0 1-12 0c0-4.7 6-11.2 6-11.2z"/></svg>
           <span id="drinkBtn">250 ml</span>
         </span>
-        <span class="a wbtn" onclick="resetWater()" style="left:134px;top:94px;background:rgba(255,255,255,.12)">
-          <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"><path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v4h-4"/></svg>Reset
+        <span class="a wbtn" onclick="resetWater()" style="left:134px;top:94px">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v4h-4"/></svg>Reset
         </span>
 
         <div class="wtank">
@@ -992,49 +1169,73 @@
 
       <!-- HALAMAN 5: TO-DO LIST -->
       <div class="ly l-todo">
-        <span class="a ttl vc">Todo<span style="color:#E2D1F9">List</span></span>
+        <span class="a ttl vc">Todo<span style="color:var(--c2)">List</span></span>
         <span class="a arw c" style="left:26px;top:70px" onclick="prevPage(event)"><svg viewBox="0 0 10 10"><path d="M6.5 1.5 3 5l3.5 3.5"/></svg></span>
         <span class="a arw c" style="left:394px;top:70px" onclick="nextPage(event)"><svg viewBox="0 0 10 10"><path d="M3.5 1.5 7 5l-3.5 3.5"/></svg></span>
 
-        <span class="a b vc" id="todoCount" style="left:44px;top:50px;font-size:29px">0/0</span>
-        <span class="a vc dim" id="todoModeSub" style="left:44px;top:75px;font-size:11px">Tasks Completed</span>
+        <span class="a b vc" id="todoCount" style="left:44px;top:47px;font-size:28px">0/0</span>
+        <span class="a vc dim" id="todoModeSub" style="left:44px;top:71px;font-size:11px">Tasks Completed</span>
 
-        <span class="a pill" id="addTodoBtn" onclick="showTodoInput()" style="left:44px;top:92px;width:96px">
-          <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Add Task
+        <span class="a pill" id="addTodoBtn" onclick="showTodoInput()" style="left:44px;top:94px;width:max-content;min-width:96px;padding:0 12px;gap:6px;white-space:nowrap;font-size:11px">
+          <svg viewBox="0 0 24 24" style="flex-shrink:0"><path d="M12 5v14M5 12h14"/></svg><span>Add Task</span>
         </span>
-        <input type="text" id="todoInlineInput" class="a todo-input-box" placeholder="Tulis & Enter..." maxlength="120">
+        <input type="text" id="todoInlineInput" class="a todo-input-box" style="top:94px" placeholder="Tulis & Enter..." maxlength="120">
 
-        <div class="a tlist horiz" id="todoList"></div>
+        <div class="a tlist horiz" id="todoList" style="left:184px;width:194px"></div>
       </div>
 
     </div>
   </div>
 
   <script>
+    let notchLang = "id";
+    let peekDurationMs = 2400;
+    let pomoAutoBreak = false;
+    let ambientVolPct = 55;
+
+    function tNotch(idStr, enStr) {
+      return notchLang === "en" ? enStr : idStr;
+    }
+
+    function applyNotchLanguage(lang) {
+      notchLang = lang === "en" ? "en" : "id";
+      const isEn = notchLang === "en";
+
+      const waterTargetLbl = document.querySelector(".wtank-info span");
+      if (waterTargetLbl) waterTargetLbl.textContent = isEn ? "Daily Goal" : "Target Harian";
+
+      const zoneMainTxt = document.querySelector("#shelfZone span:nth-of-type(1)");
+      const zoneSubTxt = document.querySelector("#shelfZone span:nth-of-type(2)");
+      if (zoneMainTxt) zoneMainTxt.textContent = isEn ? "Drop files, Click to Pick, or press Ctrl+V" : "Drop files, Klik Pilih, atau tekan Ctrl+V";
+      if (zoneSubTxt) zoneSubTxt.textContent = isEn ? "Click = select · Double-click = open · Drag = move out" : "Klik = pilih · Klik 2x = buka · Drag = keluarkan";
+
+      const addTodoSpan = document.querySelector("#addTodoBtn span");
+      if (addTodoSpan) addTodoSpan.textContent = isEn ? "Add Task" : "Tambah Tugas";
+
+      const todoInp = document.getElementById("todoInlineInput");
+      if (todoInp) todoInp.placeholder = isEn ? "Type & Enter..." : "Tulis & Enter...";
+
+      const todoSub = document.getElementById("todoModeSub");
+      if (todoSub) todoSub.textContent = isEn ? "Tasks Completed" : "Tugas Selesai";
+
+      if (!hasMedia) {
+        applyMarqueeToElements(".js-title", isEn ? "No media playing" : "Tidak ada media");
+        applyMarqueeToElements(".js-artist", isEn ? "Play music in Spotify / Browser" : "Putar lagu di Spotify / Browser");
+      }
+
+      if (!parsedLyrics.length) {
+        renderEmptyLyricsFallback();
+      }
+      updateWaterUI();
+      renderTodos();
+    }
+
     const { invoke } = window.__TAURI__.core;
     const { listen } = window.__TAURI__.event;
     const mn = document.getElementById("mn");
     const esc = (s) => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
-
-    const ID_TO_EN = {"Tutup": "Close", "Pembaruan Tersedia!": "Update Available!", "Versi terbaru siap diunduh.": "A new version is ready to download.", "Update Sekarang": "Update Now", "Pembaruan Wajib Diperlukan": "Required Update", "Versi MangNotch yang kamu gunakan sudah tidak didukung karena perbaikan penting. Silakan perbarui ke versi terbaru.": "Your version of MangNotch is no longer supported due to important fixes. Please update to the latest version.", "Perbarui MangNotch Sekarang": "Update MangNotch Now", "Produktivitas": "Productivity", "TAB 1: DISPLAY & SYSTEM": "TAB 1: DISPLAY & SYSTEM", "Perilaku Layar & Interaksi": "Display & Interaction", "Gaya Interaksi Membuka Notch": "Notch Interaction Mode", "Pilih melebar otomatis saat disentuh kursor atau harus diklik dulu": "Choose whether the notch expands on hover or only after clicking", "Hover Biasa (Default)": "Standard Hover (Default)", "Klik Dulu Baru Melebar": "Click to Expand", "Jalankan MangNotch otomatis di background saat komputer menyala": "Start MangNotch automatically in the background when Windows starts", "Monitor & Tampilan": "Monitor & Display", "Selalu di Primary Monitor": "Use Primary Monitor", "Ikuti layar utama Windows secara otomatis": "Automatically follow the primary Windows display", "Pilih Monitor Manual": "Choose Monitor Manually", "Pindahkan Notch ke layar eksternal tertentu": "Move the notch to a specific external display", "Auto-Hide Total saat Fullscreen": "Auto-hide in Fullscreen", "Sembunyikan Notch 100% saat bermain game atau video F11": "Completely hide the notch during games or fullscreen videos", "Otomatis mengecil ke garis minimalis saat tertutup tab browser/jendela": "Automatically shrink to a minimal line when covered by a browser tab or window", "Pop-up animasi Volume, Brightness, Bluetooth, Caps Lock & Charger": "Animated pop-ups for volume, brightness, Bluetooth, Caps Lock, and charging", "TAB 2: MASCOT & THEME": "TAB 2: MASCOT & THEME", "Pilih Karakter Maskot MangNotch": "Choose Your MangNotch Mascot", "Blob Imut": "Cute Blob", "Spirit Orbs": "Spirit Orbs", "Tampilan Notch Saat Idle": "Idle Notch Appearance", "Saat mode Lirik aktif, otomatis menampilkan 1 baris lirik": "When lyrics mode is active, automatically show one line of lyrics", "Jam & Equalizer": "Clock & Equalizer", "Minimalis (Garis Tipis)": "Minimal (Thin Line)", "Palet Warna Cahaya Notch": "Notch Glow Color Palette", "Termasuk palet MangNime Dark Dusk (Pink - Lavender - Ice Cyan)": "Includes the MangNime Dark Dusk palette (Pink - Lavender - Ice Cyan)", "TAB 3: POMODORO, WATER & TASKS": "TAB 3: POMODORO, WATER & TASKS", "Durasi Fokus & Short Break (Menit)": "Focus & Short Break Duration (Minutes)", "Waktu sesi fokus utama & jeda istirahat": "Main focus session and break duration", "Suara Chime Pomodoro": "Pomodoro Chime Sound", "Bunyikan chime saat waktu fokus selesai": "Play a chime when a focus session ends", "Water Tracker & Chime (Auto-Reset Harian)": "Water Tracker & Chime (Daily Auto-Reset)", "Target Harian & Ukuran Gelas (ml)": "Daily Goal & Cup Size (ml)", "Otomatis reset ke 0 ml setiap pergantian hari": "Automatically reset to 0 ml at the start of each day", "Aktifkan Pengingat Minum Berkala": "Enable Periodic Water Reminders", "Tampilkan pop-up notifikasi minum di Notch sesuai interval": "Show water reminder pop-ups on the notch at the selected interval", "Interval Pengingat Minum (Menit)": "Water Reminder Interval (Minutes)", "Jeda waktu antar pop-up pengingat minum": "Time between water reminder pop-ups", "Suara Chime Tap Pertakaran (+ Drink)": "Water Tap Chime Sound (+ Drink)", "Bunyikan chime saat menekan tombol tambah minum": "Play a chime when adding water", "Suara Chime Notifikasi Pengingat Minum": "Water Reminder Chime Sound", "Bunyikan chime saat pop-up pengingat minum berkala muncul": "Play a chime when a periodic water reminder appears", "Kelola Daftar Tugas (To-Do List)": "Manage To-Do List", "Gaya Tampilan To-Do List di Notch": "To-Do List Layout on the Notch", "Jika > 2 tugas, gulir ke samping (Horizontal) atau atas-bawah": "When there are more than 2 tasks, scroll horizontally or vertically", "Geser ke Samping (Horizontal)": "Horizontal Scrolling", "List Atas-Bawah (Vertikal)": "Vertical List", "Tambah": "Add", "TAB 4: ABOUT PAGE": "TAB 4: ABOUT PAGE", "Interactive Living Notch & Productivity Companion dengan sentuhan estetika editorial": "Interactive Living Notch & Productivity Companion with an editorial aesthetic", "Integrasi Windows GSMTC, kontrol master volume real-time, warna album, dan lirik.": "Windows GSMTC integration, real-time master volume control, album colors, and lyrics.", "Simpan file sementara via Drag-in dari Explorer & Drag-out langsung ke WhatsApp/Discord.": "Temporarily store files by dragging them in from Explorer and dragging them directly into WhatsApp/Discord.", "Timer Pomodoro kustom, pencatat hidrasi auto-reset harian, & To-Do List dual style.": "Custom Pomodoro timer, daily auto-reset hydration tracker, and two To-Do List layouts.", "Pop-up interaktif Volume, Brightness, Bluetooth, Caps Lock, Charger & auto-shrink.": "Interactive pop-ups for volume, brightness, Bluetooth, Caps Lock, charging, and auto-shrink.", "Pengembang, Landing Page & Open Source": "Developer, Landing Page & Open Source", "Kunjungi halaman resmi MangNotch & repositori kode sumber": "Visit the official MangNotch page and source repository", "Data & Konfigurasi Lokal": "Local Data & Configuration", "Tersimpan otomatis di %AppData%\\MangNotch\\config.json": "Automatically saved to %AppData%\\MangNotch\\config.json", "Buka Folder Data": "Open Data Folder", "Tersimpan ✓": "Saved ✓", "Belum ada tugas hari ini.": "No tasks for today yet.", "Hapus Tugas": "Delete Task", "Bahasa Aplikasi": "App Language", "Pilih bahasa antarmuka MangNotch": "Choose the MangNotch interface language", "Bahasa Indonesia": "Indonesian", "English": "English", "Tidak ada media": "No media playing", "Putar lagu di Spotify / Browser": "Play a song in Spotify / your browser", "Menunggu lirik...": "Waiting for lyrics...", "Menunggu lirik lagu...": "Waiting for song lyrics...", "Drop files, Klik Pilih, atau tekan Ctrl+V": "Drop files, click Select, or press Ctrl+V", "Klik = pilih · Klik 2x = buka · Drag = keluarkan": "Click = select · Double-click = open · Drag = move out", "Tidak ada tugas": "No tasks", "Simpan": "Save", "Batal": "Cancel", "Pilih": "Select", "Hapus": "Delete", "Volume": "Volume", "Tambah tugas": "Add task", "Masukkan tugas...": "Enter a task...", "Daily Goal": "Target Harian", "Sistem": "System", "Maskot": "Mascot", "Tentang": "About", "Sesi Fokus": "Focus Session", "Istirahat": "Break", "Fokus": "Focus", "Atur Ulang": "Reset", "Tugas Selesai": "Tasks Completed", "Tambah Tugas": "Add Task", "Rak File": "File Shelf", "Pelacak Air": "Water Tracker", "Daftar Tugas": "Todo List", "Timer Pomodoro": "Pomodoro Timer", "Audio Utama Sistem": "System Master Audio", "Kecerahan": "Brightness", "BISU": "MUTE", "Tunda": "Snooze", "Minum": "Drink", "Tugas": "Task", "Selesai": "Done", "Hari ini": "Today", "Semua": "All", "Air": "Water", "Musik": "Music", "Lirik": "Lyrics", "Waktunya minum": "Time to drink",
-"air!": "of water!",
-"dari": "of",
-"gelas hari ini": "glasses today",
-"Target Harian": "Daily Goal",
-"Klik untuk pilih / batal pilih": "Click to select / deselect",
-"Pilih / Batal Pilih Semua untuk Multi-Drag":
-  "Select / Deselect All for Multi-Drag",
-"Hapus semua file dari shelf": "Remove all files from shelf",
-"Hapus": "Delete",
-"Belum ada tugas hari ini": "No tasks for today",
-"Drop files, Klik Pilih, atau tekan Ctrl+V":
-  "Drop files, click Select, or press Ctrl+V",
-"Klik = pilih · Klik 2x = buka · Drag = keluarkan":
-  "Click = select · Double-click = open · Drag = move out",
-"Tulis & Enter...": "Type & press Enter...",
-"Reset": "Reset",
-"Tambah Tugas": "Add Task",};
+    const ID_TO_EN = {"Tutup": "Close", "Tidak ada media": "No media playing", "Putar lagu di Spotify / Browser": "Play a song in Spotify / your browser", "Menunggu lirik...": "Waiting for lyrics...", "Menunggu lirik lagu...": "Waiting for song lyrics...", "Drop files, Klik Pilih, atau tekan Ctrl+V": "Drop files, click Select, or press Ctrl+V", "Klik = pilih · Klik 2x = buka · Drag = keluarkan": "Click = select · Double-click = open · Drag = move out", "Target Harian": "Daily Goal", "Tugas Selesai": "Tasks Completed", "Tambah Tugas": "Add Task", "Belum ada tugas hari ini": "No tasks for today", "Tulis & Enter...": "Type & press Enter...", "Reset": "Reset"};
     const EN_TO_ID = Object.fromEntries(Object.entries(ID_TO_EN).map(([id, en]) => [en, id]));
     let appLanguage = "id";
     const i18nOriginalText = new WeakMap();
@@ -1067,21 +1268,7 @@
         }
         el.childNodes.forEach(child => { if (child.nodeType === Node.TEXT_NODE) translateTextNode(child); });
       });
-      if (typeof refreshAllCustomSelects === "function") refreshAllCustomSelects();
     }
-    const i18nObserver = new MutationObserver(records => {
-      for (const record of records) {
-        if (record.type === "characterData") translateTextNode(record.target);
-        record.addedNodes && record.addedNodes.forEach(node => {
-          if (node.nodeType === Node.TEXT_NODE) translateTextNode(node);
-          else if (node.nodeType === Node.ELEMENT_NODE && !node.closest("script,style,noscript")) {
-            node.querySelectorAll("*").forEach(el => el.childNodes.forEach(ch => { if (ch.nodeType === Node.TEXT_NODE) translateTextNode(ch); }));
-            node.childNodes.forEach(ch => { if (ch.nodeType === Node.TEXT_NODE) translateTextNode(ch); });
-          }
-        });
-      }
-    });
-    i18nObserver.observe(document.documentElement, {subtree:true, childList:true, characterData:true});
 
     const PAGES = ["music", "pomo", "water", "shelf", "todo"];
     const THEMES = {
@@ -1097,9 +1284,27 @@
     };
     const NOTE_SVG = `<svg class="music-note-svg" viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>`;
 
-    let bootPhase = "boot"; // "boot" -> "intro" -> "done"
+    let bootPhase = "boot";
     let pageIdx = 0;
     let isLyricsOpen = false;
+    let mmLyrOpen = false;
+    const mmApplyOpen = () => {
+      const m = document.querySelector(".mn");
+      if (m) m.classList.toggle("mm-open", mmLyrOpen);
+      window.mmTip();
+      try { updateDynamicLyricsWidth(""); } catch {}
+      try { renderActivePage(); } catch {}
+    };
+    window.mmTip = () => {
+      const p = document.getElementById("mmPin");
+      if (p) p.setAttribute("data-tip", mmLyrOpen ? tNotch("Ubah ke minimalis", "Switch to minimal") : tNotch("Biarkan terbuka", "Keep open"));
+    };
+    window.mmToggleLyrOpen = ev => {
+      if (ev) ev.stopPropagation();
+      mmLyrOpen = !mmLyrOpen;
+      mmApplyOpen();
+      invoke("set_lyrics_pinned", { pinned: mmLyrOpen }).catch(() => {});
+    };
     let interactionMode = "hover";
     let todoStyle = "horizontal";
     let isExpandedByClick = false;
@@ -1158,13 +1363,11 @@
       });
     }
 
-    // Set teks lirik pada mode Idle: gunakan marquee otomatis jika lirik sangat panjang agar bagian kanan tidak terpotong
     function setIdleLyricPlain(text) {
       const el = document.getElementById("idleLyrText");
       if (!el) return;
       const clean = String(text || "");
       const textW = measureTextPx(clean, '700 12px "Segoe UI Variable Text", "Segoe UI", sans-serif');
-      // Jika lebar total melebihi batas maksimum idle notch (960px), jalankan marquee agar ujung kanan tetap terbaca
       if (203 + textW + 42 > 960) {
         delete el.dataset.rawText;
         el.dataset.maxw = "720";
@@ -1176,51 +1379,6 @@
       }
     }
 
-    // Fallback saat lirik tidak ditemukan: kunci ukuran notch di default standar & jalankan marquee judul
-    function setIdleLyricFallbackTitle(title) {
-      updateDynamicLyricsWidth("", "");
-      const el = document.getElementById("idleLyrText");
-      if (el) {
-        delete el.dataset.rawText;
-        el.dataset.maxw = "135";
-      }
-      applyMarqueeToElements("#idleLyrText", title);
-    }
-
-    function updateDynamicLyricsWidth(activeText, nextText = "") {
-      const cleanAct = String(activeText || "").trim();
-      const cleanNext = String(nextText || "").trim();
-      const validAct = (cleanAct && cleanAct !== "♪" && cleanAct !== "Instrumental...") ? cleanAct : "";
-      const validNext = (cleanNext && cleanNext !== "♪" && cleanNext !== "Instrumental...") ? cleanNext : "";
-
-      // Gunakan baris terpanjang antara baris aktif & baris berikutnya agar bagian kanan tidak terpotong
-      const longestExpanded = validAct.length >= validNext.length ? validAct : validNext;
-
-      if (!longestExpanded) {
-        dynLyricsW = 520;
-      } else {
-        const expLinePx = measureTextPx(longestExpanded, '700 14.5px "Segoe UI Variable Text", "Segoe UI", sans-serif');
-        const neededExpTotalW = Math.ceil(282 + expLinePx + 58);
-        dynLyricsW = Math.max(520, Math.min(1040, neededExpTotalW));
-      }
-
-      if (!validAct) {
-        dynIdleLyricsW = 340;
-      } else {
-        const idleLinePx = measureTextPx(validAct, '700 12px "Segoe UI Variable Text", "Segoe UI", sans-serif');
-        const neededIdleTotalW = Math.ceil(203 + idleLinePx + 44);
-        dynIdleLyricsW = Math.max(340, Math.min(960, neededIdleTotalW));
-      }
-
-      document.documentElement.style.setProperty("--dyn-lyr-w", dynLyricsW + "px");
-      document.documentElement.style.setProperty("--dyn-idle-lyr-w", dynIdleLyricsW + "px");
-
-      if (mn.dataset.s === "lyrics" || mn.dataset.s === "idle-lyrics") {
-        applyNotchState(mn.dataset.s);
-      }
-    }
-
-    // Fallback saat lirik tidak ditemukan: kunci ukuran notch di default standar & jalankan marquee judul
     function setIdleLyricFallbackTitle(title) {
       updateDynamicLyricsWidth("");
       const el = document.getElementById("idleLyrText");
@@ -1234,17 +1392,16 @@
         dynLyricsW = 520;
         dynIdleLyricsW = 340;
       } else {
-        // 1. Expanded Lyrics Mode: non-lyric area = 282px + 54px safety buffer
         const expLinePx = measureTextPx(clean, '700 14.5px "Segoe UI Variable Text", "Segoe UI", sans-serif');
         const neededExpTotalW = Math.ceil(282 + expLinePx + 54);
         dynLyricsW = Math.max(520, Math.min(1060, neededExpTotalW));
 
-        // 2. Compact Idle Lyrics Mode: non-lyric area = 203px + 42px safety buffer
         const idleLinePx = measureTextPx(clean, '700 12px "Segoe UI Variable Text", "Segoe UI", sans-serif');
         const neededIdleTotalW = Math.ceil(203 + idleLinePx + 42);
         dynIdleLyricsW = Math.max(340, Math.min(960, neededIdleTotalW));
       }
 
+      if (mmLyrOpen) dynLyricsW = 600;
       document.documentElement.style.setProperty("--dyn-lyr-w", dynLyricsW + "px");
       document.documentElement.style.setProperty("--dyn-idle-lyr-w", dynIdleLyricsW + "px");
 
@@ -1326,7 +1483,7 @@
       peekTimer = setTimeout(() => {
         peekTimer = null;
         renderActivePage();
-      }, 2400);
+      }, peekDurationMs);
     }
 
     function renderMascot() {
@@ -1358,7 +1515,6 @@
       if (currentMood) getMascotStage()?.classList.add(currentMood);
     }
 
-    // Mood otomatis: maskot bereaksi sendiri (jalan di mode hover & click)
     setInterval(() => {
       if (isPlaying && !currentMood && Math.random() < 0.55) setMood("happy", 1800);
     }, 5200);
@@ -1388,7 +1544,7 @@
       else if (stateName === "lyrics") { w = dynLyricsW; h = 140; }
       else if (!["pet", "idle"].includes(stateName)) { w = 420; h = 140; }
 
-      const restingW = (isLyricsOpen && hasMedia) ? dynIdleLyricsW : (restingMode === "minimal" ? 130 : 155);
+      const restingW = (isLyricsOpen && hasMedia) ? (mmLyrOpen ? dynLyricsW : dynIdleLyricsW) : (restingMode === "minimal" ? 130 : 155);
       invoke("update_notch_hitbox", { width: w, height: h, restingWidth: restingW });
     }
 
@@ -1410,7 +1566,7 @@
         if (isObstructed && !(interactionMode === "click" && isHovered)) {
           applyNotchState("minimal");
         } else if (isLyricsOpen && hasMedia) {
-          applyNotchState("idle-lyrics");
+          applyNotchState(mmLyrOpen ? "lyrics" : "idle-lyrics");
         } else if (restingMode === "minimal" && interactionMode === "click" && isHovered) {
           applyNotchState("pet");
         } else {
@@ -1441,15 +1597,6 @@
       isLyricsOpen = false;
       pageIdx = idx;
       renderActivePage();
-    }
-    function toggleLyrics(ev, open) {
-      if (ev) ev.stopPropagation();
-      isLyricsOpen = open;
-      renderActivePage();
-      if (open) {
-        lastActiveLyrIdx = -1;
-        syncLyricScroll();
-      }
     }
 
     let volActiveTimer = null;
@@ -1504,7 +1651,6 @@
       if (Math.abs(e.deltaX) > 20 || Math.abs(e.deltaY) > 20) {
         const dir = (e.deltaX + e.deltaY) > 0 ? 1 : -1;
         const targetIdx = pageIdx + dir;
-        // Mentok di halaman pertama (0) dan halaman terakhir (PAGES.length - 1)
         if (targetIdx >= 0 && targetIdx < PAGES.length) {
           window._wheelPageCooldown = nowMs + 180;
           goToPage(targetIdx);
@@ -1599,7 +1745,6 @@
       }
     });
 
-    // Real-Time Audio Peak Visualizer & PitVisor Shift-Lights
     listen("audio-peak", (event) => {
       const peak = Number(event.payload) || 0;
       const mochiBody = document.querySelector("#mochiStage .mochi-body");
@@ -1629,406 +1774,270 @@
       renderActivePage();
     });
 
-    // Hujan Gerimis + Petir Jauh + Environment (angin, talang, jangkrik, kodok)
-let ambientStopFn = null;
-let isAmbientPlaying = false;
-let rainWorkletReady = false;
+    let ambientStopFn = null;
+    let isAmbientPlaying = false;
+    let rainWorkletReady = false;
 
-// ====== KNOB PETIR ======
-const THUNDER_FIRST_MS = [10000, 20000];
-const THUNDER_GAP_MS   = [30000, 90000];
-const THUNDER_VOLUME   = 0.7;
-// ====== KNOB ENVIRONMENT ======
-const WIND_LEVEL      = 0.12;   // angin sepoi (0 = mati)
-const DRIP_VOLUME     = 0.22;   // tetes talang (0 = mati)
-const DRIP_GAP_MS     = [2500, 8000];
-const CRICKET_VOLUME  = 0.035;  // jangkrik (0 = mati)
-const FROG_VOLUME     = 0.15;   // kodok (0 = mati)
-// ==============================
+    const THUNDER_FIRST_MS = [10000, 20000];
+    const THUNDER_GAP_MS   = [30000, 90000];
+    const THUNDER_VOLUME   = 0.7;
+    const WIND_LEVEL      = 0.12;
+    const DRIP_VOLUME     = 0.22;
+    const DRIP_GAP_MS     = [2500, 8000];
+    const CRICKET_VOLUME  = 0.035;
+    const FROG_VOLUME     = 0.15;
 
-const RAIN_WORKLET_SRC = `
-class RainProc extends AudioWorkletProcessor {
-  constructor(opts) {
-    super();
-    const o = opts.processorOptions;
-    this.tickP = o.tickRate / sampleRate;
-    this.roofP = o.roofRate / sampleRate;
-    this.bed = o.bedLevel;
-    this.windLevel = o.windLevel;
-    this.aHi = 1 - Math.exp(-2 * Math.PI * 6500 / sampleRate);
-    this.aLo = 1 - Math.exp(-2 * Math.PI * 1500 / sampleRate);
-    this.hiL = 0; this.hiR = 0; this.loL = 0; this.loR = 0;
-
-    // angin: dua lowpass (~400Hz) dikurangi lowpass (~90Hz), gain naik-turun pelan
-    this.wA1 = 1 - Math.exp(-2 * Math.PI * 400 / sampleRate);
-    this.wA2 = 1 - Math.exp(-2 * Math.PI * 90 / sampleRate);
-    this.wSm = 1 - Math.exp(-1 / (1.8 * sampleRate));
-    this.wa = [0, 0]; this.wb = [0, 0]; this.wl = [0, 0];
-    this.wCur = 0.3; this.wTarget = 0.3; this.wCount = 0;
-
-    this.drops = [];
-    this.alive = true;
-    this.port.onmessage = (e) => { if (e.data === 'stop') this.alive = false; };
-  }
-
-  spawn(roof) {
-    if (this.drops.length > 48) return;
-    let freq, decMs, q, amp, click;
-    if (roof) {
-      freq = 300 + Math.random() * 700;
-      decMs = 8 + Math.random() * 14;
-      q = 0.4 + Math.random() * 0.3;
-      amp = 0.05 + Math.random() * 0.10;
-      click = 0.8;
-    } else {
-      freq = 2500 + Math.random() * 4500;
-      decMs = 1.5 + Math.random() * 3.5;
-      q = 1.0 + Math.random() * 0.9;
-      amp = 0.02 + Math.random() * 0.07;
-      click = 0;
-    }
-    const pan = Math.random() * 1.8 - 0.9;
-    this.drops.push({
-      env: 1,
-      decay: Math.exp(-1 / (decMs * 0.001 * sampleRate)),
-      f: Math.min(0.9, 2 * Math.sin(Math.PI * freq / sampleRate)),
-      q, click, lp: 0, bp: 0,
-      gL: amp * (1 - pan) * 0.5,
-      gR: amp * (1 + pan) * 0.5
-    });
-  }
-
-  process(inputs, outputs) {
-    if (!this.alive) return false;
-    const L = outputs[0][0], R = outputs[0][1];
-    const drops = this.drops;
-
-    for (let i = 0; i < L.length; i++) {
-      if (Math.random() < this.tickP) this.spawn(false);
-      if (Math.random() < this.roofP) this.spawn(true);
-
-      // bed tipis
-      const wL = Math.random() * 2 - 1, wR = Math.random() * 2 - 1;
-      this.hiL += (wL - this.hiL) * this.aHi; this.loL += (wL - this.loL) * this.aLo;
-      this.hiR += (wR - this.hiR) * this.aHi; this.loR += (wR - this.loR) * this.aLo;
-      let sL = (this.hiL - this.loL) * this.bed * 3;
-      let sR = (this.hiR - this.loR) * this.bed * 3;
-
-      // angin sepoi (embusan baru tiap 3-8 detik, dihaluskan)
-      if (this.windLevel > 0) {
-        if (--this.wCount <= 0) {
-          this.wTarget = 0.15 + Math.pow(Math.random(), 2) * 0.85;
-          this.wCount = (3 + Math.random() * 5) * sampleRate;
+    const RAIN_WORKLET_SRC = `
+    class RainProc extends AudioWorkletProcessor {
+      constructor(opts) {
+        super();
+        const o = opts.processorOptions;
+        this.tickP = o.tickRate / sampleRate;
+        this.roofP = o.roofRate / sampleRate;
+        this.bed = o.bedLevel;
+        this.windLevel = o.windLevel;
+        this.aHi = 1 - Math.exp(-2 * Math.PI * 6500 / sampleRate);
+        this.aLo = 1 - Math.exp(-2 * Math.PI * 1500 / sampleRate);
+        this.hiL = 0; this.hiR = 0; this.loL = 0; this.loR = 0;
+        this.wA1 = 1 - Math.exp(-2 * Math.PI * 400 / sampleRate);
+        this.wA2 = 1 - Math.exp(-2 * Math.PI * 90 / sampleRate);
+        this.wSm = 1 - Math.exp(-1 / (1.8 * sampleRate));
+        this.wa = [0, 0]; this.wb = [0, 0]; this.wl = [0, 0];
+        this.wCur = 0.3; this.wTarget = 0.3; this.wCount = 0;
+        this.drops = [];
+        this.alive = true;
+        this.port.onmessage = (e) => { if (e.data === 'stop') this.alive = false; };
+      }
+      spawn(roof) {
+        if (this.drops.length > 48) return;
+        let freq, decMs, q, amp, click;
+        if (roof) {
+          freq = 300 + Math.random() * 700;
+          decMs = 8 + Math.random() * 14;
+          q = 0.4 + Math.random() * 0.3;
+          amp = 0.05 + Math.random() * 0.10;
+          click = 0.8;
+        } else {
+          freq = 2500 + Math.random() * 4500;
+          decMs = 1.5 + Math.random() * 3.5;
+          q = 1.0 + Math.random() * 0.9;
+          amp = 0.02 + Math.random() * 0.07;
+          click = 0;
         }
-        this.wCur += (this.wTarget - this.wCur) * this.wSm;
-        const gain = this.windLevel * this.wCur * 6;
-        for (let c = 0; c < 2; c++) {
-          const x = Math.random() * 2 - 1;
-          this.wa[c] += (x - this.wa[c]) * this.wA1;
-          this.wb[c] += (this.wa[c] - this.wb[c]) * this.wA1;
-          this.wl[c] += (x - this.wl[c]) * this.wA2;
-          const w = (this.wb[c] - this.wl[c]) * gain;
-          if (c === 0) sL += w; else sR += w;
+        const pan = Math.random() * 1.8 - 0.9;
+        this.drops.push({
+          env: 1,
+          decay: Math.exp(-1 / (decMs * 0.001 * sampleRate)),
+          f: Math.min(0.9, 2 * Math.sin(Math.PI * freq / sampleRate)),
+          q, click, lp: 0, bp: 0,
+          gL: amp * (1 - pan) * 0.5,
+          gR: amp * (1 + pan) * 0.5
+        });
+      }
+      process(inputs, outputs) {
+        if (!this.alive) return false;
+        const L = outputs[0][0], R = outputs[0][1];
+        const drops = this.drops;
+        for (let i = 0; i < L.length; i++) {
+          if (Math.random() < this.tickP) this.spawn(false);
+          if (Math.random() < this.roofP) this.spawn(true);
+          const wL = Math.random() * 2 - 1, wR = Math.random() * 2 - 1;
+          this.hiL += (wL - this.hiL) * this.aHi; this.loL += (wL - this.loL) * this.aLo;
+          this.hiR += (wR - this.hiR) * this.aHi; this.loR += (wR - this.loR) * this.aLo;
+          let sL = (this.hiL - this.loL) * this.bed * 3;
+          let sR = (this.hiR - this.loR) * this.bed * 3;
+          if (this.windLevel > 0) {
+            if (--this.wCount <= 0) {
+              this.wTarget = 0.15 + Math.pow(Math.random(), 2) * 0.85;
+              this.wCount = (3 + Math.random() * 5) * sampleRate;
+            }
+            this.wCur += (this.wTarget - this.wCur) * this.wSm;
+            const gain = this.windLevel * this.wCur * 6;
+            for (let c = 0; c < 2; c++) {
+              const x = Math.random() * 2 - 1;
+              this.wa[c] += (x - this.wa[c]) * this.wA1;
+              this.wb[c] += (this.wa[c] - this.wb[c]) * this.wA1;
+              this.wl[c] += (x - this.wl[c]) * this.wA2;
+              const w = (this.wb[c] - this.wl[c]) * gain;
+              if (c === 0) sL += w; else sR += w;
+            }
+          }
+          const white = Math.random() * 2 - 1;
+          for (let d = drops.length - 1; d >= 0; d--) {
+            const dr = drops[d];
+            dr.env *= dr.decay;
+            if (dr.env < 0.003) { drops.splice(d, 1); continue; }
+            const ex = (white + (dr.env > 0.85 ? dr.click * 2 : 0)) * dr.env;
+            dr.lp += dr.f * dr.bp;
+            const hp = ex - dr.lp - dr.q * dr.bp;
+            dr.bp += dr.f * hp;
+            const sig = dr.bp * dr.q;
+            sL += sig * dr.gL;
+            sR += sig * dr.gR;
+          }
+          L[i] = Math.tanh(sL);
+          R[i] = Math.tanh(sR);
         }
-      }
-
-      // tetes individual
-      const white = Math.random() * 2 - 1;
-      for (let d = drops.length - 1; d >= 0; d--) {
-        const dr = drops[d];
-        dr.env *= dr.decay;
-        if (dr.env < 0.003) { drops.splice(d, 1); continue; }
-        const ex = (white + (dr.env > 0.85 ? dr.click * 2 : 0)) * dr.env;
-        dr.lp += dr.f * dr.bp;
-        const hp = ex - dr.lp - dr.q * dr.bp;
-        dr.bp += dr.f * hp;
-        const sig = dr.bp * dr.q;
-        sL += sig * dr.gL;
-        sR += sig * dr.gR;
-      }
-      L[i] = Math.tanh(sL);
-      R[i] = Math.tanh(sR);
-    }
-    return true;
-  }
-}
-registerProcessor('rain-proc', RainProc);
-`;
-
-function makeRainIR(ctx, seconds = 1.0, curve = 3.0) {
-  const len = Math.floor(ctx.sampleRate * seconds);
-  const ir = ctx.createBuffer(2, len, ctx.sampleRate);
-  for (let c = 0; c < 2; c++) {
-    const d = ir.getChannelData(c);
-    for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, curve);
-  }
-  return ir;
-}
-
-function makeThunderBuffer(ctx, d) {            // d: 0 = dekat, 1 = jauh
-  const sr = ctx.sampleRate;
-  const dur = 5 + d * 6;
-  const len = Math.floor(sr * dur);
-  const buf = ctx.createBuffer(2, len, sr);
-
-  const env = new Float32Array(len);
-  const bumps = 6 + Math.floor(Math.random() * 5);
-  for (let k = 0; k < bumps; k++) {
-    const t0  = k === 0 ? 0 : Math.random() * dur * 0.65;
-    const amp = k === 0 ? 1 : 0.2 + Math.random() * 0.5;
-    const atk = k === 0 ? 0.02 + d * 0.25 : 0.05 + Math.random() * 0.2;
-    const dec = 0.6 + Math.random() * 1.4 + d * 0.8;
-    const i0 = Math.floor(t0 * sr);
-    const n1 = Math.min(len, i0 + Math.floor((atk + dec * 5) * sr));
-    for (let n = i0; n < n1; n++) {
-      const t = (n - i0) / sr;
-      env[n] += amp * (t < atk ? t / atk : Math.exp(-(t - atk) / dec));
-    }
-  }
-
-  for (let c = 0; c < 2; c++) {
-    const out = buf.getChannelData(c);
-    let b = 0, y1 = 0, y2 = 0, peak = 0;
-    for (let n = 0; n < len; n++) {
-      const p = n / len;
-      b = (b + 0.02 * (Math.random() * 2 - 1)) / 1.02;
-      const fc = 70 + (900 - d * 600) * Math.exp(-2.5 * p);
-      const a = 1 - Math.exp(-2 * Math.PI * fc / sr);
-      y1 += (b - y1) * a;
-      y2 += (y1 - y2) * a;
-      const v = y2 * env[n] * Math.pow(1 - p, 1.5);
-      out[n] = v;
-      const av = Math.abs(v); if (av > peak) peak = av;
-    }
-    const norm = peak > 0 ? 1 / peak : 1;
-    for (let n = 0; n < len; n++) out[n] *= norm;
-
-    if (d < 0.5) {
-      const crackAmp = (0.5 - d) * 1.2;
-      const cl = Math.floor(0.3 * sr);
-      let lpC = 0;
-      for (let n = 0; n < cl; n++) {
-        lpC += ((Math.random() * 2 - 1) - lpC) * 0.35;
-        out[n] += lpC * Math.exp(-n / (0.05 * sr)) * crackAmp;
+        return true;
       }
     }
-    let pk = 0;
-    for (let n = 0; n < len; n++) { const av = Math.abs(out[n]); if (av > pk) pk = av; }
-    const fin = pk > 0 ? 0.9 / pk : 1;
-    for (let n = 0; n < len; n++) out[n] *= fin;
-  }
-  return buf;
-}
+    registerProcessor('rain-proc', RainProc);
+    `;
 
-const rand = (a, b) => a + Math.random() * (b - a);
-
-async function toggleAmbientNoise(ev) {
-  if (ev) ev.stopPropagation();
-  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  if (audioCtx.state === "suspended") await audioCtx.resume();
-
-  if (isAmbientPlaying) {
-    if (ambientStopFn) { ambientStopFn(); ambientStopFn = null; }
-    isAmbientPlaying = false;
-  } else {
-    if (!rainWorkletReady) {
-      const url = URL.createObjectURL(new Blob([RAIN_WORKLET_SRC], { type: "application/javascript" }));
-      await audioCtx.audioWorklet.addModule(url);
-      URL.revokeObjectURL(url);
-      rainWorkletReady = true;
-    }
-
-    // ====== KNOB UTAMA (gerimis) ======
-    const TICK_RATE = 50;
-    const ROOF_RATE = 6;
-    const BED_LEVEL = 0.005;
-    const VOLUME = 0.6;
-    // ==================================
-
-    const now = audioCtx.currentTime;
-    const master = audioCtx.createGain();
-    master.gain.setValueAtTime(0.0001, now);
-    master.gain.exponentialRampToValueAtTime(VOLUME, now + 1.0);
-    master.connect(audioCtx.destination);
-
-    const node = new AudioWorkletNode(audioCtx, "rain-proc", {
-      numberOfInputs: 0,
-      outputChannelCount: [2],
-      processorOptions: { tickRate: TICK_RATE, roofRate: ROOF_RATE, bedLevel: BED_LEVEL, windLevel: WIND_LEVEL }
-    });
-
-    const hp = audioCtx.createBiquadFilter();
-    hp.type = "highpass"; hp.frequency.value = 70; hp.Q.value = 0.7;
-    const lp = audioCtx.createBiquadFilter();
-    lp.type = "lowpass"; lp.frequency.value = 9000; lp.Q.value = 0.5;
-
-    const dry = audioCtx.createGain(); dry.gain.value = 0.85;
-    const wet = audioCtx.createGain(); wet.gain.value = 0.28;
-    const verb = audioCtx.createConvolver();
-    verb.buffer = makeRainIR(audioCtx);
-
-    node.connect(hp); hp.connect(lp);
-    lp.connect(dry); dry.connect(master);
-    lp.connect(verb); verb.connect(wet); wet.connect(master);
-
-    // ---------- helper timer & node ----------
-    const timers = [];
-    const liveOscs = new Set();
-    let running = true;
-
-    const later = (fn, ms) => timers.push(setTimeout(fn, ms));
-    function loop(fn, [a, b], first) {
-      later(() => { if (!running) return; fn(); loop(fn, [a, b]); }, first ?? rand(a, b));
-    }
-    // output env: gain -> panner -> (master + reverb)
-    function envOut(pan, level) {
-      const g = audioCtx.createGain(); g.gain.value = level;
-      const p = audioCtx.createStereoPanner(); p.pan.value = pan;
-      g.connect(p); p.connect(master); p.connect(verb);
-      return { input: g, free() { try { g.disconnect(); p.disconnect(); } catch {} } };
-    }
-    function track(osc, out) {
-      liveOscs.add(osc);
-      osc.onended = () => { liveOscs.delete(osc); out.free(); };
-    }
-
-    // ---------- Petir (jauh) ----------
-    function fireThunder() {
-      if (!running) return;
-      const d = 0.5 + Math.random() * 0.5;
-      const buf = makeThunderBuffer(audioCtx, d);
-      const delayMs = 300 + d * 4500;
-      if (typeof window.onRainLightning === "function") window.onRainLightning(d);
-      later(() => {
-        if (!running) return;
-        const src = audioCtx.createBufferSource();
-        src.buffer = buf;
-        const g = audioCtx.createGain();
-        g.gain.value = THUNDER_VOLUME * (1 - d * 0.55);
-        src.connect(g); g.connect(master); g.connect(verb);
-        liveOscs.add(src);
-        src.onended = () => { liveOscs.delete(src); try { g.disconnect(); } catch {} };
-        src.start();
-      }, delayMs);
-    }
-    loop(fireThunder, THUNDER_GAP_MS, rand(...THUNDER_FIRST_MS));
-
-    // ---------- Tetes talang/daun ("plok") ----------
-    function drip() {
-      const t = audioCtx.currentTime + 0.02;
-      const n = Math.random() < 0.3 ? 2 : 1;           // kadang dobel
-      const out = envOut(rand(-0.7, 0.7), DRIP_VOLUME);
-      let lastEnd = t;
-      for (let k = 0; k < n; k++) {
-        const ts = t + k * rand(0.12, 0.25);
-        const amp = k === 0 ? 1 : 0.5;
-        const osc = audioCtx.createOscillator();
-        const g = audioCtx.createGain();
-        const f0 = rand(650, 1100), f1 = rand(220, 380);
-        osc.type = "sine";
-        osc.frequency.setValueAtTime(f0, ts);
-        osc.frequency.exponentialRampToValueAtTime(f1, ts + 0.08);
-        g.gain.setValueAtTime(0.0001, ts);
-        g.gain.exponentialRampToValueAtTime(amp, ts + 0.004);
-        g.gain.exponentialRampToValueAtTime(0.0001, ts + 0.16);
-        osc.connect(g); g.connect(out.input);
-        osc.start(ts); osc.stop(ts + 0.2);
-        lastEnd = ts + 0.2;
-        if (k === n - 1) track(osc, out); else { liveOscs.add(osc); osc.onended = () => liveOscs.delete(osc); }
+    function makeRainIR(ctx, seconds = 1.0, curve = 3.0) {
+      const len = Math.floor(ctx.sampleRate * seconds);
+      const ir = ctx.createBuffer(2, len, ctx.sampleRate);
+      for (let c = 0; c < 2; c++) {
+        const d = ir.getChannelData(c);
+        for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, curve);
       }
+      return ir;
     }
-    if (DRIP_VOLUME > 0) loop(drip, DRIP_GAP_MS, rand(1500, 4000));
 
-    // ---------- Jangkrik ----------
-    function cricketSession() {
-      const t0 = audioCtx.currentTime + 0.05;
-      const dur = rand(5, 12);
-      const f = rand(4300, 5200);
-      const period = rand(0.32, 0.55);
-      const pulses = 2 + Math.floor(Math.random() * 3);
-      const pLen = 0.018, pGap = 0.028;
-      const out = envOut(rand(-0.85, 0.85), CRICKET_VOLUME);
-      const osc = audioCtx.createOscillator();
-      osc.type = "sine"; osc.frequency.value = f;
-      const g = audioCtx.createGain(); g.gain.value = 0;
-      osc.connect(g); g.connect(out.input);
-      for (let t = 0; t < dur; t += period) {
-        const s = Math.sin(Math.PI * t / dur);          // fade in-out per sesi
-        for (let k = 0; k < pulses; k++) {
-          const ts = t0 + t + k * (pLen + pGap);
-          g.gain.setValueAtTime(0, ts);
-          g.gain.linearRampToValueAtTime(s, ts + 0.005);
-          g.gain.linearRampToValueAtTime(s, ts + pLen * 0.7);
-          g.gain.linearRampToValueAtTime(0, ts + pLen);
+    function makeThunderBuffer(ctx, d) {
+      const sr = ctx.sampleRate;
+      const dur = 5 + d * 6;
+      const len = Math.floor(sr * dur);
+      const buf = ctx.createBuffer(2, len, sr);
+      const env = new Float32Array(len);
+      const bumps = 6 + Math.floor(Math.random() * 5);
+      for (let k = 0; k < bumps; k++) {
+        const t0  = k === 0 ? 0 : Math.random() * dur * 0.65;
+        const amp = k === 0 ? 1 : 0.2 + Math.random() * 0.5;
+        const atk = k === 0 ? 0.02 + d * 0.25 : 0.05 + Math.random() * 0.2;
+        const dec = 0.6 + Math.random() * 1.4 + d * 0.8;
+        const i0 = Math.floor(t0 * sr);
+        const n1 = Math.min(len, i0 + Math.floor((atk + dec * 5) * sr));
+        for (let n = i0; n < n1; n++) {
+          const t = (n - i0) / sr;
+          env[n] += amp * (t < atk ? t / atk : Math.exp(-(t - atk) / dec));
         }
       }
-      osc.start(t0); osc.stop(t0 + dur + period + 0.1);
-      track(osc, out);
-    }
-    if (CRICKET_VOLUME > 0) loop(cricketSession, [6000, 20000], rand(2000, 6000));
-
-    // ---------- Kodok ----------
-    function frogSession() {
-      const t0 = audioCtx.currentTime + 0.05;
-      const croaks = 2 + Math.floor(Math.random() * 4);
-      const f0 = rand(110, 170);
-      const out = envOut(rand(-0.9, 0.9), FROG_VOLUME);
-      const osc = audioCtx.createOscillator();
-      osc.type = "sawtooth";
-      const bp = audioCtx.createBiquadFilter();
-      bp.type = "bandpass"; bp.frequency.value = rand(350, 550); bp.Q.value = 1.5;
-      const g = audioCtx.createGain(); g.gain.value = 0;
-      osc.connect(bp); bp.connect(g); g.connect(out.input);
-      let end = t0;
-      for (let c = 0; c < croaks; c++) {
-        const ts = t0 + c * rand(0.38, 0.5);
-        const len = rand(0.22, 0.32);
-        osc.frequency.setValueAtTime(f0 * 1.25, ts);
-        osc.frequency.exponentialRampToValueAtTime(f0 * 0.9, ts + len);
-        const pulseP = 0.034;                            // ~29 Hz pulse train
-        for (let t = 0; t < len; t += pulseP) {
-          const bell = Math.sin(Math.PI * t / len);
-          const tp = ts + t;
-          g.gain.setValueAtTime(0, tp);
-          g.gain.linearRampToValueAtTime(bell, tp + 0.008);
-          g.gain.linearRampToValueAtTime(0, tp + pulseP * 0.9);
+      for (let c = 0; c < 2; c++) {
+        const out = buf.getChannelData(c);
+        let b = 0, y1 = 0, y2 = 0, peak = 0;
+        for (let n = 0; n < len; n++) {
+          const p = n / len;
+          b = (b + 0.02 * (Math.random() * 2 - 1)) / 1.02;
+          const fc = 70 + (900 - d * 600) * Math.exp(-2.5 * p);
+          const a = 1 - Math.exp(-2 * Math.PI * fc / sr);
+          y1 += (b - y1) * a;
+          y2 += (y1 - y2) * a;
+          const v = y2 * env[n] * Math.pow(1 - p, 1.5);
+          out[n] = v;
+          const av = Math.abs(v); if (av > peak) peak = av;
         }
-        end = ts + len + 0.05;
+        const norm = peak > 0 ? 1 / peak : 1;
+        for (let n = 0; n < len; n++) out[n] *= norm;
       }
-      osc.start(t0); osc.stop(end + 0.1);
-      track(osc, out);
+      return buf;
     }
-    if (FROG_VOLUME > 0) loop(frogSession, [12000, 40000], rand(5000, 15000));
 
-    ambientStopFn = () => {
-      running = false;
-      timers.forEach(clearTimeout);
-      liveOscs.forEach(s => { try { s.stop(); } catch {} });
-      try {
-        const t = audioCtx.currentTime;
-        master.gain.setValueAtTime(Math.max(master.gain.value, 0.0001), t);
-        master.gain.exponentialRampToValueAtTime(0.0001, t + 0.5);
-        setTimeout(() => {
+    const rand = (a, b) => a + Math.random() * (b - a);
+
+    async function toggleAmbientNoise(ev) {
+      if (ev) ev.stopPropagation();
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      if (audioCtx.state === "suspended") await audioCtx.resume();
+
+      if (isAmbientPlaying) {
+        if (ambientStopFn) { ambientStopFn(); ambientStopFn = null; }
+        isAmbientPlaying = false;
+      } else {
+        if (!rainWorkletReady) {
+          const url = URL.createObjectURL(new Blob([RAIN_WORKLET_SRC], { type: "application/javascript" }));
+          await audioCtx.audioWorklet.addModule(url);
+          URL.revokeObjectURL(url);
+          rainWorkletReady = true;
+        }
+
+        const TICK_RATE = 50;
+        const ROOF_RATE = 6;
+        const BED_LEVEL = 0.005;
+        const VOLUME = Math.max(0.1, (ambientVolPct || 55) / 100);
+
+        const now = audioCtx.currentTime;
+        const master = audioCtx.createGain();
+        master.gain.setValueAtTime(0.0001, now);
+        master.gain.exponentialRampToValueAtTime(VOLUME, now + 1.0);
+        master.connect(audioCtx.destination);
+
+        const node = new AudioWorkletNode(audioCtx, "rain-proc", {
+          numberOfInputs: 0,
+          outputChannelCount: [2],
+          processorOptions: { tickRate: TICK_RATE, roofRate: ROOF_RATE, bedLevel: BED_LEVEL, windLevel: WIND_LEVEL }
+        });
+
+        const hp = audioCtx.createBiquadFilter();
+        hp.type = "highpass"; hp.frequency.value = 70; hp.Q.value = 0.7;
+        const lp = audioCtx.createBiquadFilter();
+        lp.type = "lowpass"; lp.frequency.value = 9000; lp.Q.value = 0.5;
+
+        const dry = audioCtx.createGain(); dry.gain.value = 0.85;
+        const wet = audioCtx.createGain(); wet.gain.value = 0.28;
+        const verb = audioCtx.createConvolver();
+        verb.buffer = makeRainIR(audioCtx);
+
+        node.connect(hp); hp.connect(lp);
+        lp.connect(dry); dry.connect(master);
+        lp.connect(verb); verb.connect(wet); wet.connect(master);
+
+        const timers = [];
+        const liveOscs = new Set();
+        let running = true;
+
+        const later = (fn, ms) => timers.push(setTimeout(fn, ms));
+        function loop(fn, [a, b], first) {
+          later(() => { if (!running) return; fn(); loop(fn, [a, b]); }, first ?? rand(a, b));
+        }
+
+        function fireThunder() {
+          if (!running) return;
+          const d = 0.5 + Math.random() * 0.5;
+          const buf = makeThunderBuffer(audioCtx, d);
+          const delayMs = 300 + d * 4500;
+          later(() => {
+            if (!running) return;
+            const src = audioCtx.createBufferSource();
+            src.buffer = buf;
+            const g = audioCtx.createGain();
+            g.gain.value = THUNDER_VOLUME * (1 - d * 0.55);
+            src.connect(g); g.connect(master); g.connect(verb);
+            liveOscs.add(src);
+            src.onended = () => { liveOscs.delete(src); try { g.disconnect(); } catch {} };
+            src.start();
+          }, delayMs);
+        }
+        loop(fireThunder, THUNDER_GAP_MS, rand(...THUNDER_FIRST_MS));
+
+        ambientStopFn = () => {
+          running = false;
+          timers.forEach(clearTimeout);
+          liveOscs.forEach(s => { try { s.stop(); } catch {} });
           try {
-            node.port.postMessage("stop");
-            node.disconnect(); hp.disconnect(); lp.disconnect();
-            dry.disconnect(); wet.disconnect(); verb.disconnect(); master.disconnect();
+            const t = audioCtx.currentTime;
+            master.gain.setValueAtTime(Math.max(master.gain.value, 0.0001), t);
+            master.gain.exponentialRampToValueAtTime(0.0001, t + 0.5);
+            setTimeout(() => {
+              try {
+                node.port.postMessage("stop");
+                node.disconnect(); hp.disconnect(); lp.disconnect();
+                dry.disconnect(); wet.disconnect(); verb.disconnect(); master.disconnect();
+              } catch {}
+            }, 550);
           } catch {}
-        }, 550);
-      } catch {}
-    };
-    isAmbientPlaying = true;
-  }
+        };
+        isAmbientPlaying = true;
+      }
 
-  const btn = document.getElementById("ambientBtn");
-  const txt = document.getElementById("ambientTxt");
-  if (btn && txt) {
-    btn.style.background = isAmbientPlaying ? "rgba(162,228,245,.25)" : "rgba(255,255,255,.1)";
-    txt.textContent = isAmbientPlaying ? "Rain On" : "Rain";
-  }
-}
+      const btn = document.getElementById("ambientBtn");
+      const txt = document.getElementById("ambientTxt");
+      if (btn && txt) {
+        btn.classList.toggle("on", isAmbientPlaying);
+        txt.textContent = isAmbientPlaying ? "Rain On" : "Rain";
+      }
+    }
 
-    // ================= MASTER VOLUME CONTROL =================
     let sysVol = 50;
     let lastNonZeroVol = 50;
     let sysMuted = false;
@@ -2049,12 +2058,8 @@ async function toggleAmbientNoise(ev) {
         wrap.classList.toggle("muted", sysMuted);
         wrap.style.setProperty("--vol-pct", effectiveVol + "%");
       }
-      if (slider) {
-        slider.value = effectiveVol;
-      }
-      if (pctTxt) {
-        pctTxt.textContent = sysMuted ? "MUTE" : (vol + "%");
-      }
+      if (slider) slider.value = effectiveVol;
+      if (pctTxt) pctTxt.textContent = sysMuted ? "MUTE" : (vol + "%");
       if (icon) {
         if (sysMuted) {
           icon.innerHTML = `<path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M22 9l-6 6M16 9l6 6"/>`;
@@ -2067,9 +2072,7 @@ async function toggleAmbientNoise(ev) {
     }
 
     listen("volume-sync", (ev) => {
-      if (!volInvokeBusy) {
-        renderVolumeUI(ev.payload.volume, ev.payload.muted);
-      }
+      if (!volInvokeBusy) renderVolumeUI(ev.payload.volume, ev.payload.muted);
     });
 
     async function syncVolumeFromSystem() {
@@ -2090,9 +2093,7 @@ async function toggleAmbientNoise(ev) {
       while (pendingVolValue !== null) {
         const target = pendingVolValue;
         pendingVolValue = null;
-        try {
-          await invoke("set_system_volume", { volume: target, mute: target === 0 });
-        } catch {}
+        try { await invoke("set_system_volume", { volume: target, mute: target === 0 }); } catch {}
       }
       volInvokeBusy = false;
     }
@@ -2111,7 +2112,6 @@ async function toggleAmbientNoise(ev) {
       } catch {}
     }
 
-    // ================= 1. MUSIK, TIMELINE & LIRIK =================
     let curTrackKey = "";
     let curPos = 0, curDur = 0, lastRawGsmtcPos = -1;
     let lastTickMs = performance.now();
@@ -2125,16 +2125,14 @@ async function toggleAmbientNoise(ev) {
     }
     function mediaCmd(action, ev) {
       if (ev) ev.stopPropagation();
-      invoke("media_action", { action });
+      Promise.resolve(invoke("media_action", { action })).then(r => console.info("[media]", action, "->", r === undefined ? "ok" : r)).catch(e => console.error("[media]", action, "gagal:", e));
     }
-
     function seekToSec(sec) {
       curPos = Math.max(0, sec);
       lastTickMs = performance.now();
       invoke("media_seek", { positionSec: curPos });
       updateMediaUI();
     }
-
     function seekBarClick(e, barEl) {
       e.stopPropagation();
       if (curDur <= 0) return;
@@ -2143,8 +2141,25 @@ async function toggleAmbientNoise(ev) {
       seekToSec(frac * curDur);
     }
 
+    let albumArtGlow = true;
+    let lastAlbumDataUrl = "";
+    let cachedAlbumGradient = "";
+
+    function syncActiveMusicGlow() {
+      if (albumArtGlow && cachedAlbumGradient) {
+        document.documentElement.style.setProperty("--lyr-glow", cachedAlbumGradient);
+      } else {
+        document.documentElement.style.setProperty("--lyr-glow", "var(--glow)");
+      }
+    }
+
     function extractAlbumGradient(dataUrl) {
-      if (!dataUrl) return;
+      if (!dataUrl) {
+        cachedAlbumGradient = "";
+        syncActiveMusicGlow();
+        return;
+      }
+      lastAlbumDataUrl = dataUrl;
       const img = new Image();
       img.onload = () => {
         const cv = document.createElement("canvas");
@@ -2155,9 +2170,10 @@ async function toggleAmbientNoise(ev) {
         let r = 0, g = 0, b = 0, cnt = 0;
         for (let i = 0; i < d.length; i += 4) { r += d[i]; g += d[i+1]; b += d[i+2]; cnt++; }
         r = Math.round(r/cnt); g = Math.round(g/cnt); b = Math.round(b/cnt);
-        const c1 = `rgb(${Math.min(255, r+25)}, ${Math.min(255, g+25)}, ${Math.min(255, b+35)})`;
-        const c2 = `rgb(${Math.max(18, r-25)}, ${Math.max(18, g-25)}, ${Math.max(28, b-15)})`;
-        document.documentElement.style.setProperty("--lyr-glow", `linear-gradient(90deg, ${c2}, ${c1} 50%, ${c2})`);
+        const c1 = `rgb(${Math.min(255, r+35)}, ${Math.min(255, g+35)}, ${Math.min(255, b+45)})`;
+        const c2 = `rgb(${Math.max(16, r-20)}, ${Math.max(16, g-20)}, ${Math.max(24, b-10)})`;
+        cachedAlbumGradient = `linear-gradient(90deg, ${c2}, ${c1} 50%, ${c2})`;
+        syncActiveMusicGlow();
       };
       img.src = dataUrl;
     }
@@ -2198,25 +2214,189 @@ async function toggleAmbientNoise(ev) {
       return withPlain.length > 0 ? withPlain[0] : null;
     }
 
-    async function fetchLyricsLRCLIB(title, artist) {
-      const myToken = ++lyricFetchToken;
+    function renderEmptyLyricsFallback(customStatusTxt = null) {
       const lyrList = document.getElementById("lyrList");
-      lyrList.innerHTML = `<li class="on">${NOTE_SVG}</li><li>Mencari lirik...</li>`;
-      setIdleLyricPlain("Mencari lirik...");
+      const statusMsg = customStatusTxt || (hasMedia
+        ? tNotch("Lirik belum tersedia", "Lyrics not available")
+        : tNotch("Menunggu lirik lagu...", "Waiting for song lyrics..."));
+
+      if (lyrList) {
+        lyrList.style.transform = "translateY(24px)";
+        lyrList.innerHTML = `<li class="on">${NOTE_SVG}</li><li class="on" style="opacity:0.85">${esc(statusMsg)}</li>`;
+      }
+
+      if (hasMedia && curTrackKey) {
+        const currentTitle = curTrackKey.split("::")[0] || statusMsg;
+        setIdleLyricFallbackTitle(currentTitle);
+      } else {
+        updateDynamicLyricsWidth("");
+        setIdleLyricPlain(statusMsg);
+      }
+    }
+
+    function toggleLyrics(ev, open) {
+      if (ev) ev.stopPropagation();
+      isLyricsOpen = open;
+      renderActivePage();
+      if (open) {
+        lastActiveLyrIdx = -1;
+        if (parsedLyrics.length > 0) syncLyricScroll();
+        else renderEmptyLyricsFallback();
+      }
+    }
+
+        /* MM-LAYER-3: multi-provider lyrics (word-synced) */
+    const MM_YL = ["https://lyricsplus.prjktla.my.id", "https://lyricsplus.binimum.org"], MM_PX = "https://lyrics.paxsenix.org";
+    const mmCache = new Map();
+    const mmJson = async (u, ms = 7000) => {
+      const nat = window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke;
+      if (nat) {
+        let r = null;
+        try { r = await Promise.race([nat("lyrics_http_get", { url: u }), new Promise((_, j) => setTimeout(() => j(new Error("timeout")), ms))]); } catch {}
+        if (r && typeof r.status === "number") { if (r.status >= 200 && r.status < 300) return JSON.parse(r.body); throw new Error(r.status); }
+      }
+      const c = new AbortController(), tm = setTimeout(() => c.abort(), ms);
+      try { const r = await fetch(u, { signal: c.signal }); if (!r.ok) throw new Error(r.status); return await r.json(); }
+      finally { clearTimeout(tm); }
+    };
+    const mmRow = (ws) => {
+      ws = ws.filter(w => w.x !== "");
+      const text = ws.map(w => w.x).join("").replace(/\s+/g, " ").trim();
+      return (ws.length && text) ? { time: ws[0].t, text, isNote: false, words: ws.map(w => ({ ...w, held: (w.e - w.t) >= 1 })) } : null;
+    };
+    const mmSpace = (list, getText, getPart) => {
+      const spaced = list.slice(0, -1).some(p => /\s$/.test(getText(p)));
+      return (p, i) => getText(p) + ((!spaced && i < list.length - 1 && !getPart(p) && !/\s$/.test(getText(p))) ? " " : "");
+    };
+    const mmErr = (e) => (e && e.errors ? e.errors.map(x => (x && x.message) || String(x)).join(" / ") : (e && e.message) || String(e));
+    async function mmYL(t, a, d, dbg) {
+      const base = `/v2/lyrics/get?title=${encodeURIComponent(t)}&artist=${encodeURIComponent(a)}`;
+      const dur = d > 1 ? `&duration=${Math.round(d)}` : "";
+      /* beberapa variasi query jalan paralel: dengan durasi, tanpa durasi, dan dengan daftar source */
+      const variants = [["dur", base + dur], ["nodur", base], ["src", base + dur + "&source=apple%2Cmusixmatch-word%2Cspotify%2Clyricsplus"]]
+        .filter((v, i, arr) => arr.findIndex(x => x[1] === v[1]) === i);
+      const parse = (j) => (j.lyrics || []).map(it => {
+        const sy = (it.syllabus || []).filter(s => !s.isBackground && s.text != null);
+        const f = mmSpace(sy, s => s.text, () => false);
+        return sy.length ? mmRow(sy.map((s, i) => ({ x: f(s, i), t: s.time / 1000, e: (s.time + (s.duration || 0)) / 1000 }))) : null;
+      }).filter(Boolean);
+      const runs = variants.map(([name, q]) => Promise.any(MM_YL.map(b => mmJson(b + q, 8000)))
+        .then(j => ({ name, rows: parse(j), n: (j.lyrics || []).length, type: j.type || (j.metadata && j.metadata.type) || "-" }))
+        .catch(e => ({ name, err: mmErr(e) })));
+      for (const p of runs) {
+        const r = await p;
+        dbg.push("YL:" + r.name + " " + (r.err ? "error " + r.err : `${r.n} baris, ${r.rows.length} ber-timing kata, tipe ${r.type}`));
+        if (r.rows && r.rows.length > 2) return r.rows;
+      }
+      return null;
+    }
+    async function mmPX(t, a, d, dbg) {
+      const tries = [t + " " + a, t];
+      let hit = null;
+      for (const q of tries) {
+        let list = [];
+        try { list = await mmJson(`${MM_PX}/apple-music/search?q=${encodeURIComponent(q)}`, 8000); } catch (e) { dbg.push("PX:search error " + mmErr(e)); continue; }
+        list = Array.isArray(list) ? list : [];
+        const ranked = list.map(r => ({ r, diff: Math.abs((r.duration || 0) - d * 1000) })).sort((x, y) => x.diff - y.diff);
+        hit = ranked.filter(x => d <= 1 || x.diff <= 6000)[0] || null;
+        dbg.push(`PX:"${q}" ${list.length} hasil${hit ? ", dipilih selisih " + hit.diff + "ms" : ", tidak ada yang cocok durasi" + (ranked[0] ? " (terdekat " + ranked[0].diff + "ms)" : "")}`);
+        if (hit) break;
+      }
+      if (!hit) return null;
+      let j;
+      try { j = await mmJson(`${MM_PX}/apple-music/lyrics?id=${encodeURIComponent(hit.r.id)}`, 8000); } catch (e) { dbg.push("PX:lyrics error " + mmErr(e)); return null; }
+      const rows = (j.content || []).filter(c => !c.background && (c.text || []).length).map(c => {
+        const f = mmSpace(c.text, p => p.text, p => p.part);
+        return mmRow(c.text.map((p, i) => ({ x: f(p, i), t: p.timestamp / 1000, e: p.endtime / 1000 })));
+      }).filter(Boolean);
+      dbg.push(`PX:lyrics ${(j.content || []).length} baris, ${rows.length} ber-timing kata`);
+      return rows.length > 2 ? rows : null;
+    }
+    /* MM-FIX5 */
+    function mmNorm(title, artist) {
+      let t = String(title || "")
+        .replace(/\s*[\(\[\{][^)\]}]*(lirik|lyrics?|official|video|audio|visuali[sz]er|m\/v|\bmv\b|\bhd\b|4k)[^)\]}]*[\)\]\}]/gi, "")
+        .replace(/\s*[~|｜].*$/, "").replace(/\s+(official|lyrics?|lirik)(\s+(video|audio|lagu))?\s*$/i, "").trim();
+      let a = String(artist || "").replace(/\s*-\s*topic$/i, "").replace(/vevo$/i, "").split(/,|&| feat\.?| x /i)[0].trim();
+      const m = t.match(/^(.+?)\s+[-–—]\s+(.+)$/);
+      if (m && !/remaster|live|version|mono|stereo|edit|mix|acoustic|from|feat|ft\./i.test(m[2])) { a = m[1].trim(); t = m[2].trim(); }
+      return [t || String(title || "").trim(), a];
+    }
+    async function mmPick(t, a, d) {
+      const dbg = [];
+      const yl = mmYL(t, a, d, dbg).catch(e => { dbg.push("YL:fatal " + mmErr(e)); return null; });
+      const px = mmPX(t, a, d, dbg).catch(e => { dbg.push("PX:fatal " + mmErr(e)); return null; });
+      let res = await yl; if (res) res.src = "YouLyPlus"; else { res = await px; if (res) res.src = "Paxsenix"; }
+      console.info("[mm-lyrics]", `${a} — ${t} (durasi ${Math.round(d)}s)`, res ? `word-synced via ${res.src}, ${res.length} baris` : "tidak ada timing per kata");
+      if (!res) console.info("[mm-lyrics:debug]\n" + dbg.join("\n"));
+      return res;
+    }
+    const mmSet = (el, k, v) => { if (el["_" + k] !== v) { el["_" + k] = v; el.style.setProperty(k, v); } };
+    function mmDrive(kids, words) {
+      const pos = curPos + (isPlaying ? (performance.now() - lastTickMs) / 1000 : 0);
+      words.forEach((w, i) => { const el = kids[i]; if (!el) return;
+        const p = Math.min(1, Math.max(0, (pos - w.t) / Math.max(.14, w.e - w.t)));
+        mmSet(el, "--p", +(1 - Math.pow(1 - p, 3)).toFixed(3));
+        mmSet(el, "--g", w.held ? +Math.min(1, p * 5, (1 - p) * 5).toFixed(2) : 0); });
+    }
+    (function mmLoop() {
+      requestAnimationFrame(mmLoop);
+      const st = mn.dataset.s; if (document.hidden || (st !== "lyrics" && st !== "idle-lyrics")) return;
+      mmWords(lastActiveLyrIdx);
+    })();
+    function mmPill(idx) {
+      const el = document.getElementById("idleLyrText"), l = parsedLyrics[idx];
+      if (!el || !l || !l.words) return;
+      let trk = el.firstElementChild;
+      if (el._mi !== idx || !trk || !trk.classList.contains("mm-trk")) {
+        el._mi = idx; el._x = 0; el.classList.remove("is-marquee");
+        el.innerHTML = '<span class="mm-trk">' + l.words.map(w => `<span class="w">${esc(w.x)}</span>`).join("") + "</span>";
+        trk = el.firstElementChild;
+      }
+      mmDrive(trk.children, l.words);
+      const over = trk.offsetWidth - el.clientWidth;
+      if (over > 3) {
+        const pos = curPos + (isPlaying ? (performance.now() - lastTickMs) / 1000 : 0);
+        let k = 0; l.words.forEach((w, i) => { if (pos >= w.t) k = i; });
+        const tx = Math.max(0, Math.min(over, trk.children[k].offsetLeft - el.clientWidth * .35));
+        el._x += (tx - el._x) * .1; trk.style.translate = `${(-el._x).toFixed(1)}px 0`;
+      } else if (el._x) { el._x = 0; trk.style.translate = "0 0"; }
+    }
+    function mmWords(idx) {
+      const l = parsedLyrics[idx]; if (!l || !l.words) return; mmPill(idx);
+      const li = document.querySelector(`#lyrList li[data-idx="${idx}"]`); if (li) mmDrive(li.children, l.words);
+    }
+    const mmSrc = t => { const e = document.getElementById("mmSrc"); if (e) e.textContent = t; };
+    async function fetchLyricsLRCLIB(title, artist) {
+      mmSrc(""); const [t, a] = mmNorm(title, artist);
+      const base = mmLegacyLyrics(t || title, a || artist), tok = lyricFetchToken;
+      const key = `${t}|${a}|${Math.round(curDur)}`;
+      let rows = mmCache.get(key);
+      if (!rows) { try { rows = await mmPick(t, a, curDur); } catch { rows = null; } if (rows) mmCache.set(key, rows); }
+      await base; if (tok === lyricFetchToken) mmSrc(rows ? tNotch("Per kata · ", "Word-synced · ") + (rows.src || "") : (parsedLyrics.length > 1 ? tNotch("Per baris · LRCLIB", "Line-synced · LRCLIB") : ""));
+      if (!rows || tok !== lyricFetchToken) return;
+      parsedLyrics = [{ time: 0, text: "♪", isNote: true }, ...rows];
+      document.getElementById("lyrList").innerHTML = parsedLyrics.map((l, i) =>
+        `<li onclick="seekToSec(${l.time})" data-idx="${i}">${l.isNote ? NOTE_SVG : l.words ? l.words.map(w => `<span class="w">${esc(w.x)}</span>`).join("") : esc(l.text)}</li>`
+      ).join("");
+      lastActiveLyrIdx = -1;
+      syncLyricScroll();
+    }
+    async function mmLegacyLyrics(title, artist) {
+      const myToken = ++lyricFetchToken;
       parsedLyrics = [];
       lastActiveLyrIdx = -1;
-      updateDynamicLyricsWidth("", "");
+      updateDynamicLyricsWidth("");
+      renderEmptyLyricsFallback(tNotch("Mencari lirik...", "Searching for lyrics..."));
 
       const cleanTitle = cleanSongTitleForSearch(title) || title.trim();
       const cleanArtist = cleanArtistForSearch(artist);
 
-      // Susun kandidat query bertingkat agar lagu dari YouTube / Browser / Spotify selalu ketemu
       const searchAttempts = [];
       if (cleanTitle && cleanArtist) {
         searchAttempts.push(`track_name=${encodeURIComponent(cleanTitle)}&artist_name=${encodeURIComponent(cleanArtist)}`);
         searchAttempts.push(`q=${encodeURIComponent(cleanTitle + " " + cleanArtist)}`);
       }
-      // Jika judul mengandung "Artis - Judul Lagu" (umum di YouTube/Browser)
       if (cleanTitle.includes(" - ") || cleanTitle.includes(" – ")) {
         const parts = cleanTitle.split(/\s+[-–]\s+/);
         if (parts.length >= 2) {
@@ -2227,9 +2407,7 @@ async function toggleAmbientNoise(ev) {
           searchAttempts.push(`q=${encodeURIComponent(pTrack)}`);
         }
       }
-      if (cleanTitle) {
-        searchAttempts.push(`q=${encodeURIComponent(cleanTitle)}`);
-      }
+      if (cleanTitle) searchAttempts.push(`q=${encodeURIComponent(cleanTitle)}`);
 
       let best = null;
       for (const queryStr of searchAttempts) {
@@ -2246,8 +2424,7 @@ async function toggleAmbientNoise(ev) {
       if (myToken !== lyricFetchToken) return;
 
       if (!best || (!best.syncedLyrics && !best.plainLyrics)) {
-        lyrList.innerHTML = `<li class="on">${NOTE_SVG}</li><li>Lirik belum tersedia</li>`;
-        setIdleLyricFallbackTitle(title);
+        renderEmptyLyricsFallback(tNotch("Lirik belum tersedia", "Lyrics not available"));
         return;
       }
 
@@ -2266,7 +2443,6 @@ async function toggleAmbientNoise(ev) {
           }
         });
       } else if (best.plainLyrics) {
-        // Fallback jika hanya ada plainLyrics: bagi rata timestamp sepanjang durasi lagu
         const rawLines = best.plainLyrics.split("\n").map(s => s.trim()).filter(Boolean);
         const effDur = curDur > 10 ? curDur : 180;
         const stepSec = effDur / Math.max(1, rawLines.length + 1);
@@ -2275,6 +2451,13 @@ async function toggleAmbientNoise(ev) {
         });
       }
 
+      if (parsedLyrics.length <= 1) {
+        parsedLyrics = [];
+        renderEmptyLyricsFallback(tNotch("Lirik belum tersedia", "Lyrics not available"));
+        return;
+      }
+
+      const lyrList = document.getElementById("lyrList");
       lyrList.innerHTML = parsedLyrics.map((l, i) =>
         `<li onclick="seekToSec(${l.time})" data-idx="${i}">${l.isNote ? NOTE_SVG : esc(l.text)}</li>`
       ).join("");
@@ -2283,12 +2466,15 @@ async function toggleAmbientNoise(ev) {
     }
 
     function syncLyricScroll() {
-      if (!parsedLyrics.length) return;
+      if (!parsedLyrics.length) {
+        renderEmptyLyricsFallback();
+        return;
+      }
       let activeIdx = 0;
       for (let i = 0; i < parsedLyrics.length; i++) {
         if (curPos >= parsedLyrics[i].time) activeIdx = i; else break;
       }
-      if (activeIdx === lastActiveLyrIdx) return;
+      if (activeIdx === lastActiveLyrIdx) { mmWords(activeIdx); return; }
       lastActiveLyrIdx = activeIdx;
 
       const activeLine = parsedLyrics[activeIdx];
@@ -2300,8 +2486,7 @@ async function toggleAmbientNoise(ev) {
       const lyrList = document.getElementById("lyrList");
       const items = lyrList.querySelectorAll("li");
 
-      // Maksimal ruang teks lirik saat Notch melebar penuh (1060px - 282px - 24px margin = 754px)
-      const maxAvailTextPx = 754;
+      const maxAvailTextPx = mmLyrOpen ? 292 : 754;
       const measuredPx = rawActiveTxt
         ? measureTextPx(rawActiveTxt, '700 14.5px "Segoe UI Variable Text", "Segoe UI", sans-serif')
         : 0;
@@ -2311,18 +2496,17 @@ async function toggleAmbientNoise(ev) {
 
       items.forEach((li, i) => {
         const isCurrent = (i === activeIdx);
-        li.classList.toggle("on", isCurrent);
+        li.classList.toggle("on", isCurrent); li.dataset.d = Math.min(Math.abs(i - activeIdx), 3); li.style.translate = `0 ${52 - activeIdx * 28 - 14}px`; li.style.setProperty("--dd", Math.min(Math.max(i - activeIdx, 0), 9));
         li.style.fontSize = isCurrent ? fittedFontSize : "";
       });
 
-      // Karena setiap <li> kini dikunci setinggi 28px (1 baris), posisi Y selalu akurat 100%
-      // dan tidak pernah terpengaruh oleh animasi lebar Notch
       const rowHeight = 28;
       const centerOffset = 52 - (activeIdx * rowHeight) - (rowHeight / 2);
-      lyrList.style.transform = `translateY(${centerOffset}px)`;
+      lyrList.style.transform = "none"; mmWords(activeIdx);
 
-      setIdleLyricPlain(lineStr);
+      setIdleLyricPlain(lineStr); mmPill(activeIdx);
     }
+
     function updateMediaUI() {
       document.querySelectorAll(".js-pos").forEach(e => e.textContent = fmtTime(curPos));
       const rem = curDur > 0 ? Math.max(0, curDur - curPos) : 0;
@@ -2381,7 +2565,6 @@ async function toggleAmbientNoise(ev) {
       updateMediaUI();
     });
 
-    // ================= 2. POMODORO =================
     let pomoDefaultMin = 25;
     let pomoBreakMin = 5;
     let pomoTotalSec = 25 * 60;
@@ -2417,18 +2600,21 @@ async function toggleAmbientNoise(ev) {
           playChime("pomo");
           setMood("party", 4500);
           showCustomPeek(
-            `<svg viewBox="0 0 24 24" style="width:16px;height:16px;stroke:#FFB7C5;fill:none;stroke-width:2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>`,
+            `<svg viewBox="0 0 24 24" style="width:16px;height:16px;stroke:var(--c1);fill:none;stroke-width:2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>`,
             "Pomodoro Selesai!",
             "Saatnya istirahat sejenak",
             "DONE",
             "#FFB7C5",
             100
           );
+          if (pomoAutoBreak && document.getElementById("pomoLabel").textContent === "Focus Session") {
+            setPomoMode(pomoBreakMin, "Short Break");
+            togglePomo();
+          }
         }
       }
     }, 1000);
 
-    // ================= 3. WATER REMINDER & AUTO-RESET HARIAN =================
     let waterCurr = 0, waterGoal = 1500, waterCup = 250;
     let waterSecCounter = 0;
 
@@ -2453,9 +2639,8 @@ async function toggleAmbientNoise(ev) {
 
       document.getElementById("waterCurr").textContent = (waterCurr / 1000).toFixed(2);
       document.getElementById("waterGoalTxt").textContent = `/ ${(waterGoal / 1000).toFixed(1)} L`;
-      document.getElementById("waterSubTxt").textContent =
-      appLanguage === "en"
-        ? `${drunkCups} of ${totalCups} glasses today`
+      document.getElementById("waterSubTxt").textContent = notchLang === "en"
+        ? `${drunkCups} of ${totalCups} cups today`
         : `${drunkCups} dari ${totalCups} gelas hari ini`;
       document.getElementById("drinkBtn").textContent = `${waterCup} ml`;
       document.getElementById("waterPctBig").textContent = pct + "%";
@@ -2467,6 +2652,7 @@ async function toggleAmbientNoise(ev) {
       }
       document.getElementById("cupsRow").innerHTML = cupsHtml;
     }
+
     function syncAllWidgetData() {
       invoke("sync_widget_data", {
         todos,
@@ -2503,8 +2689,8 @@ async function toggleAmbientNoise(ev) {
             `<svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:#A2E4F5"><path d="M12 2.8s6 6.5 6 11.2a6 6 0 0 1-12 0c0-4.7 6-11.2 6-11.2z"/></svg>`,
             "Water Reminder",
             appLanguage === "en"
-            ? `Time to drink ${waterCup} ml of water!`
-            : `Waktunya minum ${waterCup} ml air!`,
+              ? `Time to drink ${waterCup} ml of water!`
+              : `Waktunya minum ${waterCup} ml air!`,
             pct + "%",
             "#A2E4F5",
             pct
@@ -2513,7 +2699,6 @@ async function toggleAmbientNoise(ev) {
       }
     }, 1000);
 
-    // ================= 4. FILE SHELF (MULTI-DRAG & CTRL+V) =================
     const shelfZone = document.getElementById("shelfZone");
     const shelfItems = document.getElementById("shelfItems");
     const shelfClearBtn = document.getElementById("shelfClearBtn");
@@ -2525,116 +2710,62 @@ async function toggleAmbientNoise(ev) {
     let lastDragEnd = 0;
     let lastClickIdx = -1;
 
-    
-function renderShelf() {
-  const isEnglish = appLanguage === "en";
+    function renderShelf() {
+      const isEnglish = appLanguage === "en";
+      if (!filesOnShelf.length) {
+        shelfZone.style.display = "flex";
+        shelfItems.style.display = "none";
+        shelfClearBtn.style.display = "none";
+        if (shelfAllBtn) shelfAllBtn.style.display = "none";
+        return;
+      }
 
-  if (!filesOnShelf.length) {
-    shelfZone.style.display = "flex";
-    shelfItems.style.display = "none";
-    shelfClearBtn.style.display = "none";
+      shelfZone.style.display = "none";
+      shelfItems.style.display = "flex";
+      shelfClearBtn.style.display = "flex";
 
-    if (shelfAllBtn) {
-      shelfAllBtn.style.display = "none";
+      const allSelected = filesOnShelf.every(f => f.selected !== false);
+      if (shelfAllBtn) {
+        shelfAllBtn.style.display = "flex";
+        shelfAllBtn.classList.toggle("on", allSelected);
+      }
+
+      const keepScroll = shelfItems.scrollLeft;
+      shelfItems.innerHTML = filesOnShelf.map((f, i) => {
+        const isSel = f.selected !== false;
+        const fileTitle = `${esc(f.name)}${f.size_str ? " (" + esc(f.size_str) + ")" : ""}`;
+        return `
+          <div class="sh-card ${isSel ? "selected" : ""}"
+               title="${fileTitle}"
+               onmousedown="onCardMouseDown(event, ${i})"
+               onclick="onCardClick(event, ${i})"
+               ondblclick="onCardDblClick(event, ${i})"
+               oncontextmenu="revealShelfItem(event, ${i})">
+            <span class="sh-sel"
+                  onmousedown="event.stopPropagation()"
+                  ondblclick="event.stopPropagation()"
+                  title="${isEnglish ? "Click to select / deselect" : "Klik untuk pilih / batal pilih"}">
+              <svg viewBox="0 0 10 10"><path d="M2 5l2.2 2.2L8 2.5"/></svg>
+            </span>
+            <span class="sh-del"
+                  onmousedown="event.stopPropagation()"
+                  ondblclick="event.stopPropagation()"
+                  onclick="removeShelfItem(event, ${i})"
+                  title="${isEnglish ? "Remove file" : "Hapus file"}">
+              <svg viewBox="0 0 10 10"><path d="M2 2l6 6M8 2L2 8"/></svg>
+            </span>
+            ${f.thumb_b64
+              ? `<img class="sh-thumb" src="${f.thumb_b64}" alt="">`
+              : `<svg class="f-ico" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>`
+            }
+            <span class="sh-name">${esc(f.name)}</span>
+            <span class="sh-ext">${esc(f.size_str || f.ext || "FILE")}</span>
+          </div>`;
+      }).join("");
+
+      shelfItems.scrollTo({ left: keepScroll, behavior: "instant" });
+      updateShelfCount();
     }
-
-    // Terjemahkan petunjuk drop file jika elemen tersedia.
-    const zoneText = shelfZone.querySelector(
-      "[data-i18n='shelf-empty']"
-    );
-
-    if (zoneText) {
-      zoneText.textContent = isEnglish
-        ? "Drop files here to add them to your shelf"
-        : "Jatuhkan file di sini untuk menambahkannya ke shelf";
-    }
-
-    return;
-  }
-
-  shelfZone.style.display = "none";
-  shelfItems.style.display = "flex";
-  shelfClearBtn.style.display = "flex";
-
-  const allSelected = filesOnShelf.every(
-    f => f.selected !== false
-  );
-
-  if (shelfAllBtn) {
-    shelfAllBtn.style.display = "flex";
-    shelfAllBtn.classList.toggle("on", allSelected);
-    shelfAllBtn.title = isEnglish
-      ? "Select / deselect all files"
-      : "Pilih / batal pilih semua file";
-  }
-
-  const keepScroll = shelfItems.scrollLeft;
-
-  shelfItems.innerHTML = filesOnShelf.map((f, i) => {
-    const isSel = f.selected !== false;
-
-    const fileTitle =
-      `${esc(f.name)}${f.size_str
-        ? " (" + esc(f.size_str) + ")"
-        : ""}`;
-
-    return `
-      <div class="sh-card ${isSel ? "selected" : ""}"
-           title="${fileTitle}"
-           onmousedown="onCardMouseDown(event, ${i})"
-           onclick="onCardClick(event, ${i})"
-           ondblclick="onCardDblClick(event, ${i})"
-           oncontextmenu="revealShelfItem(event, ${i})">
-
-        <span class="sh-sel"
-              onmousedown="event.stopPropagation()"
-              title="${isEnglish
-                ? "Click to select / deselect"
-                : "Klik untuk pilih / batal pilih"}">
-          <svg viewBox="0 0 10 10">
-            <path d="M2 5l2.2 2.2L8 2.5"/>
-          </svg>
-        </span>
-
-        <span class="sh-del"
-              onmousedown="event.stopPropagation()"
-              ondblclick="event.stopPropagation()"
-              onclick="removeShelfItem(event, ${i})"
-              title="${isEnglish ? "Remove file" : "Hapus file"}">
-          <svg viewBox="0 0 10 10">
-            <path d="M2 2l6 6M8 2L2 8"/>
-          </svg>
-        </span>
-
-        ${f.thumb_b64
-          ? `<img class="sh-thumb"
-                  src="${f.thumb_b64}"
-                  alt="">`
-          : `<svg class="f-ico" viewBox="0 0 24 24">
-               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-               <path d="M14 2v6h6"/>
-             </svg>`
-        }
-
-        <span class="sh-name">${esc(f.name)}</span>
-        <span class="sh-ext">${esc(f.size_str || f.ext || "FILE")}</span>
-      </div>`;
-  }).join("");
-
-  shelfItems.scrollTo({
-    left: keepScroll,
-    behavior: "instant"
-  });
-
-  updateShelfCount();
-
-  if (shelfClearBtn) {
-    shelfClearBtn.title = isEnglish
-      ? "Remove all files from shelf"
-      : "Hapus semua file dari shelf";
-  }
-}
-
 
     function updateShelfCount() {
       if (!shelfAllBtn) return;
@@ -2668,9 +2799,7 @@ function renderShelf() {
       if (e) e.stopPropagation();
       try {
         const picked = await invoke("pick_shelf_files");
-        if (Array.isArray(picked) && picked.length > 0) {
-          handleShelfDropPaths(picked);
-        }
+        if (Array.isArray(picked) && picked.length > 0) handleShelfDropPaths(picked);
       } catch {}
     }
 
@@ -2694,13 +2823,9 @@ function renderShelf() {
         if (draggedCard) {
           let targetPaths = [];
           if (draggedCard.selected !== false) {
-            targetPaths = filesOnShelf
-              .filter(f => f.selected !== false && f.path)
-              .map(f => f.path);
+            targetPaths = filesOnShelf.filter(f => f.selected !== false && f.path).map(f => f.path);
           }
-          if (targetPaths.length === 0) {
-            targetPaths = [draggedCard.path];
-          }
+          if (targetPaths.length === 0) targetPaths = [draggedCard.path];
           invoke("start_file_drag", { paths: targetPaths }).finally(() => {
             lastDragEnd = performance.now();
             isDraggingOut = false;
@@ -2716,7 +2841,6 @@ function renderShelf() {
       isDraggingOut = false;
     });
 
-    // Klik 1x = pilih/batal pilih (Shift+klik = pilih rentang). Klik 2x = buka file.
     function onCardClick(e, idx) {
       e.stopPropagation();
       if (performance.now() - lastDragEnd < 350) return;
@@ -2789,11 +2913,9 @@ function renderShelf() {
       else renderActivePage();
       shelfZone.classList.add("dragover");
     }
-
     function handleShelfDragLeave() {
       shelfZone.classList.remove("dragover");
     }
-
     function handleShelfDropPaths(rawPayload) {
       shelfZone.classList.remove("dragover");
       const list = (rawPayload && rawPayload.paths) ? rawPayload.paths : rawPayload;
@@ -2818,29 +2940,70 @@ function renderShelf() {
     listen("tauri://drag-drop", (event) => handleShelfDropPaths(event.payload));
     listen("shelf-drag-drop", (event) => handleShelfDropPaths(event.payload));
 
-    // ================= 5. TO-DO LIST =================
+    // Cursor coordinates originate from the native Win32 drag loop, relative to the notch.
+    let nativeDragPoint = null, nativeDragStarted = 0, nativeDragFrame = 0;
+    listen("shelf-drag-position", (event) => {
+      const p = event.payload; if (!p || !Number.isFinite(p.x) || !Number.isFinite(p.y)) return;
+      nativeDragPoint = p;
+      if (!nativeDragStarted) nativeDragStarted = performance.now();
+      shelfZone.classList.add("file-drag-active");
+      const r = shelfZone.getBoundingClientRect();
+      const x = Math.max(0, Math.min(r.width, p.x - r.left));
+      const y = Math.max(0, Math.min(r.height, p.y - r.top));
+      const power = Math.min(1, (performance.now() - nativeDragStarted) / 1800);
+      shelfZone.style.setProperty("--drag-x", `${x}px`);
+      shelfZone.style.setProperty("--drag-y", `${y}px`);
+      shelfZone.style.setProperty("--drag-power", power.toFixed(3));
+      if (!nativeDragFrame) nativeDragFrame = requestAnimationFrame(() => { nativeDragFrame = 0; });
+    });
+    const clearNativeDrag = () => {
+      nativeDragPoint = null; nativeDragStarted = 0;
+      shelfZone.classList.remove("file-drag-active");
+      shelfZone.style.removeProperty("--drag-x"); shelfZone.style.removeProperty("--drag-y");
+      shelfZone.style.removeProperty("--drag-power");
+    };
+    listen("shelf-drag-leave", clearNativeDrag);
+    listen("shelf-drag-drop", clearNativeDrag);
+
     let todos = [];
     const addTodoBtn = document.getElementById("addTodoBtn");
     const todoInput = document.getElementById("todoInlineInput");
 
+    let _todoPrev = null;
+    const _todoReduce = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+    function todoKeys() { const seen = {}; return todos.map(t => { const n = (seen[t.text] = (seen[t.text] || 0) + 1); return t.text + "|" + n; }); }
     function renderTodos() {
       const doneCount = todos.filter(t => t.done).length;
-      document.getElementById("todoCount").textContent = `${doneCount}/${todos.length}`;
+      const cntEl = document.getElementById("todoCount");
+      const cntTxt = `${doneCount}/${todos.length}`;
+      if (cntEl.textContent !== cntTxt) {
+        cntEl.textContent = cntTxt;
+        if (_todoPrev && !_todoReduce) { cntEl.classList.remove("cnt-pop"); void cntEl.offsetWidth; cntEl.classList.add("cnt-pop"); }
+      }
       const listEl = document.getElementById("todoList");
       listEl.classList.toggle("horiz", todoStyle === "horizontal");
 
+      const keys = todoKeys();
+      const oldRects = new Map();
+      if (_todoPrev) listEl.querySelectorAll(".trow[data-k]").forEach(el => { const r = el.getBoundingClientRect(); if (r.width) oldRects.set(el.dataset.k, r); });
+      const sTop = listEl.scrollTop, sLeft = listEl.scrollLeft;
+      const hadPrev = !!_todoPrev;
+
       if (!todos.length) {
-        listEl.innerHTML = `
-          <div class="dim"
-              style="font-size:11px;margin:auto 0;text-align:center;grid-column:1/-1">
-            ${appLanguage === "en"
-              ? "No tasks for today"
-              : "Belum ada tugas hari ini"}
-          </div>`;
+        const emptyTodoTxt = tNotch("Belum ada tugas hari ini", "No tasks for today");
+        listEl.innerHTML = `<div class="dim" style="font-size:11px;margin:auto 0;text-align:center;grid-column:1/-1">${emptyTodoTxt}</div>`;
+        _todoPrev = new Map();
         return;
       }
-      listEl.innerHTML = todos.map((t, i) => `
-        <div class="trow ${t.done ? 'done' : ''}" onclick="toggleTodo(${i}, event)">
+      listEl.innerHTML = todos.map((t, i) => {
+        const prev = _todoPrev && _todoPrev.get(keys[i]);
+        let cls = t.done ? "done" : "";
+        if (hadPrev) {
+          if (!prev) cls += " t-new";
+          else if (prev.done !== t.done) cls += t.done ? " t-done" : " t-undone";
+        } else cls += " t-enter";
+        return `
+        <div class="trow ${cls}" data-k="${esc(keys[i])}" style="--k:${Math.min(i, 8)}" onclick="toggleTodo(${i}, event)">
           <div class="trow-left">
             <span class="chk"><svg viewBox="0 0 10 10"><path d="M2 5l2.2 2.2L8 2.5"/></svg></span>
             <span class="trow-txt mq-box js-todo-txt" data-maxw="132" data-font="400 11.5px Segoe UI">${esc(t.text)}</span>
@@ -2848,8 +3011,32 @@ function renderShelf() {
           <span class="tdel" onclick="deleteTodo(event, ${i})">
             <svg viewBox="0 0 10 10"><path d="M2 2l6 6M8 2L2 8"/></svg>
           </span>
-        </div>
-      `).join("");
+        </div>`;
+      }).join("");
+      _todoPrev = new Map(keys.map((k, i) => [k, { done: !!todos[i].done }]));
+      listEl.classList.add("tl-anim"); clearTimeout(listEl._tlTm); listEl._tlTm = setTimeout(() => listEl.classList.remove("tl-anim"), 900);
+
+      listEl.style.scrollBehavior = "auto";
+      listEl.scrollTop = sTop; listEl.scrollLeft = sLeft;
+      listEl.style.scrollBehavior = "";
+
+      if (!_todoReduce && oldRects.size) {
+        listEl.querySelectorAll(".trow[data-k]").forEach(el => {
+          const o = oldRects.get(el.dataset.k); if (!o) return;
+          const n = el.getBoundingClientRect();
+          const dx = o.left - n.left, dy = o.top - n.top;
+          if (Math.abs(dx) < .5 && Math.abs(dy) < .5) return;
+          el.animate([{ translate: `${dx}px ${dy}px` }, { translate: "0 0" }], { duration: 340, easing: "cubic-bezier(.2,.8,.2,1)" });
+        });
+      }
+      const nr = listEl.querySelector(".t-new");
+      if (nr) {
+        const lr = listEl.getBoundingClientRect(), r = nr.getBoundingClientRect();
+        if (r.bottom > lr.bottom) listEl.scrollBy({ top: r.bottom - lr.bottom + 4, behavior: "smooth" });
+        else if (r.top < lr.top) listEl.scrollBy({ top: r.top - lr.top - 4, behavior: "smooth" });
+        if (r.right > lr.right) listEl.scrollBy({ left: r.right - lr.right + 6, behavior: "smooth" });
+        else if (r.left < lr.left) listEl.scrollBy({ left: r.left - lr.left - 6, behavior: "smooth" });
+      }
 
       listEl.querySelectorAll(".js-todo-txt").forEach((el, idx) => {
         if (todos[idx]) {
@@ -2873,9 +3060,14 @@ function renderShelf() {
     }
     function deleteTodo(ev, i) {
       ev.stopPropagation();
-      todos.splice(i, 1);
-      renderTodos();
-      syncAllWidgetData();
+      const row = ev.currentTarget && ev.currentTarget.closest ? ev.currentTarget.closest(".trow") : null;
+      const run = () => { todos.splice(i, 1); renderTodos(); syncAllWidgetData(); };
+      if (row && !_todoReduce) {
+        if (row.classList.contains("t-leave")) return;
+        row.classList.add("t-leave");
+        const _le = document.getElementById("todoList"); _le.classList.add("tl-anim"); clearTimeout(_le._tlTm); _le._tlTm = setTimeout(() => _le.classList.remove("tl-anim"), 900);
+        setTimeout(run, 190);
+      } else run();
     }
     let todoInputOpen = false;
     let todoInputShownAt = 0;
@@ -2885,7 +3077,6 @@ function renderShelf() {
       todoInput.value = "";
       todoInputOpen = true;
       todoInputShownAt = performance.now();
-      // Notch normalnya non-activatable (tidak bisa terima keyboard). Aktifkan dulu, baru fokus ke input.
       try { await invoke("set_notch_text_input", { active: true }); } catch {}
       setTimeout(() => { if (todoInputOpen) todoInput.focus(); }, 50);
       setTimeout(() => { if (todoInputOpen && document.activeElement !== todoInput) todoInput.focus(); }, 250);
@@ -2908,7 +3099,6 @@ function renderShelf() {
       }
     });
     todoInput.addEventListener("blur", () => {
-      // abaikan blur sesaat setelah dibuka (window masih proses activate)
       if (performance.now() - todoInputShownAt < 400) return;
       hideTodoInput();
     });
@@ -2929,7 +3119,19 @@ function renderShelf() {
       waterReminderSound = cfg.water_reminder_sound !== false;
       waterIntervalMin = cfg.water_interval_min;
       lastWaterDate = cfg.last_water_date || "";
+      albumArtGlow = cfg.album_art_glow !== false;
+      const gFill = typeof cfg.glass_fill === "number" ? cfg.glass_fill : 0.045;
+      const gBlur = typeof cfg.glass_blur === "number" ? cfg.glass_blur : 6;
+      const gRim  = typeof cfg.glass_rim === "number" ? cfg.glass_rim : 0.07;
+      document.documentElement.style.setProperty("--mm-fill", gFill);
+      document.documentElement.style.setProperty("--mm-blur", gBlur + "px");
+      document.documentElement.style.setProperty("--mm-rim", gRim);
+
+      mmLyrOpen = !!cfg.lyrics_pinned_open;
+      if (mn) mn.classList.toggle("mm-open", mmLyrOpen);
+      window.mmTip();
       applyTheme(cfg.theme_preset);
+      syncActiveMusicGlow();
       waterGoal = cfg.water_goal_ml;
       waterCup = cfg.water_cup_ml;
       waterCurr = cfg.water_current_ml;
@@ -2937,6 +3139,10 @@ function renderShelf() {
       pomoBreakMin = cfg.pomo_break_minutes || 5;
       todos = cfg.todos || [];
       filesOnShelf = cfg.shelf || [];
+      peekDurationMs = cfg.peek_duration_ms || 2400;
+      pomoAutoBreak = !!cfg.pomo_auto_break;
+      ambientVolPct = cfg.ambient_volume || 55;
+      applyNotchLanguage(cfg.language || "id");
 
       checkDailyWaterAutoReset();
 
@@ -2957,24 +3163,26 @@ function renderShelf() {
     syncVolumeFromSystem();
     listen("config-updated", (ev) => applyConfigData(ev.payload));
 
+    /* Opening Animation dengan Frame-Settle agar 100% Mulus Tanpa Stutter */
     function startOpeningAnimation() {
       if (bootPhase !== "boot") return;
-      bootPhase = "intro";
-      renderActivePage();
-
       requestAnimationFrame(() => {
-        const fill = document.getElementById("introBarFill");
-        if (fill) fill.style.width = "100%";
-      });
+        requestAnimationFrame(() => {
+          bootPhase = "intro";
+          renderActivePage();
+          const fill = document.getElementById("introBarFill");
+          if (fill) fill.style.transform = "scaleX(1)";
 
-      setTimeout(() => {
-        bootPhase = "done";
-        renderActivePage();
-      }, 950);
+          setTimeout(() => {
+            bootPhase = "done";
+            renderActivePage();
+          }, 920);
+        });
+      });
     }
 
     listen("notch-revealed", () => {
-      startOpeningAnimation();
+      setTimeout(startOpeningAnimation, 60);
     });
 
     invoke("get_config").then(applyConfigData).then(() => {
@@ -2983,7 +3191,7 @@ function renderShelf() {
         if (!sent) {
           sent = true;
           invoke("notch_ready");
-          setTimeout(startOpeningAnimation, 700);
+          setTimeout(startOpeningAnimation, 650);
         }
       };
       requestAnimationFrame(() => requestAnimationFrame(ready));
@@ -3001,5 +3209,163 @@ function renderShelf() {
     }
     updateClock(); setInterval(updateClock, 5000);
   </script>
+  <script>
+  /* ---- Pointer-Reactive 2D Liquid Glass Specular Rim di Notch ---- */
+  (function () {
+    document.addEventListener("pointermove", (e) => {
+      const el = e.target.closest(".arw, .pill, .wbtn, .vol-wrap, .sh-card, .trow");
+      if (!el) return;
+      window.__mmSpec(el, e);
+    }, { passive: true });
+  })();
+  </script>
+<script>
+/* ---- File Shelf · NameDrop ripple v2 ----
+   Gelombang menyebar dari titik hover/drag ke seluruh halaman shelf; elemen yang
+   dilewati terangkat sedikit sesuai jaraknya. Lapisan memakai <div> supaya tidak
+   tertangkap selector "#shelfZone span:nth-of-type(n)" milik kode ganti bahasa. */
+(function () {
+  const reduce = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const area = document.getElementById("shelfArea");
+  const zone = document.getElementById("shelfZone");
+  if (!area || !zone) return;
+  const layer = document.createElement("div");
+  layer.className = "nd-layer";
+  area.prepend(layer);
+
+  /* Kecepatan gelombang tetap (px/ms): cincin dan angkatan kartu memakai kecepatan yang sama, jadi kartu terangkat tepat saat cincin lewat */
+  const SPEED = 0.17;
+  function bump(x, y, strong, R) {
+    const ar = area.getBoundingClientRect();
+    area.querySelectorAll("#shelfZone, .sh-card, .arw, .sh-act-row, .ttl").forEach((el) => {
+      const r = el.getBoundingClientRect();
+      const d = Math.hypot(r.left + r.width / 2 - ar.left - x, r.top + r.height / 2 - ar.top - y);
+      if (d > R) return;
+      const amp = (strong ? 4 : 2.6) * (1 - 0.6 * d / R);
+      el.style.setProperty("--bd", Math.round(d / SPEED) + "ms");
+      el.style.setProperty("--ba", amp.toFixed(2) + "px");
+      el.classList.remove("nd-bump");
+      void el.offsetWidth;
+      el.classList.add("nd-bump");
+      el.addEventListener("animationend", (e) => { if (e.animationName === "ndBump") el.classList.remove("nd-bump"); }, { once: true });
+    });
+  }
+
+  function ripple(cx, cy, strong) {
+    if (reduce) return;
+    if (getComputedStyle(area).visibility === "hidden") return;
+    const ar = area.getBoundingClientRect();
+    const x = cx - ar.left, y = cy - ar.top;
+    const R = strong ? 290 : 230, T = Math.round(R / SPEED * 1.2);
+    const pos = `left:${x.toFixed(0)}px;top:${y.toFixed(0)}px;--sz:${R * 2}px;--T:${T}ms;`;
+    const els = ["nd-water", "nd-water b", "nd-sheen"].map(cls => {
+      const d = document.createElement("div");
+      d.className = cls; d.style.cssText = pos;
+      layer.appendChild(d);
+      setTimeout(() => d.remove(), T + 260);
+      return d;
+    });
+    while (layer.children.length > 9) layer.firstChild.remove();
+    bump(x, y, strong, R);
+  }
+  window.mnRipple = (host, x, y, strong) => ripple(x, y, strong);
+
+  /* hover: ripple saat masuk, menyusul saat kursor bergeser, dan terus berdenyut selama kursor bertahan */
+  let hoverEl = null, pos = { x: 0, y: 0 }, spawnPos = { x: 0, y: 0 }, lastSpawn = 0, loop = null;
+  const hostOf = (t) => t.closest && t.closest(".sh-card, #shelfZone");
+  document.addEventListener("pointerover", (e) => {
+    const h = hostOf(e.target);
+    if (!h || h.contains(e.relatedTarget)) return;
+    hoverEl = h; pos = spawnPos = { x: e.clientX, y: e.clientY }; lastSpawn = performance.now();
+    ripple(pos.x, pos.y, false);
+    clearInterval(loop);
+    loop = setInterval(() => { if (hoverEl) { ripple(pos.x, pos.y, false); lastSpawn = performance.now(); spawnPos = pos; } }, 1400);
+  }, { passive: true });
+  document.addEventListener("pointermove", (e) => {
+    if (!hoverEl) return;
+    pos = { x: e.clientX, y: e.clientY };
+    const now = performance.now();
+    if (now - lastSpawn > 480 && Math.hypot(pos.x - spawnPos.x, pos.y - spawnPos.y) > 30) {
+      lastSpawn = now; spawnPos = pos; ripple(pos.x, pos.y, false);
+    }
+  }, { passive: true });
+  document.addEventListener("pointerout", (e) => {
+    if (hoverEl && !hoverEl.contains(e.relatedTarget)) { hoverEl = null; clearInterval(loop); loop = null; }
+  }, { passive: true });
+
+  /* drag file dari luar (event Tauri): gelombang kuat berulang dari titik kursor, dan satu lagi saat dilepas */
+  let dpos = null, timer = null;
+  try {
+    const listen = window.__TAURI__ && window.__TAURI__.event && window.__TAURI__.event.listen;
+    if (listen) listen("tauri://drag-over", (ev) => {
+      const p = ev.payload && ev.payload.position;
+      if (p) dpos = { x: p.x / (window.devicePixelRatio || 1), y: p.y / (window.devicePixelRatio || 1) };
+    });
+  } catch (_) {}
+  const burst = () => {
+    const r = zone.getBoundingClientRect();
+    const inside = dpos && dpos.x >= r.left && dpos.x <= r.right && dpos.y >= r.top && dpos.y <= r.bottom;
+    ripple(inside ? dpos.x : r.left + r.width / 2, inside ? dpos.y : r.top + r.height / 2, true);
+  };
+  new MutationObserver(() => {
+    const on = zone.classList.contains("dragover");
+    if (on && !timer) { burst(); timer = setInterval(burst, 1150); }
+    else if (!on && timer) { burst(); clearInterval(timer); timer = null; dpos = null; }
+  }).observe(zone, { attributes: true, attributeFilter: ["class"] });
+})();
+</script>
+
+<script>
+/* MM-LAYER: grain + stagger index + pause saat tab/jendela tersembunyi */
+(() => {
+  const host = document.querySelector(".mn") || document.querySelector(".tahoe-window");
+  if (host && !host.querySelector(":scope > .mm-grain")) {
+    const g = document.createElement("div"); g.className = "mm-grain"; g.setAttribute("aria-hidden", "true"); host.appendChild(g);
+  }
+  document.querySelectorAll(".ly").forEach(l => [...l.children].filter(c => c.classList.contains("a"))
+    .forEach((c, i) => c.style.setProperty("--mi", Math.min(i, 9))));
+  document.addEventListener("visibilitychange", () => document.documentElement.classList.toggle("mm-paused", document.hidden));
+})();
+</script>
+<script>
+/* MM-LAYER-2 */
+(() => {
+  document.querySelectorAll(".l-music, .l-lyrics").forEach(l => {
+    const art = l.querySelector(".js-art"); if (!art) return;
+    const bd = document.createElement("div"); bd.className = "mm-bd"; bd.setAttribute("aria-hidden", "true");
+    const amb = l.querySelector(".ambient"); amb ? amb.after(bd) : l.prepend(bd);
+    let last = null;
+    const sync = () => {
+      const u = art.style.backgroundImage; if (u === last) return; last = u;
+      bd.classList.remove("on");
+      if (u && u !== "none") {
+        void bd.offsetWidth;
+        bd.style.backgroundImage = `linear-gradient(rgba(12,9,20,.28), rgba(12,9,20,.5)), ${u}`;
+        bd.classList.add("on");
+      }
+    };
+    new MutationObserver(sync).observe(art, { attributes: true, attributeFilter: ["style"] }); sync();
+  });
+  const ol = document.getElementById("lyrList"), box = ol && ol.closest(".lyr");
+  if (box) new MutationObserver(() => box.classList.toggle("mm-skel",
+    /Mencari lirik|Searching for lyrics/i.test((ol.lastElementChild || {}).textContent || ""))).observe(ol, { childList: true });
+  let p = null;
+  window.__mmSpec = (el, e) => {
+    if (!p) requestAnimationFrame(() => {
+      const { el, x, y } = p; p = null; const r = el.getBoundingClientRect();
+      el.style.setProperty("--mx", (x - r.left).toFixed(0) + "px"); el.style.setProperty("--my", (y - r.top).toFixed(0) + "px");
+    });
+    p = { el, x: e.clientX, y: e.clientY };
+  };
+})();
+</script>
+<script>
+/* MM-LAYER-7: filter air (distorsi halus) + pop saat play/pause berubah */
+(() => {
+  document.body.insertAdjacentHTML("beforeend", '<svg width="0" height="0" style="position:absolute" aria-hidden="true"><filter id="mmWater" x="-20%" y="-20%" width="140%" height="140%" color-interpolation-filters="sRGB"><feTurbulence type="fractalNoise" baseFrequency="0.012 0.02" numOctaves="2" seed="4" result="n"><animate attributeName="baseFrequency" dur="4s" values="0.012 0.02;0.017 0.026;0.012 0.02" repeatCount="indefinite"/></feTurbulence><feDisplacementMap in="SourceGraphic" in2="n" scale="20" xChannelSelector="R" yChannelSelector="G"/></filter></svg>');
+  document.querySelectorAll(".js-play-icon").forEach(el => new MutationObserver(() => { el.classList.remove("pop"); void el.getBoundingClientRect(); el.classList.add("pop"); })
+    .observe(el, { childList: true, subtree: true, attributes: true, attributeFilter: ["d"] }));
+})();
+</script>
 </body>
 </html>

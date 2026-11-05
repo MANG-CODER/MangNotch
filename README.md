@@ -199,13 +199,18 @@ For more information about its data handling practices, please review the [Priva
 
 ## 📝 Latest Release
 
-**Current release: v1.3.0**
+**Current release: v2.0.0**
+
+MangNotch v2.0.0 introduces a redesigned Control Center, customizable Soft Glass visuals, refined UI/UX animations, and an improved lyrics experience.
 
 Highlights:
-- Added English language support in the Control Center.
-- Fixed an issue with the Notch address bar.
-- Improved the naturalness of rain sounds in Pomodoro mode.
-- Improved text length handling in TodoList.
+- Redesigned Control Center with customizable Soft Glass settings.
+- Refined UI/UX with improved micro-interactions and animation details.
+- New water-inspired animations for the File Shelf.
+- Updated lyrics animations and optimized lyrics searching.
+- Added pinned lyrics behavior while the Notch is expanded.
+- Fixed Windows startup registry cleanup when Start with Windows is disabled.
+- Improved language handling.
 
 For the complete release history and downloadable packages, visit [GitHub Releases](https://github.com/MANG-CODER/MangNotch/releases).
 

@@ -18,6 +18,7 @@ src-tauri/gen/schemas/
 dist/
 dist-ssr/
 *.local
+/release/
 
 # Tauri / Windows packaging outputs
 dist-msix/

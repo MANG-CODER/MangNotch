@@ -1,994 +1,1499 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="id">
 <head>
 <meta charset="utf-8">
+<meta name="color-scheme" content="dark">
 <title>MangNotch Control Center</title>
 <style>
-  :root {
-    color-scheme: dark;
-    --bg: #120F16;
-    --surface: rgba(28, 23, 35, 0.78);
-    --surface-hi: rgba(255, 255, 255, 0.04);
-    --border: rgba(226, 209, 249, 0.11);
-    --ink: #F6F2F8;
-    --mist: #9E94A8;
-    --pink: #FFB7C5;
-    --lavender: #E2D1F9;
-    --cyan: #A2E4F5;
-    --c1: #FFB7C5; --c2: #E2D1F9; --c3: #A2E4F5;
-    --ui: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
-  }
-  * {
-    box-sizing: border-box;
-    user-select: none;
-    -webkit-user-drag: none;
-  }
+@property --spec { syntax: "<number>"; inherits: false; initial-value: 0; }
 
-  ::-webkit-scrollbar {
-    width: 5px;
-    height: 5px;
-  }
-  ::-webkit-scrollbar-track {
-    background: rgba(18, 15, 22, 0.35);
-    border-radius: 99px;
-    margin: 4px 0;
-  }
-  ::-webkit-scrollbar-thumb {
-    background: rgba(226, 209, 249, 0.18);
-    border-radius: 99px;
-    transition: background .2s ease;
-  }
-  ::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 183, 197, 0.48);
-  }
-  ::-webkit-scrollbar-thumb:active {
-    background: var(--pink);
-  }
-  ::-webkit-scrollbar-corner {
-    background: transparent;
-  }
+:root {
+  color-scheme: dark;
+  --c1: #FFB7C5; --c2: #E2D1F9; --c3: #A2E4F5;
+  --pink: var(--c1); --lavender: var(--c2); --cyan: var(--c3);
 
-  body {
-    margin: 0; padding: 18px 20px; background: var(--bg); color: var(--ink);
-    font-family: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
-    overflow-x: hidden; overflow-y: auto; position: relative; min-height: 100vh;
-    background-image:
-      radial-gradient(circle at 12% 8%, rgba(255, 183, 197, 0.08), transparent 42%),
-      radial-gradient(circle at 88% 92%, rgba(226, 209, 249, 0.07), transparent 45%);
-  }
+  --ink: #f7f5fa;
+  --mist: rgba(247, 245, 250, .60);
+  --mist-2: rgba(247, 245, 250, .40);
+  --on-accent: #120d18;
+  --danger: #ff8093;
 
-  .app-wrap { position: relative; z-index: 1; }
+  --hy-ink: #1b1222;
+  --hy-ink-soft: rgba(27, 18, 34, .60);
+  --hy-ink-accent: color-mix(in srgb, var(--c1) 45%, #4a1430);
 
-  .hdr {
-    display: flex; justify-content: space-between; align-items: center;
-    padding: 13px 16px; border-radius: 16px; margin-bottom: 12px;
-    background: var(--surface); backdrop-filter: blur(20px);
-    border: 1px solid var(--border);
-  }
-  .brand { display: flex; align-items: center; gap: 12px; }
-  .brand-logo {
-    width: 38px; height: 38px; border-radius: 10px;
-    background: rgba(255, 183, 197, 0.1); border: 1px solid rgba(255, 183, 197, 0.25);
-    display: grid; place-items: center; overflow: hidden; flex-shrink: 0;
-  }
-  .brand-logo img { width: 100%; height: 100%; object-fit: cover; display: block; }
-  .brand h1 { margin: 0; font-size: 17px; font-weight: 700; letter-spacing: -.02em; color: var(--ink); }
-  .brand span { font-size: 11px; color: var(--mist); display: block; margin-top: 2px; }
-  .ver-pill {
-    font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 8px;
-    background: rgba(255, 183, 197, 0.12); border: 1px solid rgba(255, 183, 197, 0.28); color: var(--pink);
-  }
+  --ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --ui-display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
 
-    .hdr { cursor: default; }
-  .hdr-right { display: flex; align-items: center; gap: 8px; }
-  .close-btn {
-    width: 28px; height: 28px; border-radius: 8px;
-    border: 1px solid var(--border); background: rgba(255, 255, 255, 0.04);
-    color: var(--mist); display: grid; place-items: center; cursor: pointer;
-    transition: all .15s;
-  }
-  .close-btn:hover {
-    background: rgba(255, 120, 140, 0.2); color: #ff8fa3;
-    border-color: rgba(255, 120, 140, 0.4);
-  }
-  .close-btn svg {
-    width: 12px; height: 12px; stroke: currentColor; fill: none;
-    stroke-width: 2.4; stroke-linecap: round;
-  }
+  --spring: cubic-bezier(.22, 1, .36, 1);
+  --spring-fluid: cubic-bezier(.28, 1.24, .38, 1);
+  --ease-fluid: cubic-bezier(.22, 1, .36, 1);
+  --ease-inout: cubic-bezier(.65, 0, .35, 1);
+  --spring-soft: cubic-bezier(.28, 1.15, .4, 1);
 
-  .tabs {
-    display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px;
-    padding: 5px; border-radius: 13px; background: var(--surface);
-    backdrop-filter: blur(20px); border: 1px solid var(--border); margin-bottom: 12px;
-  }
-  .tab-btn {
-    background: transparent; border: 1px solid transparent; color: var(--mist); padding: 8px 6px;
-    border-radius: 9px; font: 600 12px inherit; cursor: pointer;
-    display: flex; align-items: center; justify-content: center; gap: 6px; transition: all .18s;
-  }
-  .tab-btn svg { width: 13.5px; height: 13.5px; stroke: currentColor; fill: none; stroke-width: 2; flex-shrink: 0; }
-  .tab-btn:hover { color: var(--ink); }
-  .tab-btn.active {
-    background: rgba(255, 183, 197, 0.14); color: var(--pink);
-    border-color: rgba(255, 183, 197, 0.28);
-  }
+  --wa-top: .88; --wa-bot: .92;
+  --win-r: 14px;
 
-  .tab-pane { display: none; animation: fadeIn .2s ease; }
-  .tab-pane.active { display: block; }
-  @keyframes fadeIn { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: none; } }
+  /* Permukaan Kartu & Kontainer */
+  --card-bg: rgba(255, 255, 255, .038);
+  --card-border: rgba(255, 255, 255, .085);
+  --well-bg: rgba(8, 6, 14, .32);
+  --well-border: rgba(255, 255, 255, .075);
+  --divider: rgba(255, 255, 255, .06);
 
-  .card {
-    background: var(--surface); backdrop-filter: blur(22px);
-    border: 1px solid var(--border); border-radius: 16px;
-    padding: 14px 16px; margin-bottom: 11px;
-  }
-  .card-hdr {
-    display: flex; align-items: center; justify-content: space-between;
-    font-size: 11px; font-weight: 700; text-transform: uppercase;
-    letter-spacing: .06em; color: var(--pink); margin-bottom: 10px;
-  }
-  .card-hdr-left { display: flex; align-items: center; gap: 7px; }
-  .card-hdr svg { width: 14px; height: 14px; stroke: var(--pink); fill: none; stroke-width: 2.2; }
+  /* Material Soft Light Glass */
+  --lg-flat-fill: rgba(255, 255, 255, .045);
+  --lg-flat-hover: rgba(255, 255, 255, .08);
+  --lg-flat-active: rgba(255, 255, 255, .06);
 
-  .row {
-    display: flex; justify-content: space-between; align-items: center;
-    padding: 7.5px 0; border-bottom: 1px solid rgba(226, 209, 249, 0.06);
-  }
-  .row:last-child { border-bottom: 0; padding-bottom: 0; }
-  .row:first-of-type { padding-top: 0; }
-  .lbl-wrap b { display: block; font-size: 13px; font-weight: 600; color: var(--ink); }
-  .lbl-wrap small { color: var(--mist); font-size: 11px; }
+  --sl-card-sheen: linear-gradient(165deg, rgba(255,255,255,.055) 0%, rgba(255,255,255,.012) 48%, rgba(255,255,255,0) 100%);
+  --sl-control-sheen: linear-gradient(180deg, rgba(255,255,255,.065) 0%, rgba(255,255,255,.01) 60%, rgba(255,255,255,0) 100%);
 
-  .switch { position: relative; width: 42px; height: 24px; display: inline-block; flex-shrink: 0; }
-  .switch input { opacity: 0; width: 0; height: 0; }
-  .slider {
-    position: absolute; inset: 0; cursor: pointer; border-radius: 24px;
-    background: rgba(255, 255, 255, 0.08); border: 1px solid var(--border); transition: .22s;
-  }
-  .slider::before {
-    content: ""; position: absolute; height: 16px; width: 16px; left: 3px; bottom: 3px;
-    background: var(--mist); border-radius: 50%; transition: .22s cubic-bezier(0.34, 1.5, 0.5, 1);
-  }
-  .switch input:checked + .slider { background: rgba(255, 183, 197, 0.22); border-color: var(--pink); }
-  .switch input:checked + .slider::before { transform: translateX(18px); background: var(--pink); }
+  --hy-rim: linear-gradient(150deg, rgba(255,255,255,.52) 0%, rgba(255,255,255,.12) 28%, rgba(255,255,255,.05) 58%, rgba(255,255,255,.30) 100%);
+  --hy-milk: linear-gradient(160deg, color-mix(in srgb, var(--c1) 12%, rgba(255,255,255,.95)) 0%, color-mix(in srgb, var(--c2) 18%, rgba(255,255,255,.86)) 100%);
+}
+html[data-glass="acrylic"] { --wa-top: .50; --wa-bot: .62; }
 
-  input[type="number"], input[type="text"] {
-    background: #141019; color: var(--ink); border: 1px solid var(--border);
-    padding: 6.5px 10px; border-radius: 9px; font: 500 12.5px inherit; outline: none; transition: border-color .2s;
-  }
-  input:disabled { opacity: 0.45; cursor: not-allowed; }
-  input:focus { border-color: var(--pink); }
-  input[type="number"] { width: 110px; text-align: center; font-weight: 700; }
-  input[type="text"] { user-select: text; }
+* { box-sizing: border-box; user-select: none; -webkit-user-drag: none; }
+.native-hidden, .search-hidden { display: none !important; }
 
-  /* Sembunyikan <select> native dan ganti dengan Custom Themed Dropdown MangNotch */
-  select.native-hidden {
-    display: none !important;
-  }
-  .csel-wrap {
-    position: relative;
-    width: 205px;
-    flex-shrink: 0;
-  }
-  .csel-wrap.disabled {
-    opacity: 0.45;
-    pointer-events: none;
-  }
-  .csel-trigger {
-    width: 100%;
-    background: linear-gradient(180deg, rgba(26, 21, 34, 0.95), rgba(18, 14, 24, 0.95));
-    color: var(--ink);
-    border: 1px solid rgba(226, 209, 249, 0.16);
-    padding: 7px 11px;
-    border-radius: 10px;
-    font: 600 12px inherit;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-    cursor: pointer;
-    transition: border-color .2s, box-shadow .2s, background .2s;
-  }
-  .csel-trigger:hover {
-    border-color: rgba(255, 183, 197, 0.45);
-    background: rgba(34, 27, 44, 0.98);
-  }
-  .csel-wrap.open .csel-trigger {
-    border-color: var(--pink);
-    box-shadow: 0 0 0 2px rgba(255, 183, 197, 0.15);
-  }
-  .csel-label {
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  .csel-arrow {
-    width: 13px;
-    height: 13px;
-    stroke: var(--pink);
-    fill: none;
-    stroke-width: 2.4;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-    flex-shrink: 0;
-    transition: transform .22s cubic-bezier(0.34, 1.5, 0.5, 1);
-  }
-  .csel-wrap.open .csel-arrow {
-    transform: rotate(180deg);
-  }
-  .csel-menu {
-    position: absolute;
-    top: calc(100% + 6px);
-    right: 0;
-    width: 100%;
-    min-width: 210px;
-    max-height: 185px;
-    overflow-y: auto;
-    background: rgba(22, 18, 30, 0.97);
-    backdrop-filter: blur(24px);
-    border: 1px solid rgba(255, 183, 197, 0.32);
-    border-radius: 12px;
-    padding: 5px;
-    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.72), 0 0 18px rgba(255, 183, 197, 0.08);
-    z-index: 999;
-    opacity: 0;
-    transform: translateY(-6px) scale(0.98);
-    pointer-events: none;
-    transition: opacity .16s ease, transform .18s cubic-bezier(0.34, 1.5, 0.5, 1);
-  }
-  .csel-wrap.open .csel-menu {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-    pointer-events: auto;
-  }
-  .csel-opt {
-    padding: 7.5px 10px;
-    border-radius: 8px;
-    font-size: 12px;
-    font-weight: 500;
-    color: var(--mist);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-    cursor: pointer;
-    transition: background .14s, color .14s;
-  }
-  .csel-opt:hover {
-    background: rgba(255, 183, 197, 0.11);
-    color: var(--ink);
-  }
-  .csel-opt.selected {
-    background: rgba(255, 183, 197, 0.18);
-    color: var(--pink);
-    font-weight: 700;
-  }
-  .csel-check {
-    width: 12px;
-    height: 12px;
-    stroke: var(--pink);
-    fill: none;
-    stroke-width: 2.6;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-    opacity: 0;
-    flex-shrink: 0;
-  }
-  .csel-opt.selected .csel-check {
-    opacity: 1;
-  }
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; margin: 8px 0; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,.18); border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: var(--c1); }
 
-  .preset-chips { display: flex; gap: 5px; }
-  .chip {
-    background: var(--surface-hi); border: 1px solid var(--border); color: var(--mist);
-    padding: 4px 9px; border-radius: 7px; font: 600 11px inherit; cursor: pointer; transition: all .15s;
-  }
-  .chip:hover { color: var(--ink); border-color: rgba(255, 183, 197, 0.4); }
-  .chip.active { background: rgba(255, 183, 197, 0.16); color: var(--pink); border-color: var(--pink); }
-
-  .mascot-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 12px; }
-  .m-card {
-    background: var(--surface-hi); border: 1px solid var(--border); border-radius: 13px;
-    padding: 11px 10px; text-align: center; cursor: pointer; transition: all .18s;
-  }
-  .m-card:hover { border-color: rgba(255, 183, 197, 0.35); }
-  .m-card.active { border-color: var(--pink); background: rgba(255, 183, 197, 0.1); }
-  .m-preview { height: 42px; background: #08060c; border-radius: 9px; margin-bottom: 7px; display: flex; align-items: center; justify-content: center; gap: 10px; border: 1px solid rgba(255,255,255,.06); }
-  .m-card b { font-size: 12.5px; display: block; color: var(--ink); }
-  .m-card span { font-size: 10.5px; color: var(--mist); }
-
-  /* Mascots */
-    .neko-stage {
-    position: relative; width: 76px; height: 28px;
-    display: flex; justify-content: center; align-items: center; gap: 16px;
-    animation: nekoFloat 3.2s ease-in-out infinite;
-  }
-  .neko-ear {
-    position: absolute; top: 2px; width: 10px; height: 9px;
-    background: var(--c1);
-    clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
-    opacity: .85; filter: drop-shadow(0 0 5px var(--c1));
-  }
-  .neko-ear.left { left: 6px; transform-origin: bottom center; animation: earTwitchL 5s ease-in-out infinite; }
-  .neko-ear.right { right: 6px; transform-origin: bottom center; animation: earTwitchR 5s ease-in-out infinite; }
-  .neko-eye-wrap {
-    display: flex; gap: 15px; align-items: center;
-    animation: nekoLookAround 7s ease-in-out infinite;
-  }
-  .neko-eye {
-    width: 11px; height: 11px; background: #fff;
-    border-radius: 3px 10px 3px 10px;
-    box-shadow: 0 0 8px var(--c1), 0 0 15px var(--c2);
-    transform-origin: center center;
-    animation: nekoBlinkLive 4.2s infinite;
-    transition: all .25s ease;
-  }
-  .neko-eye.right { border-radius: 10px 3px 10px 3px; }
-  .neko-stage.happy .neko-eye,
-  .neko-stage.party .neko-eye {
-    height: 7px; width: 12px; background: transparent;
-    border-top: 3px solid #fff; border-radius: 50% 50% 0 0;
-    box-shadow: none; filter: drop-shadow(0 0 6px var(--c1));
-    animation: nekoGroove .75s ease-in-out infinite alternate;
-  }
-  @keyframes nekoFloat { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-1.8px); } }
-  @keyframes nekoLookAround {
-    0%, 18%, 100% { transform: translate(0, 0); }
-    24%, 38% { transform: translate(-4.5px, -0.5px); }
-    44%, 56% { transform: translate(0, 0); }
-    62%, 78% { transform: translate(4.5px, -0.5px); }
-    84%, 92% { transform: translate(0, 1px); }
-  }
-  @keyframes nekoBlinkLive {
-    0%, 44%, 48%, 90%, 94%, 98%, 100% { transform: scaleY(1) scaleX(1); }
-    46%, 92%, 96% { transform: scaleY(0.08) scaleX(1.12); }
-  }
-  @keyframes earTwitchL {
-    0%, 82%, 90%, 100% { transform: rotate(-20deg); }
-    85% { transform: rotate(-36deg) scale(1.08); }
-    88% { transform: rotate(-12deg); }
-  }
-  @keyframes earTwitchR {
-    0%, 36%, 44%, 100% { transform: rotate(20deg); }
-    39% { transform: rotate(36deg) scale(1.08); }
-    42% { transform: rotate(12deg); }
-  }
-  @keyframes nekoGroove { from { transform: translateY(1px) scale(0.96); } to { transform: translateY(-1.5px) scale(1.05); } }
-
-  /* Mochi — maskot blob lucu */
-  .mochi-stage {
-    position: relative; width: 44px; height: 25px;
-    display: flex; align-items: flex-end; justify-content: center;
-    transform-origin: 50% 100%;
-    animation: mochiHop 2.9s ease-in-out infinite;
-  }
-  .mochi-body {
-    position: relative; width: 34px; height: 21px;
-    border-radius: 52% 52% 44% 44% / 62% 62% 38% 38%;
-    background: radial-gradient(circle at 34% 28%, #fff 0%, var(--c2) 58%, var(--c1) 135%);
-    box-shadow: 0 0 12px color-mix(in srgb, var(--c1) 55%, transparent), inset 0 -3px 5px rgba(255,140,175,.28);
-    transform-origin: 50% 100%;
-    transform: scale(calc(1 + var(--beat, 0) * .12), calc(1 - var(--beat, 0) * .1));
-    transition: transform .08s linear;
-  }
-  .mochi-face { position: absolute; inset: 0; animation: mochiLook 7s ease-in-out infinite; }
-  .mochi-eye {
-    position: absolute; top: 7px; width: 4px; height: 6px; border-radius: 50%;
-    background: #2a1c33; transform-origin: center; animation: nekoBlinkLive 4.4s infinite;
-  }
-  .mochi-eye.l { left: 9px; } .mochi-eye.r { right: 9px; }
-  .mochi-blush {
-    position: absolute; top: 12px; width: 6px; height: 3px; border-radius: 50%;
-    background: #ff8fb0; opacity: .6; filter: blur(.4px);
-  }
-  .mochi-blush.l { left: 3px; } .mochi-blush.r { right: 3px; }
-  .mochi-mouth {
-    position: absolute; left: 50%; top: 12px; width: 5px; height: 3px; margin-left: -2.5px;
-    border-bottom: 1.5px solid #2a1c33; border-radius: 0 0 5px 5px;
-    transition: all .2s ease;
-  }
-  .mochi-stage.happy .mochi-eye,
-  .mochi-stage.party .mochi-eye {
-    height: 3px; width: 5px; background: transparent; animation: none;
-    border-top: 2px solid #2a1c33; border-radius: 50% 50% 0 0;
-  }
-  .mochi-stage.happy .mochi-mouth,
-  .mochi-stage.party .mochi-mouth { width: 6px; height: 4px; margin-left: -3px; border: 0; background: #c94d78; }
-  @keyframes mochiHop {
-    0%, 100% { transform: translateY(0) scale(1.04, .94); }
-    45% { transform: translateY(-2.5px) scale(.96, 1.05); }
-    62% { transform: translateY(0) scale(1.05, .93); }
-    78% { transform: translateY(0) scale(1, 1); }
-  }
-  @keyframes mochiLook {
-    0%, 20%, 100% { transform: translateX(0); }
-    30%, 42% { transform: translateX(-2.5px); }
-    55%, 66% { transform: translateX(0); }
-    74%, 86% { transform: translateX(2.5px); }
-  }
-
-  /* Mood maskot: surprised / party / sleepy (happy sudah ada) */
-  .kitsune-wrap, .neko-stage, .mochi-stage { position: relative; }
-  .mochi-stage.surprised .mochi-eye { width: 5px; height: 8px; top: 6px; animation: none; }
-  .mochi-stage.surprised .mochi-mouth { width: 4px; height: 4px; margin-left: -2px; border: 1.5px solid #2a1c33; border-radius: 50%; }
-  .mochi-stage.sleepy { animation: mochiSleep 4s ease-in-out infinite; }
-  .mochi-stage.sleepy .mochi-eye { height: 2px; width: 5px; top: 10px; border-radius: 2px; animation: none; }
-  .mochi-stage.sleepy .mochi-mouth { width: 3px; margin-left: -1.5px; }
-  .neko-stage.surprised .neko-eye { width: 10px; height: 14px; border-radius: 50%; animation: none; }
-  .neko-stage.surprised .neko-ear.left { animation: none; transform: rotate(-34deg) scale(1.15); }
-  .neko-stage.surprised .neko-ear.right { animation: none; transform: rotate(34deg) scale(1.15); }
-  .neko-stage.sleepy { animation: mochiSleep 4s ease-in-out infinite; }
-  .neko-stage.sleepy .neko-eye-wrap { animation: none; }
-  .neko-stage.sleepy .neko-eye { animation: none; transform: scaleY(.1); }
-  .neko-stage.sleepy .neko-ear { animation: none; opacity: .5; }
-  .kitsune-wrap.happy .kit-eye { animation: nekoGroove .75s ease-in-out infinite alternate; }
-  .kitsune-wrap.surprised .kit-eye { animation: none; transform: scale(1.35); }
-  .kitsune-wrap.party .kit-eye { animation: nekoGroove .45s ease-in-out infinite alternate; }
-  .kitsune-wrap.sleepy { animation: none; }
-  .kitsune-wrap.sleepy .kit-eye { animation: none; transform: scaleY(.1); }
-  .mochi-stage.party, .neko-stage.party, .kitsune-wrap.party { animation: mascotParty .45s ease-in-out infinite; }
-  .mochi-stage.sleepy::after, .neko-stage.sleepy::after, .kitsune-wrap.sleepy::after {
-    content: "z"; position: absolute; right: -9px; top: -2px;
-    font: 700 8px var(--ui, "Segoe UI"); color: var(--c2); animation: zzz 2.4s ease-in-out infinite;
-  }
-  @keyframes mascotParty {
-    0%, 100% { transform: translateY(0) rotate(-4deg) scale(1.05, .93); }
-    50% { transform: translateY(-4px) rotate(4deg) scale(.96, 1.06); }
-  }
-  @keyframes mochiSleep { 0%, 100% { transform: scale(1.04, .95); } 50% { transform: scale(.98, 1.02); } }
-  @keyframes zzz {
-    0% { opacity: 0; transform: translate(0, 4px); } 40% { opacity: .9; }
-    100% { opacity: 0; transform: translate(4px, -6px); }
-  }
-
-  .kitsune-wrap { display: flex; gap: 18px; align-items: center; animation: nekoLookAround 6s ease-in-out infinite; }
-  .kit-eye { width: 9px; height: 12px; background: #fff; clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%); filter: drop-shadow(0 0 6px var(--c1)); animation: nekoBlinkLive 4s infinite; }
-
-  .notch-prev { height: 78px; margin-bottom: 12px; border-radius: 14px; background: #0c0a10; border: 1px solid var(--border);
-    display: flex; justify-content: center; align-items: flex-start; overflow: hidden; }
-  .np-notch { position: relative; width: 190px; height: 44px; background: #08060c; border-radius: 0 0 20px 20px;
-    display: flex; align-items: center; justify-content: center; overflow: hidden; box-shadow: 0 6px 22px rgba(0,0,0,.7); }
-  .np-glow { position: absolute; inset: auto 0 0 0; height: 90%; opacity: .55;
-    -webkit-mask: linear-gradient(to top, #000, transparent); mask: linear-gradient(to top, #000, transparent); transition: background .3s; }
-  .np-mascot { position: relative; transform: scale(1.45); display: flex; align-items: center; justify-content: center; }
-  .toast { position: fixed; right: 18px; bottom: 16px; padding: 7px 13px; border-radius: 10px; font-size: 12px; font-weight: 600;
-    background: rgba(28,23,35,.95); border: 1px solid rgba(255,183,197,.4); color: var(--pink);
-    opacity: 0; transform: translateY(6px); transition: all .22s; pointer-events: none; z-index: 5000; }
-  .toast.show { opacity: 1; transform: none; }
-  button:focus-visible, .switch input:focus-visible + .slider, .csel-trigger:focus-visible, .m-card:focus-visible { outline: 2px solid var(--pink); outline-offset: 2px; }
-  .todo-items { max-height: 150px !important; }
-  .swatch-row {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
+html, body {
+  margin: 0; padding: 0; width: 100vw; height: 100vh;
+  background: transparent !important; color: var(--ink);
+  font-family: var(--ui); overflow: hidden;
+  -webkit-font-smoothing: antialiased;
 }
 
-.swatch {
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  cursor: pointer;
-  border: 2px solid rgba(255,255,255,.15);
-  transition: transform .18s, border-color .18s;
+/* ==========================================================================
+   1. WINDOW & AMBIENT LIGHT FIELD
+   ========================================================================== */
+.tahoe-window {
+  position: relative; display: grid; grid-template-columns: 198px 1fr; width: 100vw; height: 100vh;
+  border-radius: var(--win-r); overflow: hidden;
+  background:
+    radial-gradient(62% 52% at 12% 8%, color-mix(in srgb, var(--c1) 16%, transparent), transparent 68%),
+    radial-gradient(54% 48% at 90% 18%, color-mix(in srgb, var(--c2) 13%, transparent), transparent 68%),
+    radial-gradient(60% 54% at 78% 92%, color-mix(in srgb, var(--c3) 14%, transparent), transparent 70%),
+    linear-gradient(180deg, rgba(22, 18, 30, var(--wa-top)), rgba(13, 10, 19, var(--wa-bot)));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, .14),
+    inset 0 0 0 1px rgba(255, 255, 255, .085);
+}
+.tahoe-window::before {
+  content: ""; position: absolute; inset: -20%; z-index: 0; pointer-events: none;
+  background:
+    radial-gradient(34% 44% at 22% 26%, color-mix(in srgb, var(--c1) 20%, transparent), transparent 70%),
+    radial-gradient(38% 46% at 78% 72%, color-mix(in srgb, var(--c3) 16%, transparent), transparent 72%),
+    radial-gradient(30% 36% at 72% 20%, color-mix(in srgb, var(--c2) 14%, transparent), transparent 70%);
+  animation: windowLight 26s var(--ease-inout) infinite alternate;
+}
+@keyframes windowLight { from { translate: -3% -2%; scale: 1; } to { translate: 4% 3%; scale: 1.07; } }
+
+/* ==========================================================================
+   2. SISTEM MATERIAL LIQUID GLASS (KONTROL INTERAKTIF)
+   ========================================================================== */
+.lg-control, .nav-lens-pill, .seg-pill-thumb, .lg-slider-thumb, .btn {
+  --mx: 24%; --my: 20%; --spec: 0; --press: .97;
   position: relative;
+  background-color: var(--lg-flat-fill);
+  background-image:
+    radial-gradient(96px circle at var(--mx) var(--my), rgba(255, 255, 255, calc(.02 + .075 * var(--spec))), transparent 72%),
+    var(--sl-control-sheen);
+  -webkit-backdrop-filter: blur(12px) saturate(135%);
+  backdrop-filter: blur(12px) saturate(135%);
+  box-shadow: none;
+  transform-origin: center center;
+  transition:
+    translate .22s var(--ease-fluid),
+    scale .24s var(--spring-soft),
+    background-color .2s ease,
+    box-shadow .2s ease,
+    --spec .25s ease;
+}
+.lg-control::before, .seg-pill-thumb::before, .lg-slider-thumb::before, .btn::before {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1px;
+  background:
+    radial-gradient(76px circle at var(--mx) var(--my), rgba(255, 255, 255, calc(.14 + .34 * var(--spec))), transparent 70%),
+    var(--hy-rim);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor; mask-composite: exclude;
+  pointer-events: none; z-index: 2;
+}
+.lg-control:hover {
+  --spec: .7;
+  background-color: var(--lg-flat-hover);
+}
+.lg-control:active {
+  --spec: 1;
+  scale: var(--press);
+  background-color: var(--lg-flat-active);
 }
 
-.swatch::after {
-  content: attr(data-name);
+/* ==========================================================================
+   3. SIDEBAR KIRI
+   ========================================================================== */
+.tahoe-sidebar {
+  position: relative; z-index: 2; display: flex; flex-direction: column; height: 100vh; overflow: hidden; padding: 14px 10px 12px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, .028) 0%, rgba(255, 255, 255, .012) 100%);
+  border-right: 1px solid var(--divider);
+  box-shadow: inset -1px 0 0 rgba(255, 255, 255, .04);
+}
+.tahoe-search {
+  display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 11px; margin-bottom: 12px;
+  border-radius: 999px; background: var(--well-bg); border: 1px solid var(--well-border);
+  transition: background .18s ease, border-color .18s ease;
+}
+.tahoe-search:focus-within { background: rgba(255, 255, 255, .05); border-color: rgba(255, 255, 255, .28); }
+.tahoe-search svg { width: 13px; height: 13px; stroke: var(--mist); fill: none; stroke-width: 2.1; flex-shrink: 0; pointer-events: none; }
+.tahoe-search:focus-within svg { stroke: #fff; }
+.tahoe-search input.search-field {
+  flex: 1; min-width: 0; width: 100%; background: transparent !important; border: 0 !important;
+  padding: 0 !important; margin: 0; color: #fff; font: 500 11.5px var(--ui); outline: none; user-select: text;
+}
+.tahoe-search input.search-field::placeholder { color: var(--mist-2); }
+
+/* Navigasi Sidebar (Indikator Susu Terang HyperOS 4 + Magnifier saat Ditahan) */
+.tahoe-nav { position: relative; display: flex; flex-direction: column; gap: 4px; flex: 1; }
+.nav-lens-pill {
+  position: absolute; left: 0; right: 0; top: 0; height: 36px; border-radius: 999px; pointer-events: none; z-index: 1;
+  background-color: rgba(255, 255, 255, .90);
+  background-image: var(--hy-milk);
+  box-shadow: 0 5px 16px -8px rgba(0, 0, 0, .55);
+  transition: transform .36s var(--ease-fluid), scale .3s var(--spring-soft);
+}
+.tahoe-nav.pressing .nav-lens-pill { scale: 1.035 1.14; background-color: rgba(255, 255, 255, .90); }
+.nav-item {
+  position: relative; z-index: 2; height: 36px; padding: 0 10px; border-radius: 999px; border: 0; background: transparent; cursor: pointer;
+  display: flex; align-items: center; gap: 9px; text-align: left; color: var(--mist); font: 500 12px var(--ui);
+  transform-origin: center center; transition: color .2s ease, transform .3s var(--spring-soft);
+}
+.nav-item:hover { color: #fff; }
+.nav-item.active { color: var(--hy-ink); font-weight: 650; }
+.tahoe-nav.pressing .nav-item.active { transform: scale(1.07); }
+.nav-ico {
+  width: 22px; height: 22px; border-radius: 6px; display: grid; place-items: center; flex-shrink: 0;
+  background: rgba(255, 255, 255, .06); border: 1px solid rgba(255, 255, 255, .09);
+  transition: background .2s ease, border-color .2s ease;
+}
+.nav-item.active .nav-ico { background: color-mix(in srgb, var(--c1) 36%, #fff); border-color: transparent; }
+.nav-ico svg { width: 13px; height: 13px; stroke: rgba(255,255,255,.85); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.nav-item.active .nav-ico svg { stroke: var(--hy-ink-accent); }
+
+.sidebar-brand-footer { margin-top: auto; padding: 10px 6px 2px; display: flex; align-items: center; justify-content: space-between; gap: 6px; border-top: 1px solid var(--divider); }
+.sidebar-brand-left { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.brand-logo { width: 24px; height: 24px; border-radius: 6px; overflow: hidden; flex-shrink: 0; border: 1px solid rgba(255,255,255,.16); }
+.brand-logo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.brand-txt b { display: block; font-size: 11.5px; font-weight: 600; color: var(--ink); }
+.ver-pill { font-size: 9.5px; font-weight: 600; padding: 2px 8px; border-radius: 99px; color: var(--c1); background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.1); }
+
+/* ==========================================================================
+   4. PANEL KANAN, KARTU & HERO BANNER
+   ========================================================================== */
+.tahoe-main { position: relative; z-index: 2; display: flex; flex-direction: column; height: 100vh; overflow: hidden; min-width: 0; }
+.tahoe-topbar { position: relative; display: flex; align-items: center; justify-content: space-between; padding: 13px 20px 10px; border-bottom: 1px solid var(--divider); z-index: 10; }
+.tahoe-topbar h2 { margin: 0; font: 650 15px var(--ui-display); letter-spacing: -.01em; color: #fff; }
+.topbar-actions { display: flex; align-items: center; gap: 8px; }
+
+.lg-btn { height: 30px; padding: 0 12px; border-radius: 999px; border: 0; color: #fff; font: 500 11.5px var(--ui); display: inline-flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer; }
+.lg-btn svg { width: 12.5px; height: 12.5px; stroke: var(--c1); fill: none; stroke-width: 2; }
+.close-btn { width: 30px; height: 30px; border-radius: 50%; border: 0; color: rgba(255,255,255,.85); display: grid; place-items: center; cursor: pointer; }
+.close-btn:hover { background: rgba(255, 95, 120, .24); color: #fff; }
+.close-btn svg { width: 11px; height: 11px; stroke: currentColor; fill: none; stroke-width: 2.2; stroke-linecap: round; }
+
+.tahoe-content { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 14px 20px 22px; }
+.tab-pane { display: none; }
+.tab-pane.active { display: block; }
+.tab-pane.active > * {
+  animation: itemIn .36s var(--ease-fluid) backwards;
+  animation-delay: calc(var(--i, 0) * 32ms);
+}
+.tab-pane.active > :nth-child(1) { --i: 0; } .tab-pane.active > :nth-child(2) { --i: 1; }
+.tab-pane.active > :nth-child(3) { --i: 2; } .tab-pane.active > :nth-child(4) { --i: 3; }
+.tab-pane.active > :nth-child(5) { --i: 4; } .tab-pane.active > :nth-child(6) { --i: 5; }
+.tab-pane.active > :nth-child(7) { --i: 6; } .tab-pane.active > :nth-child(8) { --i: 7; }
+.tab-pane.active > :nth-child(n+9) { --i: 8; }
+.tahoe-content[data-dir="up"] { --dy: -7px; }
+@keyframes itemIn { from { opacity: 0; translate: 0 var(--dy, 7px); } }
+
+.card, .hero-banner-card {
+  background-color: var(--card-bg);
+  background-image: var(--sl-card-sheen);
+  border: 1px solid var(--card-border);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .065), 0 6px 18px -8px rgba(0, 0, 0, .26);
+}
+.hero-banner-card {
+  display: grid; grid-template-columns: 1fr 168px; gap: 16px; align-items: center; padding: 12px 16px; margin-bottom: 14px; border-radius: 14px;
+}
+.hero-banner-text { min-width: 0; }
+.hero-banner-text b { display: block; font: 650 13px var(--ui-display); color: #fff; margin-bottom: 3px; }
+.hero-banner-text p { margin: 0; font-size: 11px; color: var(--mist); line-height: 1.45; }
+.notch-prev { height: 60px; border-radius: 11px; display: flex; justify-content: center; align-items: flex-start; overflow: hidden; background: var(--well-bg); border: 1px solid var(--well-border); }
+.np-notch {
+  position: relative; width: 142px; height: 34px; border-radius: 0 0 14px 14px; display: flex; align-items: center; justify-content: center; overflow: hidden;
+  background: #0c0914;
+}
+.np-glow { position: absolute; inset: auto 0 0 0; height: 75%; opacity: .42; -webkit-mask: linear-gradient(to top, #000, transparent); mask: linear-gradient(to top, #000, transparent); transition: background .3s; }
+.np-mascot { position: relative; transform: scale(1.22); display: flex; align-items: center; justify-content: center; }
+
+.sec-title { font-size: 11px; font-weight: 600; color: var(--mist); margin: 14px 2px 7px; display: flex; align-items: center; justify-content: space-between; }
+.sec-title:first-child { margin-top: 0; }
+.card { border-radius: 14px; padding: 2px 15px; margin-bottom: 12px; }
+.row { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 10px 0; border-bottom: 1px solid var(--divider); }
+.row:last-child { border-bottom: 0; }
+.lbl-wrap { flex: 1; min-width: 180px; }
+.lbl-wrap b { display: block; font-size: 12.5px; font-weight: 500; color: #fff; }
+.lbl-wrap small { display: block; color: var(--mist); font-size: 11px; margin-top: 2px; line-height: 1.4; }
+
+/* ==========================================================================
+   5. SEGMENTED CONTROL (Kaca Bening + Magnifier Center)
+   ========================================================================== */
+.seg-pill-bar {
+  position: relative; display: grid; grid-template-columns: 1fr 1fr; width: 178px; height: 34px; padding: 2px;
+  border-radius: 999px; flex-shrink: 0; touch-action: none; cursor: pointer;
+  background: rgba(255, 255, 255, .035); border: 1px solid rgba(255, 255, 255, .075);
+}
+.seg-pill-bar:hover .seg-pill-thumb { --spec: .6; }
+.seg-pill-thumb {
+  position: absolute; top: 2px; bottom: 2px; left: 2px; width: calc(50% - 2px);
+  border-radius: 999px; pointer-events: none; z-index: 1;
+  background-color: rgba(255, 255, 255, .10);
+  background-image: linear-gradient(160deg, rgba(255, 255, 255, .14), rgba(255, 255, 255, .035));
+  -webkit-backdrop-filter: blur(6px) saturate(130%); backdrop-filter: blur(6px) saturate(130%);
+  transition: transform .4s var(--spring), scale .34s var(--spring-soft), box-shadow .25s ease, background-color .2s ease;
+}
+.seg-pill-bar.magnifying .seg-pill-thumb {
+  scale: 1.1 1.34;
+  background-color: rgba(255, 255, 255, .13);
+  box-shadow: 0 10px 22px -12px rgba(0, 0, 0, .55);
+}
+.seg-pill-bar.dragging .seg-pill-thumb {
+  transition: transform .04s linear, scale .3s var(--spring-soft), box-shadow .25s ease;
+}
+.seg-pill-btn {
+  position: relative; z-index: 2; border: 0; background: transparent; color: var(--mist); font: 500 11.5px var(--ui);
+  border-radius: 999px; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; margin: 0;
+  transform-origin: center center; transition: color .2s ease, transform .34s var(--spring-soft);
+}
+.seg-pill-btn:hover { color: #fff; }
+.seg-pill-btn.active { color: #fff; font-weight: 650; }
+.seg-pill-bar.magnifying .seg-pill-btn.active { transform: scale(1.22); }
+
+/* ==========================================================================
+   6. LIQUID GLASS SLIDER + CUSTOM PILL SWITCH
+   ========================================================================== */
+
+/* VOLUME SLIDER */
+.lg-slider-wrap {
+  --slider-thumb-w: 32px;
+  --slider-thumb-h: 16px;
+  --slider-value: 84%;
+
+  position: relative;
+  width: 156px;
+  height: 28px;
+  display: block;
+  flex-shrink: 0;
+  cursor: pointer;
+  touch-action: none;
+  user-select: none;
+}
+
+/* Track selalu berada tepat di center vertikal */
+.lg-slider-track {
   position: absolute;
-  top: calc(100% + 8px);
-  left: 50%;
-  transform: translate(-50%, -4px);
-  padding: 4px 9px;
-  border-radius: 8px;
-  white-space: nowrap;
-  font: 600 11px inherit;
-  color: var(--ink);
-  background: rgba(22, 18, 30, 0.97);
-  border: 1px solid rgba(255, 183, 197, 0.32);
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.6);
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity .15s ease, transform .15s ease;
-  z-index: 50;
-}
-
-.swatch:hover::after {
-  opacity: 1;
-  transform: translate(-50%, 0);
-}
-
-/* Swatch paling kiri: tooltip mulai dari kiri */
-.swatch:first-child::after {
   left: 0;
-  transform: translate(0, -4px);
-}
-
-.swatch:first-child:hover::after {
-  transform: translate(0, 0);
-}
-
-/* Swatch paling kanan pada setiap baris */
-.swatch:last-child::after {
-  left: auto;
   right: 0;
-  transform: translate(0, -4px);
+  top: 50%;
+
+  height: 6px;
+  transform: translateY(-50%);
+
+  border-radius: 999px;
+  overflow: hidden;
+
+  background: rgba(255, 255, 255, .10);
+  border: 1px solid var(--well-border);
+
+  transition:
+    height .30s var(--spring-soft),
+    background-color .2s ease;
 }
 
-.swatch:last-child:hover::after {
-  transform: translate(0, 0);
+/* Fill */
+.lg-slider-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+
+  width: var(--slider-value);
+  height: 100%;
+
+  border-radius: 999px;
+
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--c1) 82%, #fff),
+    color-mix(in srgb, var(--c2) 82%, #fff)
+  );
 }
 
-.swatch.active {
-  border-color: var(--ink);
-  transform: scale(1.14);
+/* Thumb */
+.lg-slider-thumb {
+  position: absolute;
+
+  top: 50%;
+  left: 0;
+
+  width: var(--slider-thumb-w);
+  height: var(--slider-thumb-h);
+
+  margin: 0;
+
+  border-radius: 999px;
+
+  pointer-events: none;
+  z-index: 3;
+
+  background-color: rgba(255, 255, 255, .94);
+  background-image: var(--hy-milk);
+
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+
+  box-shadow:
+    0 2px 7px -1px rgba(0, 0, 0, .45);
+
+  transform: none;
+  translate: 0 -50%;
+  transform-origin: center center;
+
+  transition:
+    scale .32s var(--spring-soft),
+    background-color .18s ease,
+    box-shadow .22s ease;
 }
 
-  .todo-bar { display: flex; gap: 8px; margin-top: 9px; margin-bottom: 9px; }
-  .todo-bar input { flex: 1; }
-  .btn {
-    background: var(--pink); color: #120F16;
-    border: 0; padding: 7px 13px; border-radius: 9px; font: 700 12px inherit;
-    cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: opacity .15s;
-  }
-  .btn:hover { opacity: .9; }
-  .btn svg { width: 13.5px; height: 13.5px; stroke: #120F16; fill: none; stroke-width: 2.3; }
-  .btn-outline {
-    background: rgba(255, 183, 197, 0.1); color: var(--pink);
-    border: 1px solid rgba(255, 183, 197, 0.28); padding: 7px 12px;
-    border-radius: 9px; font: 600 12px inherit; cursor: pointer;
-    display: inline-flex; align-items: center; gap: 6px;
-  }
-  .btn-outline:hover { background: rgba(255, 183, 197, 0.2); }
-  .btn-outline svg { width: 13.5px; height: 13.5px; stroke: currentColor; fill: none; stroke-width: 2; }
+/* Specular rim */
+.lg-slider-thumb::before {
+  content: "";
 
-  .todo-items {
-    max-height: 96px; overflow-y: auto; display: flex;
-    flex-direction: column; gap: 5px; padding-right: 4px;
-  }
-  .t-item {
-    display: flex; justify-content: space-between; align-items: center;
-    background: var(--surface-hi); border: 1px solid rgba(226, 209, 249, 0.07);
-    padding: 6px 10px; border-radius: 9px; font-size: 12.5px; transition: background .15s;
-  }
-  .t-item:hover { background: rgba(255, 255, 255, 0.06); }
-  .t-item.done span.t-txt { text-decoration: line-through; color: var(--mist); }
+  position: absolute;
+  inset: 0;
 
-  .custom-chk {
-    width: 16px; height: 16px; border-radius: 5px;
-    border: 1.5px solid rgba(226, 209, 249, 0.35);
-    background: #141019; display: grid; place-items: center;
-    flex-shrink: 0; transition: all .18s;
-  }
-  .custom-chk svg { width: 10px; height: 10px; stroke: #120F16; stroke-width: 3; fill: none; opacity: 0; }
-  .t-item.done .custom-chk { background: var(--pink); border-color: var(--pink); }
-  .t-item.done .custom-chk svg { opacity: 1; }
+  border-radius: inherit;
+  padding: 1px;
 
-  .icon-btn {
-    background: rgba(255, 120, 140, 0.12); color: #ff8fa3; border: 0; border-radius: 7px;
-    width: 24px; height: 24px; display: grid; place-items: center; cursor: pointer;
-  }
-  .icon-btn:hover { background: rgba(255, 120, 140, 0.25); }
-  .icon-btn svg { width: 12px; height: 12px; stroke: currentColor; fill: none; stroke-width: 2.2; }
+  background: var(--hy-rim);
 
-  .about-hero {
-    display: flex; align-items: center; gap: 16px; padding: 6px 0 14px;
-    border-bottom: 1px solid rgba(226, 209, 249, 0.08); margin-bottom: 12px;
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+
+  pointer-events: none;
+}
+
+/* Hover */
+.lg-slider-val { font-size: 11.5px; font-weight: 700; width: 40px; text-align: right; flex-shrink: 0; font-variant-numeric: tabular-nums; }
+
+.lg-slider-wrap:hover .lg-slider-thumb {
+  background-color: #fff;
+}
+
+/* Hold / drag */
+.lg-slider-wrap.dragging .lg-slider-track {
+  height: 9px;
+  background: rgba(255, 255, 255, .14);
+}
+
+.lg-slider-wrap.dragging .lg-slider-thumb {
+  scale: 1.18 1.45;
+
+  background-color: rgba(255, 255, 255, .14);
+  background-image: none;
+
+  -webkit-backdrop-filter: brightness(1.08) saturate(135%);
+  backdrop-filter: brightness(1.08) saturate(135%);
+
+  box-shadow:
+    0 8px 18px -10px rgba(0, 0, 0, .6);
+}
+
+/* ==========================================================
+   CUSTOM PILL SWITCH
+   ========================================================== */
+
+.switch {
+  position: relative;
+
+  width: 44px;
+  height: 24px;
+
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+/* Native checkbox tetap berfungsi */
+.switch input {
+  position: absolute;
+  inset: 0;
+
+  width: 100%;
+  height: 100%;
+
+  margin: 0;
+
+  opacity: 0;
+  cursor: pointer;
+
+  z-index: 3;
+}
+
+/* Pill track */
+.switch .slider {
+  position: absolute;
+  inset: 0;
+
+  border-radius: 999px;
+
+  cursor: pointer;
+
+  background: var(--well-bg);
+  border: 1px solid var(--well-border);
+
+  transition:
+    background .24s var(--spring),
+    border-color .24s ease,
+    box-shadow .24s ease;
+}
+
+/* Knob */
+.switch .slider::before {
+  content: "";
+
+  position: absolute;
+
+  width: 20px;
+  height: 18px;
+
+  left: 2px;
+  top: 2px;
+
+  border-radius: 999px;
+
+  background: rgba(255, 255, 255, .92);
+
+  box-shadow:
+    0 1px 4px rgba(0, 0, 0, .3);
+
+  transition:
+    transform .26s var(--spring-soft),
+    width .2s var(--spring-soft),
+    background .18s ease,
+    box-shadow .18s ease;
+}
+
+/* ON */
+.switch input:checked + .slider {
+  background:
+    color-mix(
+      in srgb,
+      var(--c1) 68%,
+      rgba(255, 255, 255, .06)
+    );
+
+  border-color:
+    color-mix(
+      in srgb,
+      var(--c1) 80%,
+      rgba(255, 255, 255, .3)
+    );
+}
+
+/* Knob ke kanan */
+.switch input:checked + .slider::before {
+  transform: translateX(18px);
+}
+
+/* Keyboard focus */
+.switch input:focus-visible + .slider {
+  outline: 2px solid var(--c1);
+  outline-offset: 2px;
+}
+
+/* Press */
+.switch:active .slider::before {
+  width: 25px;
+}
+
+/* Press saat ON */
+.switch input:checked:active + .slider::before {
+  transform: translateX(13px);
+}
+
+/* ==========================================================================
+   7. SYSTEM PEEKS TILES, INPUTS, DROPDOWN & CHIPS
+   ========================================================================== */
+.tahoe-tiles-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 12px; }
+.tahoe-pill-tile {
+  position: relative; isolation: isolate;
+  display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 13px;
+  border-radius: 999px; cursor: pointer;
+  background-color: rgba(255, 255, 255, .04); border: 1px solid transparent;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .08), 0 4px 12px -6px rgba(0, 0, 0, .28);
+  transition: background-color .25s ease, scale .26s var(--spring-soft), box-shadow .3s ease;
+}
+.tahoe-pill-tile:hover { background-color: rgba(255, 255, 255, .07); }
+.tahoe-pill-tile:active { scale: .98; }
+.tahoe-pill-tile::before {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1px; z-index: 2; pointer-events: none;
+  background: var(--hy-rim);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor; mask-composite: exclude;
+  opacity: .85; transition: opacity .3s ease;
+}
+.tahoe-pill-tile::after {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; z-index: -1; pointer-events: none;
+  background: var(--hy-milk); opacity: 0; transition: opacity .32s var(--ease-fluid);
+}
+.tahoe-pill-tile.on { background-color: rgba(255, 255, 255, .04); box-shadow: 0 6px 16px -10px rgba(0, 0, 0, .55); }
+.tahoe-pill-tile.on::after { opacity: 1; }
+.tahoe-pill-tile.on::before { opacity: 0; }
+.tile-left { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.tile-orb {
+  width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; flex-shrink: 0;
+  background: rgba(255, 255, 255, .07); border: 1px solid rgba(255, 255, 255, .12);
+  transition: background .2s ease, border-color .2s ease;
+}
+.tile-orb svg { width: 14px; height: 14px; stroke: var(--mist); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; transition: stroke .28s ease; }
+.tahoe-pill-tile.on .tile-orb { background: color-mix(in srgb, var(--c1) 38%, #fff); border-color: transparent; }
+.tahoe-pill-tile.on .tile-orb svg { stroke: var(--hy-ink-accent); }
+.tile-info b { display: block; font-size: 12px; font-weight: 600; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: color .28s ease; }
+.tile-info small { display: block; font-size: 10.5px; color: var(--mist); margin-top: 1px; transition: color .28s ease; }
+.tahoe-pill-tile.on .tile-info b { color: var(--hy-ink); }
+.tahoe-pill-tile.on .tile-info small { color: var(--hy-ink-soft); }
+
+input[type="number"], input[type="text"]:not(.search-field) {
+  background: var(--well-bg); color: #fff; border: 1px solid var(--well-border); padding: 6px 11px; border-radius: 999px;
+  font: 600 12px var(--ui); outline: none; transition: border-color .18s ease, background .18s ease;
+}
+input:disabled { opacity: .4; cursor: not-allowed; }
+input[type="number"]:focus, input[type="text"]:not(.search-field):focus { border-color: rgba(255, 255, 255, .32); background: rgba(255, 255, 255, .05); }
+input[type="number"] { width: 68px; text-align: center; }
+input[type="text"] { user-select: text; }
+input::placeholder { color: var(--mist-2); }
+
+.csel-wrap { position: relative; width: 178px; flex-shrink: 0; }
+.csel-wrap.disabled { opacity: .4; pointer-events: none; }
+.csel-trigger {
+  width: 100%; height: 32px; padding: 0 13px; border-radius: 999px; color: #fff;
+  font: 500 11.5px var(--ui); display: flex; align-items: center; justify-content: space-between; gap: 6px; cursor: pointer;
+}
+.csel-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.csel-arrow { width: 12px; height: 12px; stroke: rgba(255,255,255,.75); fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; transition: transform .22s var(--spring); }
+.csel-wrap.open .csel-arrow { transform: rotate(180deg); }
+.csel-menu {
+  position: absolute; top: calc(100% + 6px); right: 0; width: 100%; min-width: 190px; max-height: 190px; overflow-y: auto;
+  padding: 5px; border-radius: 16px; z-index: 999;
+  background: rgba(24, 19, 35, .86);
+  -webkit-backdrop-filter: blur(20px) saturate(145%); backdrop-filter: blur(20px) saturate(145%);
+  border: 1px solid rgba(255, 255, 255, .10);
+  box-shadow: 0 16px 32px -12px rgba(0, 0, 0, .65);
+  opacity: 0; transform: translateY(-6px) scale(.82); transform-origin: top right; pointer-events: none;
+  transition: opacity .16s ease, transform .26s var(--ease-fluid);
+}
+.csel-wrap.up .csel-menu { top: auto; bottom: calc(100% + 6px); transform-origin: bottom right; transform: translateY(6px) scale(.82); }
+.csel-wrap.open .csel-menu { opacity: 1; transform: translateY(0) scale(1); pointer-events: auto; }
+.csel-opt {
+  padding: 7.5px 11px; border-radius: 11px; font-size: 11.5px; font-weight: 500;
+  color: var(--mist); display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  cursor: pointer; transition: background .12s ease, color .12s ease;
+}
+.csel-opt:hover { background: rgba(255,255,255,.09); color: #fff; }
+.csel-opt.selected { background: var(--hy-milk); color: var(--hy-ink); font-weight: 600; }
+.csel-check { width: 11px; height: 11px; stroke: var(--hy-ink-accent); fill: none; stroke-width: 2.6; opacity: 0; }
+.csel-opt.selected .csel-check { opacity: 1; }
+
+.preset-chips { display: flex; gap: 5px; }
+.chip {
+  border: 1px solid rgba(255,255,255,.1); color: var(--mist); padding: 3px 10px; border-radius: 999px; font: 600 10.5px var(--ui); cursor: pointer;
+  background: rgba(255,255,255,.04);
+  transition: background-color .22s ease, color .22s ease, scale .24s var(--spring-soft);
+}
+.chip:hover { color: #fff; background: rgba(255,255,255,.08); }
+.chip:active { scale: .94; }
+.chip.active { color: var(--hy-ink); background: var(--hy-milk); border-color: transparent; }
+
+/* ==========================================================================
+   8. MASCOT CARDS, SWATCHES, TO-DO, ABOUT & TOOLTIP
+   ========================================================================== */
+.mascot-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 6px 0; }
+.m-card {
+  position: relative; background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 14px;
+  padding: 9px 8px; text-align: center; cursor: pointer;
+  transition: background .2s ease, border-color .2s ease, translate .2s var(--spring);
+}
+.m-card:hover { background: rgba(255,255,255,.06); translate: 0 -1px; }
+.m-card.active {
+  background-color: rgba(255,255,255,.06);
+  border-color: color-mix(in srgb, var(--c1) 45%, rgba(255,255,255,.2));
+  box-shadow: 0 6px 16px -10px rgba(0,0,0,.5);
+}
+.m-preview { height: 38px; border-radius: 9px; margin-bottom: 6px; display: flex; align-items: center; justify-content: center; gap: 10px; background: #0c0914; border: 1px solid var(--well-border); }
+.m-card b { font-size: 12px; display: block; color: #fff; }
+.m-card span { font-size: 10px; color: var(--mist); }
+
+.neko-stage { position: relative; width: 76px; height: 28px; display: flex; justify-content: center; align-items: center; gap: 16px; animation: nekoFloat 3.2s ease-in-out infinite; }
+.neko-ear { position: absolute; top: 2px; width: 10px; height: 9px; background: var(--c1); clip-path: polygon(50% 0%, 0% 100%, 100% 100%); opacity: .85; filter: drop-shadow(0 0 5px var(--c1)); }
+.neko-ear.left { left: 6px; transform-origin: bottom center; animation: earTwitchL 5s ease-in-out infinite; }
+.neko-ear.right { right: 6px; transform-origin: bottom center; animation: earTwitchR 5s ease-in-out infinite; }
+.neko-eye-wrap { display: flex; gap: 15px; align-items: center; animation: nekoLookAround 7s ease-in-out infinite; }
+.neko-eye { width: 11px; height: 11px; background: #fff; border-radius: 3px 10px 3px 10px; box-shadow: 0 0 8px var(--c1), 0 0 15px var(--c2); animation: nekoBlinkLive 4.2s infinite; }
+.neko-eye.right { border-radius: 10px 3px 10px 3px; }
+@keyframes nekoFloat { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-1.8px); } }
+@keyframes nekoLookAround { 0%, 18%, 100% { transform: translate(0, 0); } 24%, 38% { transform: translate(-4.5px, -0.5px); } 44%, 56% { transform: translate(0, 0); } 62%, 78% { transform: translate(4.5px, -0.5px); } }
+@keyframes nekoBlinkLive { 0%, 44%, 48%, 90%, 94%, 98%, 100% { transform: scaleY(1); } 46%, 92%, 96% { transform: scaleY(0.08); } }
+@keyframes earTwitchL { 0%, 82%, 90%, 100% { transform: rotate(-20deg); } 85% { transform: rotate(-36deg) scale(1.08); } }
+@keyframes earTwitchR { 0%, 36%, 44%, 100% { transform: rotate(20deg); } 39% { transform: rotate(36deg) scale(1.08); } }
+
+.mochi-stage { position: relative; width: 44px; height: 25px; display: flex; align-items: flex-end; justify-content: center; animation: mochiHop 2.9s ease-in-out infinite; }
+.mochi-body { position: relative; width: 34px; height: 21px; border-radius: 52% 52% 44% 44% / 62% 62% 38% 38%; background: radial-gradient(circle at 34% 28%, #fff 0%, var(--c2) 58%, var(--c1) 135%); box-shadow: 0 0 12px color-mix(in srgb, var(--c1) 55%, transparent), inset 0 -3px 5px rgba(255,140,175,.28); }
+.mochi-face { position: absolute; inset: 0; animation: mochiLook 7s ease-in-out infinite; }
+.mochi-eye { position: absolute; top: 7px; width: 4px; height: 6px; border-radius: 50%; background: #2a1c33; animation: nekoBlinkLive 4.4s infinite; }
+.mochi-eye.l { left: 9px; } .mochi-eye.r { right: 9px; }
+.mochi-blush { position: absolute; top: 12px; width: 6px; height: 3px; border-radius: 50%; background: #ff8fb0; opacity: .6; }
+.mochi-blush.l { left: 3px; } .mochi-blush.r { right: 3px; }
+.mochi-mouth { position: absolute; left: 50%; top: 12px; width: 5px; height: 3px; margin-left: -2.5px; border-bottom: 1.5px solid #2a1c33; border-radius: 0 0 5px 5px; }
+@keyframes mochiHop { 0%, 100% { transform: translateY(0) scale(1.04, .94); } 45% { transform: translateY(-2.5px) scale(.96, 1.05); } }
+@keyframes mochiLook { 0%, 20%, 100% { transform: translateX(0); } 30%, 42% { transform: translateX(-2.5px); } 74%, 86% { transform: translateX(2.5px); } }
+
+.kitsune-wrap { display: flex; gap: 18px; align-items: center; animation: nekoLookAround 6s ease-in-out infinite; }
+.kit-eye { width: 9px; height: 12px; background: #fff; clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%); filter: drop-shadow(0 0 6px var(--c1)); animation: nekoBlinkLive 4s infinite; }
+
+.swatch-row { display: flex; gap: 10px; flex-wrap: wrap; padding: 4px 0; }
+.swatch {
+  position: relative; width: 24px; height: 24px; border-radius: 50%; cursor: pointer;
+  box-shadow: inset 0 0 0 1.5px rgba(255,255,255,.32);
+  transition: scale .2s var(--spring), box-shadow .18s ease;
+}
+.swatch:hover { scale: 1.12; }
+.swatch.active { scale: 1.16; box-shadow: inset 0 0 0 2px #fff, 0 0 10px -1px var(--c1); }
+.swatch::after {
+  content: attr(data-name); position: absolute; top: calc(100% + 7px); left: 50%; translate: -50% -4px; padding: 3px 9px; border-radius: 999px; white-space: nowrap; font: 600 10.5px var(--ui); color: #fff; z-index: 50;
+  background: rgba(22,18,32,.92); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,.16);
+  opacity: 0; pointer-events: none; transition: opacity .15s, translate .15s;
+}
+.swatch:hover::after { opacity: 1; translate: -50% 0; }
+
+.todo-bar { display: flex; gap: 8px; margin: 8px 0; }
+.todo-bar input { flex: 1; }
+.btn {
+  border: 0; padding: 6px 14px; border-radius: 999px; font: 600 11.5px var(--ui);
+  cursor: pointer; display: inline-flex; align-items: center; gap: 5px; color: #fff;
+  background-color: color-mix(in srgb, var(--c1) 22%, rgba(255, 255, 255, .06));
+  background-image:
+    radial-gradient(84px circle at var(--mx) var(--my), rgba(255, 255, 255, calc(.03 + .09 * var(--spec))), transparent 70%),
+    linear-gradient(135deg, rgba(255, 255, 255, .09) 0%, rgba(255, 255, 255, 0) 60%, color-mix(in srgb, var(--c2) 14%, transparent) 100%);
+}
+.btn:hover { background-color: color-mix(in srgb, var(--c1) 30%, rgba(255, 255, 255, .09)); scale: 1.02; }
+.btn:active { scale: .96; }
+.btn svg { width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 2.2; }
+
+.todo-items { max-height: 135px; overflow-y: auto; display: flex; flex-direction: column; gap: 5px; padding: 2px 2px 6px 0; }
+.t-item { display: flex; justify-content: space-between; align-items: center; padding: 6px 12px; border-radius: 11px; font-size: 12px; background: rgba(255,255,255,.035); border: 1px solid rgba(255,255,255,.065); }
+.t-item.done span.t-txt { text-decoration: line-through; color: var(--mist); }
+.custom-chk { width: 15px; height: 15px; border-radius: 5px; display: grid; place-items: center; flex-shrink: 0; background: var(--well-bg); border: 1.5px solid rgba(255,255,255,.32); }
+.custom-chk svg { width: 9px; height: 9px; stroke: var(--on-accent); stroke-width: 3; fill: none; opacity: 0; }
+.t-item.done .custom-chk { background: var(--c1); border-color: var(--c1); }
+.t-item.done .custom-chk svg { opacity: 1; }
+.icon-btn { border: 0; border-radius: 8px; width: 23px; height: 23px; display: grid; place-items: center; cursor: pointer; color: var(--danger); background: color-mix(in srgb, var(--danger) 14%, transparent); }
+.icon-btn:hover { background: color-mix(in srgb, var(--danger) 32%, transparent); color: #fff; }
+.icon-btn svg { width: 11px; height: 11px; stroke: currentColor; fill: none; stroke-width: 2.2; }
+
+.about-hero { display: flex; align-items: center; gap: 14px; padding: 10px 0 12px; border-bottom: 1px solid var(--divider); margin-bottom: 10px; }
+.about-logo { width: 50px; height: 50px; border-radius: 14px; overflow: hidden; flex-shrink: 0; border: 1px solid rgba(255,255,255,.2); }
+.about-logo img { width: 100%; height: 100%; object-fit: cover; }
+.about-title h2 { margin: 0 0 3px; font: 650 16px var(--ui-display); color: #fff; }
+.about-title p { margin: 0; font-size: 11.5px; color: var(--mist); line-height: 1.45; }
+.tag-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.tag { font-size: 10px; font-weight: 600; padding: 2.5px 9px; border-radius: 999px; color: var(--c2); background: rgba(255,255,255,.045); border: 1px solid rgba(255,255,255,.1); }
+.feat-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; padding-bottom: 8px; }
+.feat-box { background: rgba(255,255,255,.028); border: 1px solid rgba(255,255,255,.06); border-radius: 12px; padding: 9px 11px; }
+.feat-box b { font-size: 11.5px; color: var(--c1); display: block; margin-bottom: 2px; }
+.feat-box span { font-size: 10.5px; color: var(--mist); line-height: 1.4; display: block; }
+
+.toast {
+  position: fixed; right: 18px; bottom: 16px; padding: 6px 14px; border-radius: 999px; font-size: 11.5px; font-weight: 600; color: #fff; z-index: 5000;
+  background: rgba(22,18,32,.84); backdrop-filter: blur(14px) saturate(160%);
+  border: 1px solid rgba(255,255,255,.22);
+  opacity: 0; transform: translateY(6px); transition: opacity .2s, transform .2s; pointer-events: none;
+}
+.toast.show { opacity: 1; transform: translateY(0); }
+
+.mn-tip {
+  position: fixed; left: 0; top: 0; z-index: 99999; max-width: 240px;
+  padding: 6px 10px; border-radius: 10px; pointer-events: none;
+  font: 500 11px/1.35 var(--ui, system-ui, sans-serif); color: #fff;
+  background: rgba(24, 19, 34, .90);
+  -webkit-backdrop-filter: blur(14px) saturate(140%); backdrop-filter: blur(14px) saturate(140%);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, .07), 0 10px 22px -10px rgba(0, 0, 0, .55);
+  opacity: 0; scale: .95; translate: 0 -3px; transform-origin: 50% 0;
+  transition: opacity .12s ease, scale .14s var(--ease-fluid), translate .14s var(--ease-fluid);
+}
+.mn-tip[data-side="t"] { transform-origin: 50% 100%; translate: 0 3px; }
+.mn-tip.on { opacity: 1; scale: 1; translate: 0 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  :root { --spring: ease-out; --spring-fluid: ease-out; }
+  *, *::before, *::after { animation-duration: .01ms !important; transition-duration: 120ms !important; }
+  .tahoe-window::before, .tab-pane.active > * { animation: none !important; }
+}
+
+/* ===== MM-LAYER: Mochy-style motion & material (patch) ===== */
+@property --c1 { syntax: "<color>"; inherits: true; initial-value: #FFB7C5; }
+@property --c2 { syntax: "<color>"; inherits: true; initial-value: #E2D1F9; }
+@property --c3 { syntax: "<color>"; inherits: true; initial-value: #A2E4F5; }
+:root { transition: --c1 .7s var(--ease-fluid), --c2 .7s var(--ease-fluid), --c3 .7s var(--ease-fluid); --mm-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .7 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url%28%23n%29'/%3E%3C/svg%3E"); }
+.mm-grain { position: absolute; inset: 0; border-radius: inherit; pointer-events: none; background: var(--mm-grain) 0 0 / 120px 120px; opacity: .045; }
+html.mm-paused *, html.mm-paused *::before, html.mm-paused *::after { animation-play-state: paused !important; }
+
+:root { --spring-fluid: linear(0.000, 0.025, 0.090, 0.182, 0.290, 0.406, 0.521, 0.631, 0.732, 0.821, 0.896, 0.958, 1.007, 1.043, 1.069, 1.085, 1.093, 1.095, 1.091, 1.085, 1.076, 1.065, 1.054, 1.043, 1.033, 1.024, 1.016, 1.009, 1.003, 0.999, 0.995, 0.993, 0.992, 0.991, 0.991, 0.991, 0.992, 0.993, 0.994, 0.995, 1); --spring-soft: linear(0.000, 0.016, 0.057, 0.115, 0.185, 0.262, 0.340, 0.419, 0.494, 0.565, 0.631, 0.691, 0.744, 0.792, 0.833, 0.869, 0.900, 0.925, 0.946, 0.964, 0.978, 0.989, 0.997, 1.004, 1.008, 1.012, 1.014, 1.015, 1.015, 1.015, 1.014, 1.014, 1.012, 1.011, 1.010, 1.009, 1.008, 1.007, 1.006, 1.005, 1); }
+.lg-control, .nav-lens-pill, .seg-pill-thumb, .lg-slider-thumb, .btn { --press: .94; }
+.lg-control, .btn { -webkit-backdrop-filter: none; backdrop-filter: none; }
+@media (prefers-reduced-motion: reduce) { :root { transition: none; } }
+
+/* ===== MM-LAYER-2: album backdrop, accent wash, lyric skeleton ===== */
+@supports (color: rgb(from red r g b)) {
+  :root { --lg-flat: rgb(from var(--c2) r g b / .075); --lg-flat-fill: rgb(from var(--c2) r g b / .07);
+          --lg-flat-hover: rgb(from var(--c2) r g b / .13); --lg-flat-active: rgb(from var(--c2) r g b / .095);
+          --card-bg: rgb(from var(--c2) r g b / .05); }
+}
+.mm-bd { position: absolute; inset: -34%; pointer-events: none; background: center / cover no-repeat;
+  filter: blur(30px) saturate(1.6) brightness(.85); opacity: 0; transition: opacity .7s var(--ease-out); }
+.mm-bd.on { opacity: .62; }
+.lyr ol { transition: transform .42s var(--spring), opacity .3s ease; }
+.lyr.mm-skel ol { opacity: 0; }
+.lyr.mm-skel::before { content: ""; position: absolute; left: 0; right: 6px; top: 50%; height: 76px; translate: 0 -50%;
+  background: linear-gradient(100deg, rgba(255,255,255,.08) 30%, rgba(255,255,255,.28) 50%, rgba(255,255,255,.08) 70%) 100% 0 / 250% 100%;
+  -webkit-mask: linear-gradient(#000 0 0) 0 0 / 76% 12px no-repeat, linear-gradient(#000 0 0) 0 32px / 92% 12px no-repeat, linear-gradient(#000 0 0) 0 64px / 58% 12px no-repeat;
+  mask: linear-gradient(#000 0 0) 0 0 / 76% 12px no-repeat, linear-gradient(#000 0 0) 0 32px / 92% 12px no-repeat, linear-gradient(#000 0 0) 0 64px / 58% 12px no-repeat;
+  animation: mmShim 1.3s linear infinite; }
+@keyframes mmShim { to { background-position: 0 0; } }
+@media (prefers-reduced-motion: reduce) { .lyr.mm-skel::before { animation: none; } .mm-bd { transition: none; } }
+
+/* ===== MM-LAYER-5/7/9: Semua Tombol & Komponen Control Center Sekaca Playback Notch ===== */
+:root {
+  --mm-fill: .045;
+  --mm-blur: 6px;
+  --mm-rim: .07;
+  --mm-edge:
+    inset 0 0 0 1px rgb(255 255 255 / var(--mm-rim)),
+    inset 0 1px calc(var(--mm-blur) * .5) rgb(255 255 255 / calc(var(--mm-rim) * 2.3)),
+    0 3px calc(var(--mm-blur) * 1.2) rgb(0 0 0 / .16);
+}
+@supports (color: rgb(from red r g b)) {
+  :root {
+    --lg-flat-fill: rgb(from var(--c2) r g b / var(--mm-fill));
+    --lg-flat-hover: rgb(from var(--c2) r g b / calc(var(--mm-fill) * 1.8));
+    --lg-flat-active: rgb(from var(--c2) r g b / calc(var(--mm-fill) * 1.35));
+    --card-bg: rgb(from var(--c2) r g b / calc(var(--mm-fill) * .85));
+    /* Aksen murni --c2 (sama dengan Playback & Lirik di Notch) */
+    --mm-edge:
+      inset 0 0 0 1px rgb(255 255 255 / var(--mm-rim)),
+      inset 0 1px calc(var(--mm-blur) * .5) rgb(255 255 255 / calc(var(--mm-rim) * 2.3)),
+      inset 0 0 calc(var(--mm-blur) * 1.4) rgb(from var(--c2) r g b / calc(var(--mm-fill) * 1.8)),
+      0 3px calc(var(--mm-blur) * 1.2) rgb(0 0 0 / .16);
   }
-  .about-logo {
-    width: 60px; height: 60px; border-radius: 16px; overflow: hidden;
-    background: rgba(255, 183, 197, 0.1); border: 1px solid rgba(255, 183, 197, 0.3);
-    flex-shrink: 0;
-  }
-  .about-logo img { width: 100%; height: 100%; object-fit: cover; }
-  .about-title h2 { margin: 0 0 4px; font-size: 19px; color: var(--ink); }
-  .about-title p { margin: 0; font-size: 12px; color: var(--mist); line-height: 1.45; }
-  .tag-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
-  .tag {
-    font-size: 10.5px; font-weight: 600; padding: 3px 9px; border-radius: 6px;
-    background: rgba(226, 209, 249, 0.08); border: 1px solid var(--border); color: var(--lavender);
-  }
-  .feat-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
-  .feat-box {
-    background: var(--surface-hi); border: 1px solid var(--border);
-    border-radius: 11px; padding: 10px 12px;
-  }
-  .feat-box b { font-size: 12px; color: var(--pink); display: block; margin-bottom: 3px; }
-  .feat-box span { font-size: 11px; color: var(--mist); line-height: 1.35; display: block; }
+}
+
+/* Matikan ::before lama agar semua komponen mengikuti --mm-edge & aksen tema */
+.lg-control::before, .btn::before, .nav-lens-pill::before, .tahoe-search::before,
+.seg-pill-thumb::before, .tahoe-pill-tile::before {
+  display: none !important;
+}
+
+/* Terapkan kaca beraksen tema seperti tombol Playback & Lirik ke seluruh tombol & kontrol */
+.lg-control, .btn, .seg-pill-thumb, .tahoe-pill-tile:not(.on),
+.chip:not(.active), .m-card:not(.active), .switch .slider,
+.nav-item:not(.active) .nav-ico, .tahoe-search {
+  -webkit-backdrop-filter: blur(var(--mm-blur)) saturate(118%);
+  backdrop-filter: blur(var(--mm-blur)) saturate(118%);
+  background:
+    linear-gradient(rgb(255 255 255 / calc(var(--mm-fill) * 1.2)), transparent),
+    linear-gradient(var(--lg-flat-fill), var(--lg-flat-fill));
+  border-color: transparent;
+  box-shadow: var(--mm-edge);
+  --press: .88;
+}
+
+.lg-control:hover, .btn:hover, .tahoe-pill-tile:not(.on):hover,
+.chip:not(.active):hover, .m-card:not(.active):hover,
+.nav-item:not(.active):hover .nav-ico, .tahoe-search:focus-within {
+  background:
+    linear-gradient(rgb(255 255 255 / calc(var(--mm-fill) * 1.8)), transparent),
+    linear-gradient(var(--lg-flat-hover), var(--lg-flat-hover));
+  box-shadow: var(--mm-edge);
+}
+
+/* Kapsul aktif pada Hover/Click & Horizontal/Vertical dibuat sedikit lebih menyala seperti tombol Lirik/Play */
+.seg-pill-bar {
+  background: rgb(from var(--c2) r g b / calc(var(--mm-fill) * .75));
+  border-color: rgb(from var(--c2) r g b / calc(var(--mm-fill) * 1.4 + var(--mm-rim)));
+}
+.seg-pill-thumb,
+.seg-pill-bar.magnifying .seg-pill-thumb {
+  background:
+    linear-gradient(rgb(255 255 255 / calc(var(--mm-fill) * 2.4)), transparent),
+    linear-gradient(var(--lg-flat-hover), var(--lg-flat-hover));
+  box-shadow: var(--mm-edge);
+}
 </style>
 </head>
 <body oncontextmenu="return false;">
-  <div class="app-wrap">
-      <div class="hdr" id="hdr">
-      <div class="brand">
-        <div class="brand-logo">
-          <img class="js-app-logo" alt="MangNotch">
-        </div>
-        <div>
-          <h1>MangNotch Control</h1>
-          <span>Living Notch & Desktop Companion</span>
-        </div>
+
+  <div id="forcedUpdateModal" style="display:none; position:fixed; inset:0; background:rgba(12,9,16,0.94); backdrop-filter:blur(16px); z-index:9999; place-items:center; padding:24px; text-align:center;">
+    <div class="card" style="padding:24px 22px; max-width:380px;">
+      <h2 style="margin:0 0 8px; font-size:18px; color:var(--ink);">Pembaruan Wajib Diperlukan</h2>
+      <p id="forcedUpdateNotes" style="margin:0 0 18px; font-size:12px; color:var(--mist); line-height:1.5;">Versi MangNotch yang kamu gunakan sudah tidak didukung karena perbaikan penting. Silakan perbarui ke versi terbaru.</p>
+      <button class="btn" id="forcedUpdateBtn" style="width:100%; justify-content:center; padding:10px;">Perbarui MangNotch Sekarang</button>
+    </div>
+  </div>
+
+  <select id="interactionSelect" class="native-hidden">
+    <option value="hover">Hover Biasa (Default)</option>
+    <option value="click">Klik Dulu Baru Melebar</option>
+  </select>
+  <select id="todoStyleSelect" class="native-hidden">
+    <option value="horizontal">Geser ke Samping (Horizontal)</option>
+    <option value="vertical">List Atas-Bawah (Vertikal)</option>
+  </select>
+
+  <div class="tahoe-window">
+    <aside class="tahoe-sidebar" id="sidebarDragArea">
+      <div class="tahoe-search">
+        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input type="text" class="search-field" id="settingsSearch" placeholder="Search Controls">
       </div>
-            <div class="hdr-right">
-        <span class="ver-pill" id="hdrVerPill">v1.3.0</span>
-        <button class="close-btn" id="closeBtn" title="Tutup">
-          <svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg>
+
+      <nav class="tahoe-nav" id="tahoeNav">
+        <div class="nav-lens-pill" id="navLensPill"></div>
+
+        <button class="nav-item active" data-idx="0" data-tab="sys" onclick="switchTab('sys', this)">
+          <span class="nav-ico">
+            <svg viewBox="0 0 24 24"><circle cx="7" cy="7" r="2.2"/><circle cx="17" cy="7" r="2.2"/><circle cx="7" cy="17" r="2.2"/><circle cx="17" cy="17" r="2.2"/></svg>
+          </span>
+          <span>General & Layar</span>
         </button>
-      </div>
-    </div>
-
-    <!-- Banner Auto-Update (Muncul otomatis jika ada versi baru) -->
-    <div id="updateBanner" style="display:none; background:rgba(255,183,197,0.14); border:1px solid var(--pink); border-radius:14px; padding:11px 15px; margin-bottom:12px; align-items:center; justify-content:space-between; gap:10px;">
-      <div>
-        <b id="updateBannerTitle" style="font-size:13px; color:var(--pink); display:block;">Pembaruan Tersedia!</b>
-        <small id="updateBannerSub" style="font-size:11px; color:var(--ink);">Versi terbaru siap diunduh.</small>
-      </div>
-      <button class="btn" id="updateBannerBtn">Update Sekarang</button>
-    </div>
-
-    <!-- Modal Layar Penuh untuk Forced Update -->
-    <div id="forcedUpdateModal" style="display:none; position:fixed; inset:0; background:rgba(12,9,16,0.94); backdrop-filter:blur(16px); z-index:9999; place-items:center; padding:24px; text-align:center;">
-      <div style="background:var(--surface); border:1px solid var(--pink); border-radius:20px; padding:24px 22px; max-width:380px; box-shadow:0 20px 50px rgba(0,0,0,0.8);">
-        <div style="width:48px; height:48px; border-radius:14px; background:rgba(255,183,197,0.15); border:1px solid var(--pink); display:grid; place-items:center; margin:0 auto 14px;">
-          <svg viewBox="0 0 24 24" style="width:24px; height:24px; stroke:var(--pink); fill:none; stroke-width:2.2;"><path d="M12 9v4M12 17h.01"/><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg>
-        </div>
-        <h2 style="margin:0 0 8px; font-size:18px; color:var(--ink);">Pembaruan Wajib Diperlukan</h2>
-        <p id="forcedUpdateNotes" style="margin:0 0 18px; font-size:12px; color:var(--mist); line-height:1.5;">Versi MangNotch yang kamu gunakan sudah tidak didukung karena perbaikan penting. Silakan perbarui ke versi terbaru.</p>
-        <button class="btn" id="forcedUpdateBtn" style="width:100%; justify-content:center; padding:10px;">Perbarui MangNotch Sekarang</button>
-      </div>
-    </div>
-
-    <div class="tabs">
-      <button class="tab-btn active" onclick="switchTab('sys', this)">
-        <svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
-        System
-      </button>
-      <button class="tab-btn" onclick="switchTab('style', this)">
-        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 9 9c0 1.66-1.34 3-3 3h-1.5a1.5 1.5 0 0 0-1.5 1.5c0 .83.67 1.5 1.5 1.5H17"/></svg>
-        Mascot
-      </button>
-      <button class="tab-btn" onclick="switchTab('tasks', this)">
-        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
-        Produktivitas
-      </button>
-      <button class="tab-btn" onclick="switchTab('about', this)">
-        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
-        About
-      </button>
-    </div>
-
-    <!-- TAB 1: DISPLAY & SYSTEM -->
-    <div class="tab-pane active" id="tab-sys">
-      <div class="card">
-        <div class="card-hdr">
-          <div class="card-hdr-left">
-            <svg viewBox="0 0 24 24"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4"/></svg>
-            Perilaku Layar & Interaksi
-          </div>
-        </div>
-        <div class="row">
-          <div class="lbl-wrap">
-            <b>Bahasa Aplikasi</b>
-            <small>Pilih bahasa antarmuka MangNotch</small>
-          </div>
-          <select id="languageSelect">
-            <option value="id">🇮🇩 Bahasa Indonesia</option>
-            <option value="en">🇺🇸 English</option>
-          </select>
-        </div>
-        <div class="row">
-          <div class="lbl-wrap">
-            <b>Gaya Interaksi Membuka Notch</b>
-            <small>Pilih melebar otomatis saat disentuh kursor atau harus diklik dulu</small>
-          </div>
-          <select id="interactionSelect">
-            <option value="hover">Hover Biasa (Default)</option>
-            <option value="click">Klik Dulu Baru Melebar</option>
-          </select>
-        </div>
-        <div class="row">
-          <div class="lbl-wrap">
-            <b>Start with Windows</b>
-            <small>Jalankan MangNotch otomatis di background saat komputer menyala</small>
-          </div>
-          <label class="switch"><input type="checkbox" id="startWinChk"><span class="slider"></span></label>
-        </div>
-      </div>
-      <div class="card">
-        <div class="card-hdr"><div class="card-hdr-left">
-          <svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
-          Monitor & Tampilan
-        </div></div>
-        <div class="row">
-          <div class="lbl-wrap">
-            <b>Selalu di Primary Monitor</b>
-            <small>Ikuti layar utama Windows secara otomatis</small>
-          </div>
-          <label class="switch"><input type="checkbox" id="primaryChk" checked><span class="slider"></span></label>
-        </div>
-        <div class="row">
-          <div class="lbl-wrap">
-            <b>Pilih Monitor Manual</b>
-            <small>Pindahkan Notch ke layar eksternal tertentu</small>
-          </div>
-          <select id="monSelect" disabled></select>
-        </div>
-        <div class="row">
-          <div class="lbl-wrap">
-            <b>Auto-Hide Total saat Fullscreen</b>
-            <small>Sembunyikan Notch 100% saat bermain game atau video F11</small>
-          </div>
-          <label class="switch"><input type="checkbox" id="fsChk" checked><span class="slider"></span></label>
-        </div>
-        <div class="row">
-          <div class="lbl-wrap">
-            <b>Smart Proximity Auto-Shrink</b>
-            <small>Otomatis mengecil ke garis minimalis saat tertutup tab browser/jendela</small>
-          </div>
-          <label class="switch"><input type="checkbox" id="proxChk" checked><span class="slider"></span></label>
-        </div>
-        <div class="row">
-          <div class="lbl-wrap">
-            <b>System Peeks Overlay</b>
-            <small>Pop-up animasi Volume, Brightness, Bluetooth, Caps Lock & Charger</small>
-          </div>
-          <label class="switch"><input type="checkbox" id="peekChk" checked><span class="slider"></span></label>
-        </div>
-      </div>
-    </div>
-
-    <!-- TAB 2: MASCOT & THEME -->
-    <div class="tab-pane" id="tab-style">
-      <div class="card">
-        <div class="card-hdr">
-          <div class="card-hdr-left">
-            <svg viewBox="0 0 24 24"><path d="M12 2a9 9 0 0 0-9 9c0 4.97 4.03 9 9 9s9-4.03 9-9a9 9 0 0 0-9-9z"/><circle cx="9" cy="10" r="1.5"/><circle cx="15" cy="10" r="1.5"/></svg>
-            Pilih Karakter Maskot MangNotch
-          </div>
-        </div>
-        <div class="notch-prev"><div class="np-notch"><div class="np-glow" id="npGlow"></div><div class="np-mascot" id="npMascot"></div></div></div>
-        <div class="mascot-grid" id="mascotCards">
-          <div class="m-card active" data-m="neko" onclick="selectMascot('neko')">
-            <div class="m-preview"><div class="neko-stage"><span class="neko-ear left"></span><div class="neko-eye-wrap"><i class="neko-eye left"></i><i class="neko-eye right"></i></div><span class="neko-ear right"></span></div></div>
-            <b>MangCat</b>
-            <span>Cyber-Neko</span>
-          </div>
-          <div class="m-card" data-m="mochi" onclick="selectMascot('mochi')">
-            <div class="m-preview"><div class="mochi-stage"><div class="mochi-body"><div class="mochi-face"><i class="mochi-eye l"></i><i class="mochi-eye r"></i><i class="mochi-blush l"></i><i class="mochi-blush r"></i><i class="mochi-mouth"></i></div></div></div></div>
-            <b>Mochi</b>
-            <span>Blob Imut</span>
-          </div>
-          <div class="m-card" data-m="kitsune" onclick="selectMascot('kitsune')">
-            <div class="m-preview"><div class="kitsune-wrap"><i class="kit-eye"></i><i class="kit-eye"></i></div></div>
-            <b>Kitsune</b>
-            <span>Spirit Orbs</span>
-          </div>
-        </div>
-
-        <div class="row">
-          <div class="lbl-wrap">
-            <b>Tampilan Notch Saat Idle</b>
-            <small>Saat mode Lirik aktif, otomatis menampilkan 1 baris lirik</small>
-          </div>
-          <select id="restSelect">
-            <option value="pet">MangNotch Mascot</option>
-            <option value="idle">Jam & Equalizer</option>
-            <option value="minimal">Minimalis (Garis Tipis)</option>
-          </select>
-        </div>
-
-        <div class="row" style="flex-direction:column; align-items:flex-start; gap:10px">
-          <div class="lbl-wrap">
-            <b>Palet Warna Cahaya Notch</b>
-            <small>Termasuk palet MangNime Dark Dusk (Pink - Lavender - Ice Cyan)</small>
-          </div>
-          <div class="swatch-row" id="swatchRow">
-            <span class="swatch active" data-t="dusk" onclick="selectTheme('dusk')" style="background:linear-gradient(135deg,#FFB7C5,#E2D1F9,#A2E4F5)" data-name="MangNime Dusk"></span>
-            <span class="swatch" data-t="emerald" onclick="selectTheme('emerald')" style="background:linear-gradient(135deg,#10b981,#059669)" data-name="Matcha Emerald"></span>
-            <span class="swatch" data-t="racing" onclick="selectTheme('racing')" style="background:linear-gradient(135deg,#ff1e42,#ff8800)" data-name="Racing Red"></span>
-            <span class="swatch" data-t="sunset" onclick="selectTheme('sunset')" style="background:linear-gradient(135deg,#ff6b6b,#feca57)" data-name="Sunset"></span>
-            <span class="swatch" data-t="cyber" onclick="selectTheme('cyber')" style="background:linear-gradient(135deg,#19b8ff,#2d5bff)" data-name="Ice Blue"></span>
-            <span class="swatch" data-t="sakura" onclick="selectTheme('sakura')" style="background:linear-gradient(135deg,#ff8fab,#ffc2d1,#b8f2e6)" data-name="Sakura"></span>
-            <span class="swatch" data-t="grape" onclick="selectTheme('grape')" style="background:linear-gradient(135deg,#c084fc,#818cf8,#f0abfc)" data-name="Grape"></span>
-            <span class="swatch" data-t="mint" onclick="selectTheme('mint')" style="background:linear-gradient(135deg,#6ee7b7,#67e8f9,#bef264)" data-name="Mint"></span>
-            <span class="swatch" data-t="amber" onclick="selectTheme('amber')" style="background:linear-gradient(135deg,#fbbf24,#fb923c,#fde68a)" data-name="Amber"></span>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- TAB 3: POMODORO, WATER & TASKS -->
-    <div class="tab-pane" id="tab-tasks">
-      <div class="card">
-        <div class="card-hdr">
-          <div class="card-hdr-left">
+        <button class="nav-item" data-idx="1" data-tab="style" onclick="switchTab('style', this)">
+          <span class="nav-ico">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 9 9c0 1.66-1.34 3-3 3h-1.5a1.5 1.5 0 0 0-1.5 1.5c0 .83.67 1.5 1.5 1.5H17"/></svg>
+          </span>
+          <span>Maskot & Tema</span>
+        </button>
+        <button class="nav-item" data-idx="2" data-tab="peeks" onclick="switchTab('peeks', this)">
+          <span class="nav-ico">
+            <svg viewBox="0 0 24 24"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>
+          </span>
+          <span>Audio & Peeks</span>
+        </button>
+        <button class="nav-item" data-idx="3" data-tab="tasks" onclick="switchTab('tasks', this)">
+          <span class="nav-ico">
             <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
-            Pomodoro Timer
-          </div>
-          <div class="preset-chips" id="pomoChips">
-            <button class="chip" onclick="setPomoPreset(15)">15m</button>
-            <button class="chip active" onclick="setPomoPreset(25)">25m</button>
-            <button class="chip" onclick="setPomoPreset(45)">45m</button>
-            <button class="chip" onclick="setPomoPreset(60)">60m</button>
-          </div>
-        </div>
-        <div class="row">
-          <div class="lbl-wrap">
-            <b>Durasi Fokus & Short Break (Menit)</b>
-            <small>Waktu sesi fokus utama & jeda istirahat</small>
-          </div>
-          <div style="display:flex;gap:6px">
-            <input type="number" id="pomoMin" value="25" min="1" max="180" style="width:76px" title="Durasi Fokus (Menit)">
-            <input type="number" id="pomoBreakMin" value="5" min="1" max="60" style="width:70px" title="Short Break (Menit)">
-          </div>
-        </div>
-        <div class="row">
-          <div class="lbl-wrap">
-            <b>Suara Chime Pomodoro</b>
-            <small>Bunyikan chime saat waktu fokus selesai</small>
-          </div>
-          <label class="switch"><input type="checkbox" id="soundChk" checked><span class="slider"></span></label>
-        </div>
-      </div>
+          </span>
+          <span>Produktivitas</span>
+        </button>
+        <button class="nav-item" data-idx="4" data-tab="about" onclick="switchTab('about', this)">
+          <span class="nav-ico">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+          </span>
+          <span>Tentang</span>
+        </button>
+      </nav>
 
-      <div class="card">
-        <div class="card-hdr">
-          <div class="card-hdr-left">
-            <svg viewBox="0 0 24 24"><path d="M12 2.8s6 6.5 6 11.2a6 6 0 0 1-12 0c0-4.7 6-11.2 6-11.2z"/></svg>
-            Water Tracker & Chime (Auto-Reset Harian)
-          </div>
-        </div>
-        <div class="row">
-          <div class="lbl-wrap"><b>Target Harian & Ukuran Gelas (ml)</b><small>Otomatis reset ke 0 ml setiap pergantian hari</small></div>
-          <div style="display:flex;gap:6px">
-            <input type="number" id="waterGoal" value="1500" step="100" style="width:82px" title="Target Harian (ml)">
-            <input type="number" id="waterCup" value="250" step="50" style="width:74px" title="Takaran Sekali Minum (ml)">
-          </div>
-        </div>
-        <div class="row">
-          <div class="lbl-wrap">
-            <b>Aktifkan Pengingat Minum Berkala</b>
-            <small>Tampilkan pop-up notifikasi minum di Notch sesuai interval</small>
-          </div>
-          <label class="switch"><input type="checkbox" id="waterRemindEnableChk" checked><span class="slider"></span></label>
-        </div>
-        <div class="row">
-          <div class="lbl-wrap"><b>Interval Pengingat Minum (Menit)</b><small>Jeda waktu antar pop-up pengingat minum</small></div>
-          <input type="number" id="waterInterval" value="45" min="1" step="15" style="width:82px">
-        </div>
-        <div class="row">
-          <div class="lbl-wrap">
-            <b>Suara Chime Tap Pertakaran (+ Drink)</b>
-            <small>Bunyikan chime saat menekan tombol tambah minum</small>
-          </div>
-          <label class="switch"><input type="checkbox" id="waterTapSoundChk" checked><span class="slider"></span></label>
-        </div>
-        <div class="row">
-          <div class="lbl-wrap">
-            <b>Suara Chime Notifikasi Pengingat Minum</b>
-            <small>Bunyikan chime saat pop-up pengingat minum berkala muncul</small>
-          </div>
-          <label class="switch"><input type="checkbox" id="waterRemSoundChk" checked><span class="slider"></span></label>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="card-hdr">
-          <div class="card-hdr-left">
-            <svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
-            Kelola Daftar Tugas (To-Do List)
-          </div>
-        </div>
-        <div class="row" style="padding-bottom:10px;margin-bottom:4px">
-          <div class="lbl-wrap">
-            <b>Gaya Tampilan To-Do List di Notch</b>
-            <small>Jika > 2 tugas, gulir ke samping (Horizontal) atau atas-bawah</small>
-          </div>
-          <select id="todoStyleSelect">
-            <option value="horizontal">Geser ke Samping (Horizontal)</option>
-            <option value="vertical">List Atas-Bawah (Vertikal)</option>
-          </select>
-        </div>
-        <div class="todo-bar">
-          <input type="text" id="newTodoInput" placeholder="Ketik tugas baru untuk ditampilkan di Notch...">
-          <button class="btn" onclick="addTodo()">
-            <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Tambah
-          </button>
-        </div>
-        <div class="todo-items" id="ctrlTodoList"></div>
-      </div>
-    </div>
-
-    <!-- TAB 4: ABOUT PAGE -->
-    <div class="tab-pane" id="tab-about">
-      <div class="card">
-        <div class="about-hero">
-          <div class="about-logo">
+      <div class="sidebar-brand-footer">
+        <div class="sidebar-brand-left">
+          <div class="brand-logo">
             <img class="js-app-logo" alt="MangNotch">
           </div>
-          <div class="about-title">
-            <h2>MangNotch <span id="aboutVerTxt" style="font-size:12px;color:var(--pink);font-weight:600">v1.3.0</span></h2>
-            <p>Interactive Living Notch & Productivity Companion dengan sentuhan estetika editorial <i>MangNime</i>.</p>
-            <div class="tag-list">
-              <span class="tag">Rust Backend</span>
-              <span class="tag">Tauri v2</span>
-              <span class="tag">Win32 Native API</span>
-              <span class="tag">Open Source</span>
+          <div class="brand-txt">
+            <b>MangNotch</b>
+          </div>
+        </div>
+        <span class="ver-pill" id="hdrVerPill">v2.0.0</span>
+      </div>
+    </aside>
+
+    <main class="tahoe-main">
+      <header class="tahoe-topbar" id="hdr">
+        <h2 id="activePaneTitle">General & Layar</h2>
+        <div class="topbar-actions">
+          <button class="lg-btn lg-control" onclick="clearShelfFromCtrl()" title="Kosongkan semua item di File Shelf">
+            <svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>
+            <span>Bersihkan Shelf</span>
+          </button>
+          <button class="close-btn lg-control" id="closeBtn" title="Tutup">
+            <svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg>
+          </button>
+        </div>
+      </header>
+
+      <div class="tahoe-content">
+        <div id="updateBanner" class="card" style="display:none; padding:10px 14px; margin-bottom:12px; align-items:center; justify-content:space-between; gap:10px;">
+          <div>
+            <b id="updateBannerTitle" style="font-size:12.5px; color:var(--c1); display:block;">Pembaruan Tersedia!</b>
+            <small id="updateBannerSub" style="font-size:11px; color:var(--ink);">Versi terbaru siap diunduh.</small>
+          </div>
+          <button class="btn" id="updateBannerBtn">Update Sekarang</button>
+        </div>
+
+        <div class="hero-banner-card">
+          <div class="hero-banner-text">
+            <b>Living Notch Companion</b>
+            <p>Kustomisasi perilaku layar, karakter maskot, dan warna cahaya kaca secara langsung.</p>
+          </div>
+          <div class="notch-prev">
+            <div class="np-notch">
+              <div class="np-glow" id="npGlow"></div>
+              <div class="np-mascot" id="npMascot"></div>
             </div>
           </div>
         </div>
 
-        <div class="feat-grid">
-          <div class="feat-box">
-            <b>Media, Volume & Live Lyrics</b>
-            <span>Integrasi Windows GSMTC, kontrol master volume real-time, warna album, dan lirik.</span>
+        <!-- TAB 1: GENERAL & DISPLAY -->
+        <div class="tab-pane active" id="tab-sys">
+          <div class="sec-title">Perilaku Layar & Interaksi</div>
+          <div class="card">
+            <div class="row">
+              <div class="lbl-wrap">
+                <b>Bahasa Aplikasi</b>
+                <small>Pilih bahasa antarmuka MangNotch, Lirik & menu System Tray</small>
+              </div>
+              <select id="languageSelect">
+                <option value="id">Bahasa Indonesia (ID)</option>
+                <option value="en">English (US)</option>
+              </select>
+            </div>
+            <div class="row">
+              <div class="lbl-wrap">
+                <b>Gaya Interaksi Membuka Notch</b>
+                <small>Pilih melebar otomatis saat disentuh kursor atau harus diklik dulu</small>
+              </div>
+              <div class="seg-pill-bar" id="interSegBar" data-target="interaction">
+                <div class="seg-pill-thumb" id="interSegLens"></div>
+                <button type="button" class="seg-pill-btn active" data-val="hover">Hover</button>
+                <button type="button" class="seg-pill-btn" data-val="click">Click</button>
+              </div>
+            </div>
+            <div class="row">
+              <div class="lbl-wrap">
+                <b>Kecepatan Auto-Close Notch</b>
+                <small>Jeda waktu sebelum Notch menutup saat kursor menjauh</small>
+              </div>
+              <select id="closeSpeedSelect">
+                <option value="fast">Cepat (Responsif)</option>
+                <option value="normal">Normal (Default)</option>
+                <option value="relaxed">Santai (Lebih Lama)</option>
+              </select>
+            </div>
+            <div class="row">
+              <div class="lbl-wrap">
+                <b>Pintasan Keyboard Global (Alt + N)</b>
+                <small>Buka atau tutup Notch dari aplikasi mana saja dengan menekan Alt + N</small>
+              </div>
+              <label class="switch"><input type="checkbox" id="hotkeyChk" checked><span class="slider"></span></label>
+            </div>
+            <div class="row">
+              <div class="lbl-wrap">
+                <b>Start with Windows</b>
+                <small>Jalankan MangNotch otomatis di background saat komputer menyala</small>
+              </div>
+              <label class="switch"><input type="checkbox" id="startWinChk"><span class="slider"></span></label>
+            </div>
           </div>
-          <div class="feat-box">
-            <b>Native File Shelf</b>
-            <span>Simpan file sementara via Drag-in dari Explorer & Drag-out langsung ke WhatsApp/Discord.</span>
-          </div>
-          <div class="feat-box">
-            <b>Focus, Hydration & Tasks</b>
-            <span>Timer Pomodoro kustom, pencatat hidrasi auto-reset harian, & To-Do List dual style.</span>
-          </div>
-          <div class="feat-box">
-            <b>System Peeks & Proximity</b>
-            <span>Pop-up interaktif Volume, Brightness, Bluetooth, Caps Lock, Charger & auto-shrink.</span>
-          </div>
-        </div>
-      </div>
 
-      <div class="card">
-        <div class="card-hdr">
-          <div class="card-hdr-left">
-            <svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-            Pengembang, Landing Page & Open Source
+          <div class="sec-title">Monitor & Deteksi Jendela</div>
+          <div class="card">
+            <div class="row">
+              <div class="lbl-wrap">
+                <b>Selalu di Primary Monitor</b>
+                <small>Ikuti layar utama Windows secara otomatis</small>
+              </div>
+              <label class="switch"><input type="checkbox" id="primaryChk" checked><span class="slider"></span></label>
+            </div>
+            <div class="row">
+              <div class="lbl-wrap">
+                <b>Pilih Monitor Manual</b>
+                <small>Pindahkan Notch ke layar eksternal tertentu</small>
+              </div>
+              <select id="monSelect" disabled></select>
+            </div>
+            <div class="row">
+              <div class="lbl-wrap">
+                <b>Auto-Hide Total saat Fullscreen</b>
+                <small>Sembunyikan Notch 100% saat bermain game atau video layar penuh</small>
+              </div>
+              <label class="switch"><input type="checkbox" id="fsChk" checked><span class="slider"></span></label>
+            </div>
+            <div class="row">
+              <div class="lbl-wrap">
+                <b>Smart Proximity Auto-Shrink</b>
+                <small>Otomatis mengecil ke garis minimalis saat tertutup tab browser/jendela</small>
+              </div>
+              <label class="switch"><input type="checkbox" id="proxChk" checked><span class="slider"></span></label>
+            </div>
           </div>
         </div>
-        <div class="row">
-          <div class="lbl-wrap">
-            <b>Developed by vestiapani</b>
-            <small>Kunjungi halaman resmi MangNotch & repositori kode sumber</small>
-          </div>
-          <div style="display:flex;gap:7px">
-            <button class="btn-outline" onclick="openUrl('https://mangnotch.vercel.app/')">
-              <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-              Landing Page
-            </button>
-            <button class="btn" onclick="openUrl('https://github.com/MANG-CODER/MangNotch')">
-              <svg viewBox="0 0 24 24"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/></svg>
-              GitHub Repo
-            </button>
+
+        <!-- TAB 2: MASCOT & APPEARANCE -->
+        <div class="tab-pane" id="tab-style">
+          <div class="sec-title">Pratinjau & Karakter Maskot</div>
+          <div class="card" style="padding:10px 16px">
+            <div class="mascot-grid" id="mascotCards">
+              <div class="m-card active" data-m="neko" onclick="selectMascot('neko')">
+                <div class="m-preview"><div class="neko-stage"><span class="neko-ear left"></span><div class="neko-eye-wrap"><i class="neko-eye left"></i><i class="neko-eye right"></i></div><span class="neko-ear right"></span></div></div>
+                <b>MangCat</b>
+                <span>Cyber-Neko</span>
+              </div>
+              <div class="m-card" data-m="mochi" onclick="selectMascot('mochi')">
+                <div class="m-preview"><div class="mochi-stage"><div class="mochi-body"><div class="mochi-face"><i class="mochi-eye l"></i><i class="mochi-eye r"></i><i class="mochi-blush l"></i><i class="mochi-blush r"></i><i class="mochi-mouth"></i></div></div></div></div>
+                <b>Mochi</b>
+                <span>Blob Imut</span>
+              </div>
+              <div class="m-card" data-m="kitsune" onclick="selectMascot('kitsune')">
+                <div class="m-preview"><div class="kitsune-wrap"><i class="kit-eye"></i><i class="kit-eye"></i></div></div>
+                <b>Kitsune</b>
+                <span>Spirit Orbs</span>
+              </div>
+            </div>
+
+            <div class="row">
+              <div class="lbl-wrap">
+                <b>Tampilan Notch Saat Idle</b>
+                <small>Saat mode Lirik aktif, otomatis menampilkan 1 baris lirik</small>
+              </div>
+              <select id="restSelect">
+                <option value="pet">MangNotch Mascot</option>
+                <option value="idle">Jam & Equalizer</option>
+                <option value="minimal">Minimalis (Garis Tipis)</option>
+              </select>
+            </div>
+
+            <div class="row">
+              <div class="lbl-wrap">
+                <b>Warna Dinamis Sampul Album</b>
+                <small>Sesuaikan cahaya latar Musik & Lirik dengan warna sampul lagu yang diputar</small>
+              </div>
+              <label class="switch"><input type="checkbox" id="albumGlowChk" checked><span class="slider"></span></label>
+            </div>
+            <div class="row">
+              <div class="lbl-wrap">
+                <b>Notch Tetap Terbuka Saat Lirik</b>
+                <small>Lirik tampil penuh terus tanpa perlu hover; matikan untuk mode minimalis 1 baris</small>
+              </div>
+              <label class="switch"><input type="checkbox" id="mmLyrOpenChk"><span class="slider"></span></label>
+            </div>
+            <div class="row">
+              <div class="lbl-wrap"><b>Transparansi Tombol & Komponen</b><small>Makin kecil makin bening (berlaku di notch dan control)</small></div>
+              <div style="display:flex;align-items:center;gap:10px">
+                <input type="range" class="native-hidden" id="mmFill" min="0" max="20" step="0.5">
+                <div class="lg-slider-wrap" id="mmFillSlider">
+                  <div class="lg-slider-track"><div class="lg-slider-fill"></div></div>
+                  <div class="lg-slider-thumb"></div>
+                </div>
+                <span class="lg-slider-val" id="mmFillVal">4.5%</span>
+              </div>
+            </div>
+            <div class="row">
+              <div class="lbl-wrap"><b>Blur Tombol & Komponen</b><small>0 = tanpa blur</small></div>
+              <div style="display:flex;align-items:center;gap:10px">
+                <input type="range" class="native-hidden" id="mmBlur" min="0" max="24" step="1">
+                <div class="lg-slider-wrap" id="mmBlurSlider">
+                  <div class="lg-slider-track"><div class="lg-slider-fill"></div></div>
+                  <div class="lg-slider-thumb"></div>
+                </div>
+                <span class="lg-slider-val" id="mmBlurVal">6px</span>
+              </div>
+            </div>
+            <div class="row">
+              <div class="lbl-wrap"><b>Garis Tepi Tombol</b><small>Terang garis tipis di tepi kaca</small></div>
+              <div style="display:flex;align-items:center;gap:10px">
+                <input type="range" class="native-hidden" id="mmRim" min="0" max="20" step="0.5">
+                <div class="lg-slider-wrap" id="mmRimSlider">
+                  <div class="lg-slider-track"><div class="lg-slider-fill"></div></div>
+                  <div class="lg-slider-thumb"></div>
+                </div>
+                <span class="lg-slider-val" id="mmRimVal">7.0%</span>
+              </div>
+            </div>
+            <div class="row">
+              <div class="lbl-wrap"><b>Reset Tampilan Glass</b><small>Kembali ke nilai bawaan</small></div>
+              <button type="button" class="btn" id="mmGlassReset">Reset</button>
+            </div>
+
+            <div class="row" style="flex-direction:column; align-items:flex-start; gap:8px">
+              <div class="lbl-wrap">
+                <b>Palet Warna Cahaya Notch & Control Center</b>
+                <small>Mengubah warna cahaya Notch sekaligus aksen Liquid Glass Control Center</small>
+              </div>
+              <div class="swatch-row" id="swatchRow">
+                <span class="swatch active" data-t="dusk" onclick="selectTheme('dusk')" style="background:linear-gradient(135deg,#FFB7C5,#E2D1F9,#A2E4F5)" data-name="MangNime Dusk"></span>
+                <span class="swatch" data-t="emerald" onclick="selectTheme('emerald')" style="background:linear-gradient(135deg,#10b981,#059669)" data-name="Matcha Emerald"></span>
+                <span class="swatch" data-t="racing" onclick="selectTheme('racing')" style="background:linear-gradient(135deg,#ff1e42,#ff8800)" data-name="Racing Red"></span>
+                <span class="swatch" data-t="sunset" onclick="selectTheme('sunset')" style="background:linear-gradient(135deg,#ff6b6b,#feca57)" data-name="Sunset"></span>
+                <span class="swatch" data-t="cyber" onclick="selectTheme('cyber')" style="background:linear-gradient(135deg,#19b8ff,#2d5bff)" data-name="Ice Blue"></span>
+                <span class="swatch" data-t="sakura" onclick="selectTheme('sakura')" style="background:linear-gradient(135deg,#ff8fab,#ffc2d1,#b8f2e6)" data-name="Sakura"></span>
+                <span class="swatch" data-t="grape" onclick="selectTheme('grape')" style="background:linear-gradient(135deg,#c084fc,#818cf8,#f0abfc)" data-name="Grape"></span>
+                <span class="swatch" data-t="mint" onclick="selectTheme('mint')" style="background:linear-gradient(135deg,#6ee7b7,#67e8f9,#bef264)" data-name="Mint"></span>
+                <span class="swatch" data-t="amber" onclick="selectTheme('amber')" style="background:linear-gradient(135deg,#fbbf24,#fb923c,#fde68a)" data-name="Amber"></span>
+              </div>
+            </div>
           </div>
         </div>
-        <div class="row">
-          <div class="lbl-wrap">
-            <b>Data & Konfigurasi Lokal</b>
-            <small>Tersimpan otomatis di %AppData%\MangNotch\config.json</small>
+
+        <!-- TAB 3: AUDIO & SYSTEM PEEKS -->
+        <div class="tab-pane" id="tab-peeks">
+          <div class="sec-title">Visualisasi Audio & Musik</div>
+          <div class="card">
+            <div class="row">
+              <div class="lbl-wrap">
+                <b>Real-Time Audio Beat Visualizer</b>
+                <small>Gerakkan equalizer dan maskot mengikuti dentuman suara asli Windows</small>
+              </div>
+              <label class="switch"><input type="checkbox" id="audioVisChk" checked><span class="slider"></span></label>
+            </div>
+            <div class="row">
+              <div class="lbl-wrap">
+                <b>Volume Suara Hujan (Rain Ambient)</b>
+                <small>Tingkat kekerasan suara hujan saat mode fokus Pomodoro dinyalakan</small>
+              </div>
+              <div style="display:flex;align-items:center;gap:10px">
+                <input type="range" class="native-hidden" id="ambientVolRange" min="10" max="100" value="55">
+                <div class="lg-slider-wrap" id="ambientOpticalSlider">
+                  <div class="lg-slider-track">
+                    <div class="lg-slider-fill" id="ambientOpticalFill"></div>
+                  </div>
+                  <div class="lg-slider-thumb" id="ambientOpticalThumb"></div>
+                </div>
+                <span id="ambientVolLabel" style="font-size:11.5px;font-weight:700;width:34px;text-align:right">55%</span>
+              </div>
+            </div>
           </div>
-          <button class="btn-outline" onclick="openConfigDir()">
-            <svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-            Buka Folder Data
-          </button>
+
+          <div class="sec-title">System Peeks Overlay</div>
+          <div class="card">
+            <div class="row">
+              <div class="lbl-wrap">
+                <b>Aktifkan System Peeks Overlay</b>
+                <small>Tampilkan animasi pop-up otomatis di Notch saat status sistem berubah</small>
+              </div>
+              <label class="switch"><input type="checkbox" id="peekChk" checked><span class="slider"></span></label>
+            </div>
+            <div class="row">
+              <div class="lbl-wrap">
+                <b>Durasi Tampil Pop-up Peek</b>
+                <small>Berapa lama notifikasi System Peek muncul sebelum menutup kembali</small>
+              </div>
+              <select id="peekDurSelect">
+                <option value="1600">Singkat (1.6 dtk)</option>
+                <option value="2400">Normal (2.4 dtk)</option>
+                <option value="3800">Lama (3.8 dtk)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="sec-title">Filter Kategori System Peeks</div>
+          <div class="tahoe-tiles-grid">
+            <div class="tahoe-pill-tile on" id="tilePeekVol" onclick="togglePeekTile('vol')">
+              <div class="tile-left">
+                <span class="tile-orb">
+                  <svg viewBox="0 0 24 24"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+                </span>
+                <div class="tile-info">
+                  <b>Master Volume</b>
+                  <small>Audio Pop-up</small>
+                </div>
+              </div>
+            </div>
+
+            <div class="tahoe-pill-tile on" id="tilePeekBr" onclick="togglePeekTile('br')">
+              <div class="tile-left">
+                <span class="tile-orb">
+                  <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+                </span>
+                <div class="tile-info">
+                  <b>Brightness</b>
+                  <small>Display Backlight</small>
+                </div>
+              </div>
+            </div>
+
+            <div class="tahoe-pill-tile on" id="tilePeekMic" onclick="togglePeekTile('mic')">
+              <div class="tile-left">
+                <span class="tile-orb">
+                  <svg viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8"/></svg>
+                </span>
+                <div class="tile-info">
+                  <b>Microphone Mute</b>
+                  <small>Mic Status</small>
+                </div>
+              </div>
+            </div>
+
+            <div class="tahoe-pill-tile on" id="tilePeekBat" onclick="togglePeekTile('bat')">
+              <div class="tile-left">
+                <span class="tile-orb">
+                  <svg viewBox="0 0 24 24"><path d="M13 2L3 14h7l-1 8 10-12h-7z"/></svg>
+                </span>
+                <div class="tile-info">
+                  <b>Charger & Baterai</b>
+                  <small>Power State</small>
+                </div>
+              </div>
+            </div>
+
+            <div class="tahoe-pill-tile on" id="tilePeekBt" onclick="togglePeekTile('bt')">
+              <div class="tile-left">
+                <span class="tile-orb">
+                  <svg viewBox="0 0 24 24"><path d="m6.5 6.5 11 11L12 23V1l5.5 5.5-11 11"/></svg>
+                </span>
+                <div class="tile-info">
+                  <b>Bluetooth</b>
+                  <small>Device Link</small>
+                </div>
+              </div>
+            </div>
+
+            <div class="tahoe-pill-tile on" id="tilePeekCaps" onclick="togglePeekTile('caps')">
+              <div class="tile-left">
+                <span class="tile-orb">
+                  <svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M6 9h.01M10 9h.01M14 9h.01M18 9h.01M8 15h8"/></svg>
+                </span>
+                <div class="tile-info">
+                  <b>Caps Lock</b>
+                  <small>Keyboard Indicator</small>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
+
+        <!-- TAB 4: PRODUCTIVITY -->
+        <div class="tab-pane" id="tab-tasks">
+          <div class="sec-title">
+            <span>Pomodoro Timer</span>
+            <div class="preset-chips" id="pomoChips">
+              <button class="chip" onclick="setPomoPreset(15)">15m</button>
+              <button class="chip active" onclick="setPomoPreset(25)">25m</button>
+              <button class="chip" onclick="setPomoPreset(45)">45m</button>
+              <button class="chip" onclick="setPomoPreset(60)">60m</button>
+            </div>
+          </div>
+          <div class="card">
+            <div class="row">
+              <div class="lbl-wrap">
+                <b>Durasi Fokus & Short Break (Menit)</b>
+                <small>Waktu sesi fokus utama & jeda istirahat</small>
+              </div>
+              <div style="display:flex;gap:6px">
+                <input type="number" id="pomoMin" value="25" min="1" max="180" title="Durasi Fokus (Menit)">
+                <input type="number" id="pomoBreakMin" value="5" min="1" max="60" title="Short Break (Menit)">
+              </div>
+            </div>
+            <div class="row">
+              <div class="lbl-wrap">
+                <b>Mulai Istirahat Otomatis (Auto-Break)</b>
+                <small>Otomatis mulai hitung mundur Short Break setelah sesi fokus selesai</small>
+              </div>
+              <label class="switch"><input type="checkbox" id="pomoAutoBreakChk"><span class="slider"></span></label>
+            </div>
+            <div class="row">
+              <div class="lbl-wrap">
+                <b>Suara Chime Pomodoro</b>
+                <small>Bunyikan chime saat waktu fokus selesai</small>
+              </div>
+              <label class="switch"><input type="checkbox" id="soundChk" checked><span class="slider"></span></label>
+            </div>
+          </div>
+
+          <div class="sec-title">Water Tracker & Chime (Auto-Reset Harian)</div>
+          <div class="card">
+            <div class="row">
+              <div class="lbl-wrap">
+                <b>Target Harian & Ukuran Gelas (ml)</b>
+                <small>Otomatis reset ke 0 ml setiap pergantian hari</small>
+              </div>
+              <div style="display:flex;gap:6px">
+                <input type="number" id="waterGoal" value="1500" step="100" title="Target Harian (ml)">
+                <input type="number" id="waterCup" value="250" step="50" title="Takaran Sekali Minum (ml)">
+              </div>
+            </div>
+            <div class="row">
+              <div class="lbl-wrap">
+                <b>Aktifkan Pengingat Minum Berkala</b>
+                <small>Tampilkan pop-up notifikasi minum di Notch sesuai interval</small>
+              </div>
+              <label class="switch"><input type="checkbox" id="waterRemindEnableChk" checked><span class="slider"></span></label>
+            </div>
+            <div class="row">
+              <div class="lbl-wrap">
+                <b>Interval Pengingat Minum (Menit)</b>
+                <small>Jeda waktu antar pop-up pengingat minum</small>
+              </div>
+              <input type="number" id="waterInterval" value="45" min="1" step="15">
+            </div>
+            <div class="row">
+              <div class="lbl-wrap">
+                <b>Suara Chime Tap Pertakaran (+ Drink)</b>
+                <small>Bunyikan chime saat menekan tombol tambah minum</small>
+              </div>
+              <label class="switch"><input type="checkbox" id="waterTapSoundChk" checked><span class="slider"></span></label>
+            </div>
+            <div class="row">
+              <div class="lbl-wrap">
+                <b>Suara Chime Notifikasi Pengingat Minum</b>
+                <small>Bunyikan chime saat pop-up pengingat minum berkala muncul</small>
+              </div>
+              <label class="switch"><input type="checkbox" id="waterRemSoundChk" checked><span class="slider"></span></label>
+            </div>
+          </div>
+
+          <div class="sec-title">Kelola Daftar Tugas (To-Do List)</div>
+          <div class="card" style="padding-bottom:10px">
+            <div class="row">
+              <div class="lbl-wrap">
+                <b>Gaya Tampilan To-Do List di Notch</b>
+                <small>Jika > 2 tugas, gulir ke samping (Horizontal) atau atas-bawah</small>
+              </div>
+              <div class="seg-pill-bar" id="todoSegBar" data-target="todoStyle">
+                <div class="seg-pill-thumb" id="todoSegLens"></div>
+                <button type="button" class="seg-pill-btn active" data-val="horizontal">Horizontal</button>
+                <button type="button" class="seg-pill-btn" data-val="vertical">Vertical</button>
+              </div>
+            </div>
+            <div class="todo-bar">
+              <input type="text" id="newTodoInput" placeholder="Ketik tugas baru untuk ditampilkan di Notch...">
+              <button class="btn" onclick="addTodo()">
+                <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+                <span>Tambah</span>
+              </button>
+            </div>
+            <div class="todo-items" id="ctrlTodoList"></div>
+          </div>
+        </div>
+
+        <!-- TAB 5: ABOUT PAGE -->
+        <div class="tab-pane" id="tab-about">
+          <div class="card" style="padding:12px 16px">
+            <div class="about-hero">
+              <div class="about-logo">
+                <img class="js-app-logo" alt="MangNotch">
+              </div>
+              <div class="about-title">
+                <h2>MangNotch <span id="aboutVerTxt" style="font-size:12px;color:var(--c1);font-weight:600">v2.0.0</span></h2>
+                <p>Interactive Living Notch & Productivity Companion dengan sentuhan estetika editorial MangNime.</p>
+                <div class="tag-list">
+                  <span class="tag">Rust Backend</span>
+                  <span class="tag">Tauri v2</span>
+                  <span class="tag">Liquid Glass UI</span>
+                  <span class="tag">Open Source</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="feat-grid">
+              <div class="feat-box">
+                <b>Media, Volume & Live Lyrics</b>
+                <span>Integrasi Windows GSMTC, kontrol master volume real-time, warna album, dan lirik.</span>
+              </div>
+              <div class="feat-box">
+                <b>Native File Shelf</b>
+                <span>Simpan file sementara via Drag-in dari Explorer & Drag-out langsung ke WhatsApp/Discord.</span>
+              </div>
+              <div class="feat-box">
+                <b>Focus, Hydration & Tasks</b>
+                <span>Timer Pomodoro kustom, pencatat hidrasi auto-reset harian, & To-Do List dual style.</span>
+              </div>
+              <div class="feat-box">
+                <b>System Peeks & Proximity</b>
+                <span>Pop-up interaktif Volume, Brightness, Bluetooth, Caps Lock, Charger & auto-shrink.</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="sec-title">Pengembang & Data Lokal</div>
+          <div class="card">
+            <div class="row">
+              <div class="lbl-wrap">
+                <b>Developed by vestiapani</b>
+                <small>Kunjungi halaman resmi MangNotch & repositori kode sumber</small>
+              </div>
+              <div style="display:flex;gap:6px">
+                <button class="lg-btn lg-control" onclick="openUrl('https://mangnotch.vercel.app/')">
+                  <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                  <span>Landing Page</span>
+                </button>
+                <button class="btn" onclick="openUrl('https://github.com/MANG-CODER/MangNotch')">
+                  <svg viewBox="0 0 24 24"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/></svg>
+                  <span>GitHub Repo</span>
+                </button>
+              </div>
+            </div>
+            <div class="row">
+              <div class="lbl-wrap">
+                <b>Data & Konfigurasi Lokal</b>
+                <small>Tersimpan otomatis di %AppData%\MangNotch\config.json</small>
+              </div>
+              <div style="display:flex;gap:6px">
+                <button class="lg-btn lg-control" onclick="openConfigDir()">
+                  <svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                  <span>Buka Folder Data</span>
+                </button>
+                <button class="lg-btn lg-control" onclick="resetDefaultConfig()" style="color:var(--danger)">
+                  <span>Reset Default</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
       </div>
-    </div>
+    </main>
   </div>
 
   <div class="toast" id="toast">Tersimpan ✓</div>
+
   <script>
     const { invoke } = window.__TAURI__.core;
     const { listen } = window.__TAURI__.event;
 
     const languageSelect = document.getElementById("languageSelect");
     const interactionSelect = document.getElementById("interactionSelect");
+    const closeSpeedSelect = document.getElementById("closeSpeedSelect");
+    const hotkeyChk = document.getElementById("hotkeyChk");
     const todoStyleSelect = document.getElementById("todoStyleSelect");
     const startWinChk = document.getElementById("startWinChk");
     const primaryChk = document.getElementById("primaryChk");
     const monSelect = document.getElementById("monSelect");
     const fsChk = document.getElementById("fsChk");
     const proxChk = document.getElementById("proxChk");
+    const albumGlowChk = document.getElementById("albumGlowChk");
+    const mmLyrOpenChk = document.getElementById("mmLyrOpenChk");
+    const mmFill = document.getElementById("mmFill");
+    const mmBlur = document.getElementById("mmBlur");
+    const mmRim = document.getElementById("mmRim");
+    const mmGlassReset = document.getElementById("mmGlassReset");
+    const audioVisChk = document.getElementById("audioVisChk");
+    const ambientVolRange = document.getElementById("ambientVolRange");
+    const ambientVolLabel = document.getElementById("ambientVolLabel");
     const peekChk = document.getElementById("peekChk");
+    const peekDurSelect = document.getElementById("peekDurSelect");
+    const pomoAutoBreakChk = document.getElementById("pomoAutoBreakChk");
     const soundChk = document.getElementById("soundChk");
     const waterRemindEnableChk = document.getElementById("waterRemindEnableChk");
     const waterTapSoundChk = document.getElementById("waterTapSoundChk");
@@ -1000,69 +1505,349 @@
     const pomoMin = document.getElementById("pomoMin");
     const pomoBreakMin = document.getElementById("pomoBreakMin");
     const newTodoInput = document.getElementById("newTodoInput");
+    const settingsSearch = document.getElementById("settingsSearch");
+    const navLensPill = document.getElementById("navLensPill");
+    const tahoeNav = document.getElementById("tahoeNav");
 
+    const peekFlags = { vol: true, br: true, mic: true, bat: true, bt: true, caps: true };
     let currentCfg = null;
-    const THEME_COLORS = { dusk:["#FFB7C5","#E2D1F9","#A2E4F5"], cyber:["#19b8ff","#2d5bff","#7b4bff"], racing:["#ff1e42","#ff8800","#1e3cff"], emerald:["#10b981","#059669","#34d399"], sunset:["#ff6b6b","#feca57","#ff9ff3"], sakura:  ["#ff8fab","#ffc2d1","#b8f2e6"],
+    let rawMonitors = [];
+    const THEME_COLORS = {
+      dusk:    ["#FFB7C5","#E2D1F9","#A2E4F5"],
+      cyber:   ["#19b8ff","#2d5bff","#7b4bff"],
+      racing:  ["#ff1e42","#ff8800","#1e3cff"],
+      emerald: ["#10b981","#059669","#34d399"],
+      sunset:  ["#ff6b6b","#feca57","#ff9ff3"],
+      sakura:  ["#ff8fab","#ffc2d1","#b8f2e6"],
       grape:   ["#c084fc","#818cf8","#f0abfc"],
       mint:    ["#6ee7b7","#67e8f9","#bef264"],
-      amber:   ["#fbbf24","#fb923c","#fde68a"] 
+      amber:   ["#fbbf24","#fb923c","#fde68a"]
     };
+
     let toastTimer = null;
     function showToast() {
       const t = document.getElementById("toast");
-      t.classList.add("show"); clearTimeout(toastTimer);
+      t.textContent = appLanguage === "en" ? "Saved ✓" : "Tersimpan ✓";
+      t.classList.add("show");
+      clearTimeout(toastTimer);
       toastTimer = setTimeout(() => t.classList.remove("show"), 1100);
     }
+
+    function applyGlassVars(fill, blur, rim) {
+      const r = document.documentElement;
+      r.style.setProperty("--mm-fill", fill);
+      r.style.setProperty("--mm-blur", blur + "px");
+      r.style.setProperty("--mm-rim", rim);
+    }
+
     function updateNotchPreview(cfg) {
       const [c1, c2, c3] = THEME_COLORS[cfg.theme_preset] || THEME_COLORS.dusk;
       const rs = document.documentElement.style;
-      rs.setProperty("--c1", c1); rs.setProperty("--c2", c2); rs.setProperty("--c3", c3);
+      rs.setProperty("--c1", c1);
+      rs.setProperty("--c2", c2);
+      rs.setProperty("--c3", c3);
+      rs.setProperty("--pink", c1);
+      rs.setProperty("--lavender", c2);
+      rs.setProperty("--cyan", c3);
       document.getElementById("npGlow").style.background = `linear-gradient(90deg, ${c1}, ${c2} 55%, ${c3})`;
       const active = document.querySelector(`#mascotCards .m-card[data-m="${cfg.mascot_style}"] .m-preview`);
       document.getElementById("npMascot").innerHTML = active ? active.innerHTML : "";
     }
-    let APP_VERSION = "1.3.0";
+
+    function setupMagnifyingSegmentedBar(barId, lensId, selectEl, valLeft, valRight) {
+      const bar = document.getElementById(barId);
+      const lens = document.getElementById(lensId);
+      if (!bar || !lens) return;
+
+      let dragging = false;
+      let startX = 0;
+      let startIdx = 0;
+
+      const updateVisual = (val) => {
+        const isRight = val === valRight;
+        lens.style.transform = `translateX(${isRight ? '100%' : '0%'})`;
+        bar.querySelectorAll(".seg-pill-btn").forEach(b => {
+          b.classList.toggle("active", b.dataset.val === val);
+        });
+      };
+
+      bar.addEventListener("pointerdown", (e) => {
+        dragging = true;
+        bar.setPointerCapture(e.pointerId);
+        bar.classList.add("magnifying");
+        startX = e.clientX;
+        startIdx = selectEl.value === valRight ? 1 : 0;
+      });
+
+      bar.addEventListener("pointermove", (e) => {
+        if (!dragging) return;
+        const deltaX = e.clientX - startX;
+        if (Math.abs(deltaX) > 3) bar.classList.add("dragging");
+        const slotW = (bar.clientWidth - 4) / 2;
+        const basePx = startIdx * slotW;
+        let nextPx = basePx + deltaX;
+        if (nextPx < 0) nextPx *= 0.22;
+        if (nextPx > slotW) nextPx = slotW + (nextPx - slotW) * 0.22;
+        const pct = (nextPx / slotW) * 100;
+        lens.style.transform = `translateX(${pct.toFixed(1)}%)`;
+
+        const hoverVal = nextPx > slotW * 0.5 ? valRight : valLeft;
+        bar.querySelectorAll(".seg-pill-btn").forEach(b => {
+          b.classList.toggle("active", b.dataset.val === hoverVal);
+        });
+      });
+
+      const finishPointer = (e) => {
+        if (!dragging) return;
+        dragging = false;
+        bar.classList.remove("magnifying", "dragging");
+        const rect = bar.getBoundingClientRect();
+        const relX = e.clientX - rect.left;
+        const chosenVal = relX > rect.width / 2 ? valRight : valLeft;
+        selectEl.value = chosenVal;
+        updateVisual(chosenVal);
+        saveAll();
+      };
+
+      bar.addEventListener("pointerup", finishPointer);
+      bar.addEventListener("pointercancel", finishPointer);
+      bar._sync = () => updateVisual(selectEl.value);
+    }
+
+    setupMagnifyingSegmentedBar("interSegBar", "interSegLens", interactionSelect, "hover", "click");
+    setupMagnifyingSegmentedBar("todoSegBar", "todoSegLens", todoStyleSelect, "horizontal", "vertical");
+
+    function syncSegmentedPills() {
+      const iBar = document.getElementById("interSegBar");
+      const tBar = document.getElementById("todoSegBar");
+      if (iBar && iBar._sync) iBar._sync();
+      if (tBar && tBar._sync) tBar._sync();
+    }
+
+    /* Slider kaca kustom (dipakai Rain Volume + 3 slider tampilan glass). Input native tetap jadi sumber nilai. */
+    function makeLgSlider(wrap, input, opts) {
+      const fill = wrap.querySelector(".lg-slider-fill");
+      const thumb = wrap.querySelector(".lg-slider-thumb");
+      const label = opts.label || null, fmt = opts.fmt || (v => String(v));
+      const thumbW = 32;
+      const min = Number(input.min) || 0, max = Number(input.max) || 100, step = Number(input.step) || 1;
+      const dec = (String(step).split(".")[1] || "").length;
+      let dragging = false, activePointer = null;
+
+      function render() {
+        let v = parseFloat(input.value); if (isNaN(v)) v = min;
+        v = Math.max(min, Math.min(max, v));
+        const pct = (v - min) / (max - min);
+        const trackW = wrap.clientWidth || 156;
+        const maxLeft = Math.max(0, trackW - thumbW);
+        thumb.style.left = "0";
+        thumb.style.transform = "none";
+        /* property `translate` (bukan transform) supaya tidak ikut ter-scale saat ditahan => thumb tetap tepat di tengah garis */
+        thumb.style.translate = `${pct * maxLeft}px -50%`;
+        fill.style.width = `${pct * trackW}px`;
+        wrap.style.setProperty("--slider-value", `${pct * 100}%`);
+        if (label) label.textContent = fmt(v);
+      }
+      function setFromClientX(clientX) {
+        const rect = wrap.getBoundingClientRect();
+        const usableW = Math.max(1, rect.width - thumbW);
+        const pct = Math.max(0, Math.min(1, (clientX - rect.left - thumbW / 2) / usableW));
+        let v = min + pct * (max - min);
+        v = Math.round(v / step) * step;
+        v = Math.min(max, Math.max(min, +v.toFixed(dec)));
+        if (parseFloat(input.value) !== v) {
+          input.value = v;
+          input.dispatchEvent(new Event("input", { bubbles: true }));
+        }
+        render();
+      }
+      wrap.addEventListener("pointerdown", (e) => {
+        if (e.button !== 0) return;
+        dragging = true; activePointer = e.pointerId;
+        wrap.setPointerCapture(e.pointerId);
+        wrap.classList.add("dragging");
+        setFromClientX(e.clientX);
+      });
+      wrap.addEventListener("pointermove", (e) => {
+        if (!dragging || e.pointerId !== activePointer) return;
+        setFromClientX(e.clientX);
+      });
+      function endDrag(e) {
+        if (!dragging) return;
+        if (e && activePointer !== null && e.pointerId !== activePointer) return;
+        dragging = false; activePointer = null;
+        wrap.classList.remove("dragging");
+        if (opts.onEnd) opts.onEnd();
+      }
+      wrap.addEventListener("pointerup", endDrag);
+      wrap.addEventListener("pointercancel", endDrag);
+      wrap.addEventListener("lostpointercapture", endDrag);
+      wrap._render = render;
+      render();
+      return wrap;
+    }
+    const lgSliders = [];
+    (function initLgSliders() {
+      const byId = (id) => document.getElementById(id);
+      const fireChange = (inp) => () => inp.dispatchEvent(new Event("change", { bubbles: true }));
+      lgSliders.push(makeLgSlider(byId("ambientOpticalSlider"), ambientVolRange, { label: ambientVolLabel, fmt: v => Math.round(v) + "%", onEnd: () => saveAll() }));
+      if (mmFill) lgSliders.push(makeLgSlider(byId("mmFillSlider"), mmFill, { label: byId("mmFillVal"), fmt: v => v.toFixed(1) + "%", onEnd: fireChange(mmFill) }));
+      if (mmBlur) lgSliders.push(makeLgSlider(byId("mmBlurSlider"), mmBlur, { label: byId("mmBlurVal"), fmt: v => Math.round(v) + "px", onEnd: fireChange(mmBlur) }));
+      if (mmRim)  lgSliders.push(makeLgSlider(byId("mmRimSlider"), mmRim, { label: byId("mmRimVal"), fmt: v => v.toFixed(1) + "%", onEnd: fireChange(mmRim) }));
+    })();
+    const renderLgSliders = () => lgSliders.forEach(w => w && w._render && w._render());
+
+    function togglePeekTile(key) {
+      peekFlags[key] = !peekFlags[key];
+      syncPeekTilesUI();
+      saveAll();
+    }
+
+    function syncPeekTilesUI() {
+      const map = {
+        vol: "tilePeekVol", br: "tilePeekBr", mic: "tilePeekMic",
+        bat: "tilePeekBat", bt: "tilePeekBt", caps: "tilePeekCaps"
+      };
+      Object.entries(map).forEach(([k, id]) => {
+        const el = document.getElementById(id);
+        if (el) el.classList.toggle("on", !!peekFlags[k]);
+      });
+    }
+
+    let APP_VERSION = "2.0.0";
     const VERSION_MANIFEST_URL = "https://raw.githubusercontent.com/MANG-CODER/MangNotch/main/version.json";
     const customSelectRegistry = new Map();
     const esc = (s) => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
+    const ID_TO_EN = {
+      "Tutup": "Close",
+      "Buka Folder Data": "Open Data Folder",
+      "Search Controls": "Search Controls",
+      "General & Layar": "General & Display",
+      "Maskot & Tema": "Mascot & Theme",
+      "Audio & Peeks": "Audio & Peeks",
+      "Produktivitas": "Productivity",
+      "Tentang": "About",
+      "Bersihkan Shelf": "Clear Shelf",
+      "Kosongkan semua item di File Shelf": "Clear all items in File Shelf",
+      "Kustomisasi perilaku layar, karakter maskot, dan warna cahaya kaca secara langsung.": "Customize screen behavior, mascot character, and glass glow colors in real-time.",
+      "Pembaruan Tersedia!": "Update Available!",
+      "Versi terbaru siap diunduh.": "A new version is ready to download.",
+      "Update Sekarang": "Update Now",
+      "Pembaruan Wajib Diperlukan": "Required Update",
+      "Versi MangNotch yang kamu gunakan sudah tidak didukung karena perbaikan penting. Silakan perbarui ke versi terbaru.": "Your version of MangNotch is no longer supported due to critical fixes. Please update to the latest version.",
+      "Perbarui MangNotch Sekarang": "Update MangNotch Now",
+      "Perilaku Layar & Interaksi": "Display & Interaction",
+      "Bahasa Aplikasi": "App Language",
+      "Pilih bahasa antarmuka MangNotch, Lirik & menu System Tray": "Choose the MangNotch UI, Lyrics & System Tray language",
+      "Bahasa Indonesia (ID)": "Indonesian (ID)",
+      "English (US)": "English (US)",
+      "Gaya Interaksi Membuka Notch": "Notch Interaction Mode",
+      "Pilih melebar otomatis saat disentuh kursor atau harus diklik dulu": "Expand automatically on hover or require a click first",
+      "Kecepatan Auto-Close Notch": "Notch Auto-Close Speed",
+      "Jeda waktu sebelum Notch menutup saat kursor menjauh": "Delay before the notch collapses after cursor leaves",
+      "Cepat (Responsif)": "Fast (Responsive)",
+      "Normal (Default)": "Normal (Default)",
+      "Santai (Lebih Lama)": "Relaxed (Slower)",
+      "Pintasan Keyboard Global (Alt + N)": "Global Keyboard Shortcut (Alt + N)",
+      "Buka atau tutup Notch dari aplikasi mana saja dengan menekan Alt + N": "Toggle the notch from anywhere by pressing Alt + N",
+      "Jalankan MangNotch otomatis di background saat komputer menyala": "Start MangNotch automatically in the background when Windows starts",
+      "Monitor & Deteksi Jendela": "Monitor & Window Detection",
+      "Selalu di Primary Monitor": "Always Use Primary Monitor",
+      "Ikuti layar utama Windows secara otomatis": "Automatically follow the primary Windows display",
+      "Pilih Monitor Manual": "Choose Monitor Manually",
+      "Pindahkan Notch ke layar eksternal tertentu": "Move the notch to a specific external display",
+      "Auto-Hide Total saat Fullscreen": "Auto-Hide in Fullscreen",
+      "Sembunyikan Notch 100% saat bermain game atau video layar penuh": "Completely hide the notch during games or fullscreen videos",
+      "Otomatis mengecil ke garis minimalis saat tertutup tab browser/jendela": "Automatically shrink to a minimal line when covered by a window or browser tab",
+      "Pratinjau & Karakter Maskot": "Preview & Mascot Character",
+      "Blob Imut": "Cute Blob",
+      "Tampilan Notch Saat Idle": "Idle Notch Appearance",
+      "Transparansi Tombol & Komponen": "Button & Component Transparency", "Makin kecil makin bening (berlaku di notch dan control)": "Lower is clearer (applies to notch and control)", "Garis Tepi Tombol": "Button Edge", "Terang garis tipis di tepi kaca": "Brightness of the thin glass edge", "Blur Tombol & Komponen": "Button & Component Blur", "0 = tanpa blur": "0 = no blur", "Reset Tampilan Glass": "Reset Glass Appearance", "Kembali ke nilai bawaan": "Back to defaults", "Notch Tetap Terbuka Saat Lirik": "Keep Notch Open in Lyrics Mode", "Lirik tampil penuh terus tanpa perlu hover; matikan untuk mode minimalis 1 baris": "Lyrics stay fully shown without hovering; turn off for the minimal 1-line mode", "Saat mode Lirik aktif, otomatis menampilkan 1 baris lirik": "When lyrics mode is active, automatically show 1 line of lyrics",
+      "Jam & Equalizer": "Clock & Equalizer",
+      "Minimalis (Garis Tipis)": "Minimal (Thin Line)",
+      "Warna Dinamis Sampul Album": "Dynamic Album Art Glow",
+      "Sesuaikan cahaya latar Musik & Lirik dengan warna sampul lagu yang diputar": "Match Music & Lyrics ambient glow with the playing song's album art",
+      "Palet Warna Cahaya Notch & Control Center": "Notch & Control Center Color Palette",
+      "Mengubah warna cahaya Notch sekaligus aksen Liquid Glass Control Center": "Updates both the Notch glow and this Liquid Glass accent theme",
+      "Visualisasi Audio & Musik": "Audio & Music Visualization",
+      "Gerakkan equalizer dan maskot mengikuti dentuman suara asli Windows": "Animate equalizer bars and mascot to real-time Windows audio peaks",
+      "Volume Suara Hujan (Rain Ambient)": "Rain Ambient Sound Volume",
+      "Tingkat kekerasan suara hujan saat mode fokus Pomodoro dinyalakan": "Volume level of the rain ambient sound in Pomodoro focus mode",
+      "Aktifkan System Peeks Overlay": "Enable System Peeks Overlay",
+      "Tampilkan animasi pop-up otomatis di Notch saat status sistem berubah": "Show animated pop-ups on the notch when system states change",
+      "Durasi Tampil Pop-up Peek": "Peek Pop-up Duration",
+      "Berapa lama notifikasi System Peek muncul sebelum menutup kembali": "How long System Peek notifications stay visible",
+      "Singkat (1.6 dtk)": "Short (1.6s)",
+      "Normal (2.4 dtk)": "Normal (2.4s)",
+      "Lama (3.8 dtk)": "Long (3.8s)",
+      "Filter Kategori System Peeks": "System Peeks Category Filter",
+      "Charger & Baterai": "Charger & Battery",
+      "Durasi Fokus & Short Break (Menit)": "Focus & Short Break Duration (Minutes)",
+      "Waktu sesi fokus utama & jeda istirahat": "Main focus session and short break duration",
+      "Durasi Fokus (Menit)": "Focus Duration (Minutes)",
+      "Short Break (Menit)": "Short Break (Minutes)",
+      "Mulai Istirahat Otomatis (Auto-Break)": "Auto-Start Short Break",
+      "Otomatis mulai hitung mundur Short Break setelah sesi fokus selesai": "Automatically start the Short Break timer when a focus session ends",
+      "Suara Chime Pomodoro": "Pomodoro Chime Sound",
+      "Bunyikan chime saat waktu fokus selesai": "Play a chime when a focus session finishes",
+      "Water Tracker & Chime (Auto-Reset Harian)": "Water Tracker & Chime (Daily Auto-Reset)",
+      "Target Harian & Ukuran Gelas (ml)": "Daily Goal & Cup Size (ml)",
+      "Otomatis reset ke 0 ml setiap pergantian hari": "Automatically reset to 0 ml at the start of each day",
+      "Target Harian (ml)": "Daily Goal (ml)",
+      "Takaran Sekali Minum (ml)": "Cup Size (ml)",
+      "Aktifkan Pengingat Minum Berkala": "Enable Periodic Water Reminders",
+      "Tampilkan pop-up notifikasi minum di Notch sesuai interval": "Show water reminder pop-ups on the notch at the chosen interval",
+      "Interval Pengingat Minum (Menit)": "Water Reminder Interval (Minutes)",
+      "Jeda waktu antar pop-up pengingat minum": "Time between water reminder pop-ups",
+      "Suara Chime Tap Pertakaran (+ Drink)": "Water Tap Chime Sound (+ Drink)",
+      "Bunyikan chime saat menekan tombol tambah minum": "Play a chime when pressing the add water button",
+      "Suara Chime Notifikasi Pengingat Minum": "Water Reminder Notification Chime",
+      "Bunyikan chime saat pop-up pengingat minum berkala muncul": "Play a chime when a periodic water reminder appears",
+      "Kelola Daftar Tugas (To-Do List)": "Manage To-Do List",
+      "Gaya Tampilan To-Do List di Notch": "To-Do List Layout on the Notch",
+      "Jika > 2 tugas, gulir ke samping (Horizontal) atau atas-bawah": "When there are more than 2 tasks, scroll horizontally or vertically",
+      "Ketik tugas baru untuk ditampilkan di Notch...": "Enter a new task to display on the Notch...",
+      "Tambah": "Add",
+      "Belum ada tugas hari ini.": "No tasks for today yet.",
+      "Hapus Tugas": "Delete Task",
+      "Interactive Living Notch & Productivity Companion dengan sentuhan estetika editorial MangNime.": "Interactive Living Notch & Productivity Companion with a MangNime editorial aesthetic.",
+      "Integrasi Windows GSMTC, kontrol master volume real-time, warna album, dan lirik.": "Windows GSMTC integration, real-time master volume control, album colors, and live lyrics.",
+      "Simpan file sementara via Drag-in dari Explorer & Drag-out langsung ke WhatsApp/Discord.": "Store temporary files by dragging in from Explorer & dragging out directly to WhatsApp/Discord.",
+      "Timer Pomodoro kustom, pencatat hidrasi auto-reset harian, & To-Do List dual style.": "Custom Pomodoro timer, daily auto-reset hydration tracker, & dual-style To-Do List.",
+      "Pop-up interaktif Volume, Brightness, Bluetooth, Caps Lock, Charger & auto-shrink.": "Interactive pop-ups for Volume, Brightness, Bluetooth, Caps Lock, Charger & auto-shrink.",
+      "Pengembang & Data Lokal": "Developer & Local Data",
+      "Kunjungi halaman resmi MangNotch & repositori kode sumber": "Visit the official MangNotch website & source code repository",
+      "Data & Konfigurasi Lokal": "Local Data & Configuration",
+      "Tersimpan otomatis di %AppData%\\MangNotch\\config.json": "Automatically saved in %AppData%\\MangNotch\\config.json",
+      "Reset Default": "Reset Defaults",
+      "Tersimpan ✓": "Saved ✓"
+    };
 
-    const ID_TO_EN = {"Tutup": "Close", "Pembaruan Tersedia!": "Update Available!", "Versi terbaru siap diunduh.": "A new version is ready to download.", "Update Sekarang": "Update Now", "Pembaruan Wajib Diperlukan": "Required Update", "Versi MangNotch yang kamu gunakan sudah tidak didukung karena perbaikan penting. Silakan perbarui ke versi terbaru.": "Your version of MangNotch is no longer supported due to important fixes. Please update to the latest version.", "Perbarui MangNotch Sekarang": "Update MangNotch Now", "Produktivitas": "Productivity", "TAB 1: DISPLAY & SYSTEM": "TAB 1: DISPLAY & SYSTEM", "Perilaku Layar & Interaksi": "Display & Interaction", "Gaya Interaksi Membuka Notch": "Notch Interaction Mode", "Pilih melebar otomatis saat disentuh kursor atau harus diklik dulu": "Choose whether the notch expands on hover or only after clicking", "Hover Biasa (Default)": "Standard Hover (Default)", "Klik Dulu Baru Melebar": "Click to Expand", "Jalankan MangNotch otomatis di background saat komputer menyala": "Start MangNotch automatically in the background when Windows starts", "Monitor & Tampilan": "Monitor & Display", "Selalu di Primary Monitor": "Use Primary Monitor", "Ikuti layar utama Windows secara otomatis": "Automatically follow the primary Windows display", "Pilih Monitor Manual": "Choose Monitor Manually", "Pindahkan Notch ke layar eksternal tertentu": "Move the notch to a specific external display", "Auto-Hide Total saat Fullscreen": "Auto-hide in Fullscreen", "Sembunyikan Notch 100% saat bermain game atau video F11": "Completely hide the notch during games or fullscreen videos", "Otomatis mengecil ke garis minimalis saat tertutup tab browser/jendela": "Automatically shrink to a minimal line when covered by a browser tab or window", "Pop-up animasi Volume, Brightness, Bluetooth, Caps Lock & Charger": "Animated pop-ups for volume, brightness, Bluetooth, Caps Lock, and charging", "TAB 2: MASCOT & THEME": "TAB 2: MASCOT & THEME", "Pilih Karakter Maskot MangNotch": "Choose Your MangNotch Mascot", "Blob Imut": "Cute Blob", "Spirit Orbs": "Spirit Orbs", "Tampilan Notch Saat Idle": "Idle Notch Appearance", "Saat mode Lirik aktif, otomatis menampilkan 1 baris lirik": "When lyrics mode is active, automatically show one line of lyrics", "Jam & Equalizer": "Clock & Equalizer", "Minimalis (Garis Tipis)": "Minimal (Thin Line)", "Palet Warna Cahaya Notch": "Notch Glow Color Palette", "Termasuk palet MangNime Dark Dusk (Pink - Lavender - Ice Cyan)": "Includes the MangNime Dark Dusk palette (Pink - Lavender - Ice Cyan)", "TAB 3: POMODORO, WATER & TASKS": "TAB 3: POMODORO, WATER & TASKS", "Durasi Fokus & Short Break (Menit)": "Focus & Short Break Duration (Minutes)", "Waktu sesi fokus utama & jeda istirahat": "Main focus session and break duration", "Suara Chime Pomodoro": "Pomodoro Chime Sound", "Bunyikan chime saat waktu fokus selesai": "Play a chime when a focus session ends", "Water Tracker & Chime (Auto-Reset Harian)": "Water Tracker & Chime (Daily Auto-Reset)", "Target Harian & Ukuran Gelas (ml)": "Daily Goal & Cup Size (ml)", "Otomatis reset ke 0 ml setiap pergantian hari": "Automatically reset to 0 ml at the start of each day", "Aktifkan Pengingat Minum Berkala": "Enable Periodic Water Reminders", "Tampilkan pop-up notifikasi minum di Notch sesuai interval": "Show water reminder pop-ups on the notch at the selected interval", "Interval Pengingat Minum (Menit)": "Water Reminder Interval (Minutes)", "Jeda waktu antar pop-up pengingat minum": "Time between water reminder pop-ups", "Suara Chime Tap Pertakaran (+ Drink)": "Water Tap Chime Sound (+ Drink)", "Bunyikan chime saat menekan tombol tambah minum": "Play a chime when adding water", "Suara Chime Notifikasi Pengingat Minum": "Water Reminder Chime Sound", "Bunyikan chime saat pop-up pengingat minum berkala muncul": "Play a chime when a periodic water reminder appears", "Kelola Daftar Tugas (To-Do List)": "Manage To-Do List", "Gaya Tampilan To-Do List di Notch": "To-Do List Layout on the Notch", "Jika > 2 tugas, gulir ke samping (Horizontal) atau atas-bawah": "When there are more than 2 tasks, scroll horizontally or vertically", "Geser ke Samping (Horizontal)": "Horizontal Scrolling", "List Atas-Bawah (Vertikal)": "Vertical List", "Tambah": "Add", "TAB 4: ABOUT PAGE": "TAB 4: ABOUT PAGE", "Interactive Living Notch & Productivity Companion dengan sentuhan estetika editorial": "Interactive Living Notch & Productivity Companion with an editorial aesthetic", "Integrasi Windows GSMTC, kontrol master volume real-time, warna album, dan lirik.": "Windows GSMTC integration, real-time master volume control, album colors, and lyrics.", "Simpan file sementara via Drag-in dari Explorer & Drag-out langsung ke WhatsApp/Discord.": "Temporarily store files by dragging them in from Explorer and dragging them directly into WhatsApp/Discord.", "Timer Pomodoro kustom, pencatat hidrasi auto-reset harian, & To-Do List dual style.": "Custom Pomodoro timer, daily auto-reset hydration tracker, and two To-Do List layouts.", "Pop-up interaktif Volume, Brightness, Bluetooth, Caps Lock, Charger & auto-shrink.": "Interactive pop-ups for volume, brightness, Bluetooth, Caps Lock, charging, and auto-shrink.", "Pengembang, Landing Page & Open Source": "Developer, Landing Page & Open Source", "Kunjungi halaman resmi MangNotch & repositori kode sumber": "Visit the official MangNotch page and source repository", "Data & Konfigurasi Lokal": "Local Data & Configuration", "Tersimpan otomatis di %AppData%\\MangNotch\\config.json": "Automatically saved to %AppData%\\MangNotch\\config.json", "Buka Folder Data": "Open Data Folder", "Tersimpan ✓": "Saved ✓", "Belum ada tugas hari ini.": "No tasks for today yet.", "Hapus Tugas": "Delete Task", "Bahasa Aplikasi": "App Language", "Pilih bahasa antarmuka MangNotch": "Choose the MangNotch interface language", "Bahasa Indonesia": "Indonesian", "English": "English", "Sistem": "System", "Maskot": "Mascot", "Tentang": "About", "Ketik tugas baru untuk ditampilkan di Notch...":
-  "Enter a new task to display on the Notch...",
-"Kelola Daftar Tugas (To-Do List)":
-  "Manage To-Do List",
-"Gaya Tampilan To-Do List di Notch":
-  "To-Do List Layout on the Notch",
-"Belum ada tugas hari ini.":
-  "No tasks for today yet.",
-"Hapus Tugas":
-  "Delete Task",
-"Tambah":
-  "Add",
-"Pelacak Air":
-  "Water Tracker",
-"Rak File":
-  "File Shelf",
-"Daftar Tugas":
-  "Todo List",};
     const EN_TO_ID = Object.fromEntries(Object.entries(ID_TO_EN).map(([id, en]) => [en, id]));
     let appLanguage = "id";
     const i18nOriginalText = new WeakMap();
     const i18nOriginalAttrs = new WeakMap();
+
     function translateValue(value, lang) {
       const dict = lang === "en" ? ID_TO_EN : EN_TO_ID;
       return Object.prototype.hasOwnProperty.call(dict, value) ? dict[value] : value;
     }
+
     function translateTextNode(node) {
       if (!node || !node.parentElement || node.parentElement.closest("script,style,noscript")) return;
       let original = i18nOriginalText.get(node);
-      if (original === undefined) { original = node.nodeValue; i18nOriginalText.set(node, original); }
+      if (original === undefined) {
+        original = node.nodeValue;
+        i18nOriginalText.set(node, original);
+      }
       const trimmed = original.trim();
       if (!trimmed) return;
       const translated = translateValue(trimmed, appLanguage);
       const nextValue = original.replace(trimmed, translated);
       if (node.nodeValue !== nextValue) node.nodeValue = nextValue;
     }
+
     function applyLanguage(lang) {
       appLanguage = lang === "en" ? "en" : "id";
       document.documentElement.lang = appLanguage;
@@ -1075,23 +1860,23 @@
           const original = attrs[attr];
           el.setAttribute(attr, translateValue(original, appLanguage));
         }
-        el.childNodes.forEach(child => { if (child.nodeType === Node.TEXT_NODE) translateTextNode(child); });
+        el.childNodes.forEach(child => {
+          if (child.nodeType === Node.TEXT_NODE) translateTextNode(child);
+        });
       });
+      renderMonitorOptions();
       if (typeof refreshAllCustomSelects === "function") refreshAllCustomSelects();
     }
-    const i18nObserver = new MutationObserver(records => {
-      for (const record of records) {
-        if (record.type === "characterData") translateTextNode(record.target);
-        record.addedNodes && record.addedNodes.forEach(node => {
-          if (node.nodeType === Node.TEXT_NODE) translateTextNode(node);
-          else if (node.nodeType === Node.ELEMENT_NODE && !node.closest("script,style,noscript")) {
-            node.querySelectorAll("*").forEach(el => el.childNodes.forEach(ch => { if (ch.nodeType === Node.TEXT_NODE) translateTextNode(ch); }));
-            node.childNodes.forEach(ch => { if (ch.nodeType === Node.TEXT_NODE) translateTextNode(ch); });
-          }
-        });
-      }
-    });
-    i18nObserver.observe(document.documentElement, {subtree:true, childList:true, characterData:true});
+
+    function renderMonitorOptions() {
+      if (!rawMonitors.length) return;
+      const prevVal = monSelect.value;
+      monSelect.innerHTML = rawMonitors.map(m => {
+        const label = appLanguage === "en" ? m.name : m.name.replace(" - Primary", " - Utama");
+        return `<option value="${m.index}">${esc(label)}</option>`;
+      }).join("");
+      if (prevVal !== undefined) monSelect.value = prevVal;
+    }
 
     function setupCustomSelect(selectEl) {
       selectEl.classList.add("native-hidden");
@@ -1110,14 +1895,14 @@
 
         wrap.classList.toggle("disabled", selectEl.disabled);
         wrap.innerHTML = `
-          <div class="csel-trigger">
-            <span class="csel-label">${selText}</span>
+          <div class="csel-trigger lg-control">
+            <span class="csel-label">${esc(selText)}</span>
             <svg class="csel-arrow" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>
           </div>
           <div class="csel-menu">
             ${opts.map(o => `
-              <div class="csel-opt ${o.value === selectEl.value ? 'selected' : ''}" data-val="${o.value}">
-                <span>${o.textContent}</span>
+              <div class="csel-opt ${o.value === selectEl.value ? 'selected' : ''}" data-val="${esc(o.value)}">
+                <span>${esc(o.textContent)}</span>
                 <svg class="csel-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>
               </div>
             `).join("")}
@@ -1130,7 +1915,13 @@
           if (selectEl.disabled) return;
           const isOpen = wrap.classList.contains("open");
           document.querySelectorAll(".csel-wrap.open").forEach(w => w.classList.remove("open"));
-          if (!isOpen) wrap.classList.add("open");
+          if (!isOpen) {
+            const sc = document.querySelector(".tahoe-content").getBoundingClientRect();
+            const r = wrap.getBoundingClientRect();
+            const menuH = Math.min(190, 8 + selectEl.options.length * 32);
+            wrap.classList.toggle("up", sc.bottom - r.bottom < menuH + 12 && r.top - sc.top > sc.bottom - r.bottom);
+            wrap.classList.add("open");
+          }
         };
 
         wrap.querySelectorAll(".csel-opt").forEach(optEl => {
@@ -1152,9 +1943,7 @@
     }
 
     function refreshAllCustomSelects() {
-      customSelectRegistry.forEach(wrap => {
-        if (wrap._refresh) wrap._refresh();
-      });
+      customSelectRegistry.forEach(wrap => { if (wrap._refresh) wrap._refresh(); });
     }
 
     window.addEventListener("click", () => {
@@ -1162,18 +1951,60 @@
     });
 
     function switchTab(id, btn) {
+      settingsSearch.value = "";
+      filterSettingsByQuery("");
       document.querySelectorAll(".tab-pane").forEach(p => p.classList.remove("active"));
-      document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+      document.querySelectorAll(".nav-item").forEach(b => b.classList.remove("active"));
       document.getElementById("tab-" + id).classList.add("active");
       btn.classList.add("active");
+
+      const idx = parseInt(btn.dataset.idx || "0", 10);
+      if (navLensPill) {
+        tahoeNav.classList.add("pressing");
+        navLensPill.style.transform = `translateY(${idx * 40}px)`;
+        setTimeout(() => tahoeNav.classList.remove("pressing"), 240);
+      }
+
+      const titleSpan = btn.querySelector("span:last-child");
+      if (titleSpan) document.getElementById("activePaneTitle").textContent = titleSpan.textContent;
     }
 
-    function openUrl(url) {
-      invoke("open_external_url", { url });
+    function filterSettingsByQuery(q) {
+      const clean = q.trim().toLowerCase();
+      const panes = document.querySelectorAll(".tab-pane");
+      if (!clean) {
+        document.querySelectorAll(".row, .card, .sec-title, .tahoe-tiles-grid").forEach(el => el.classList.remove("search-hidden"));
+        const activeBtn = document.querySelector(".nav-item.active");
+        const activeTab = activeBtn ? activeBtn.dataset.tab : "sys";
+        panes.forEach(p => p.classList.toggle("active", p.id === "tab-" + activeTab));
+        return;
+      }
+
+      panes.forEach(p => p.classList.add("active"));
+      document.querySelectorAll(".sec-title").forEach(el => el.classList.add("search-hidden"));
+      document.querySelectorAll(".card").forEach(card => {
+        const rows = card.querySelectorAll(".row");
+        if (!rows.length) {
+          const matchCard = card.textContent.toLowerCase().includes(clean);
+          card.classList.toggle("search-hidden", !matchCard);
+          return;
+        }
+        let anyVisible = false;
+        rows.forEach(r => {
+          const match = r.textContent.toLowerCase().includes(clean);
+          r.classList.toggle("search-hidden", !match);
+          if (match) anyVisible = true;
+        });
+        card.classList.toggle("search-hidden", !anyVisible);
+      });
     }
+
+    settingsSearch.addEventListener("input", (e) => filterSettingsByQuery(e.target.value));
+
+    function openUrl(url) { invoke("open_external_url", { url }); }
 
     async function initControl() {
-      [languageSelect, interactionSelect, todoStyleSelect, restSelect, monSelect].forEach(setupCustomSelect);
+      [languageSelect, closeSpeedSelect, restSelect, monSelect, peekDurSelect].forEach(setupCustomSelect);
 
       try {
         APP_VERSION = await invoke("get_app_version");
@@ -1184,8 +2015,9 @@
       const logoDataUrl = await invoke("get_app_logo");
       document.querySelectorAll(".js-app-logo").forEach(img => img.src = logoDataUrl);
 
-      const monitors = await invoke("get_monitors");
-      monSelect.innerHTML = monitors.map(m => `<option value="${m.index}">${m.name}</option>`).join("");
+      rawMonitors = await invoke("get_monitors");
+      renderMonitorOptions();
+
       const cfg = await invoke("get_config");
       populateUI(cfg);
       checkAppUpdate();
@@ -1195,30 +2027,63 @@
       currentCfg = cfg;
       languageSelect.value = cfg.language === "en" ? "en" : "id";
       applyLanguage(languageSelect.value);
+
       if (cfg.mascot_style === "visor") cfg.mascot_style = "mochi";
       interactionSelect.value = cfg.interaction_mode || "hover";
+      closeSpeedSelect.value = cfg.hover_close_speed || "normal";
+      hotkeyChk.checked = cfg.enable_hotkey !== false;
       todoStyleSelect.value = cfg.todo_style || "horizontal";
-      startWinChk.checked = cfg.start_with_windows;
-      primaryChk.checked = cfg.use_primary_monitor;
-      monSelect.value = cfg.selected_monitor_index;
-      monSelect.disabled = cfg.use_primary_monitor;
-      fsChk.checked = cfg.hide_on_fullscreen;
+      syncSegmentedPills();
+
+      startWinChk.checked = !!cfg.start_with_windows;
+      primaryChk.checked = cfg.use_primary_monitor !== false;
+      monSelect.value = String(cfg.selected_monitor_index || 0);
+      monSelect.disabled = primaryChk.checked;
+      fsChk.checked = cfg.hide_on_fullscreen !== false;
       proxChk.checked = cfg.smart_proximity !== false;
-      peekChk.checked = cfg.enable_peeks;
+
+      albumGlowChk.checked = cfg.album_art_glow !== false;
+      const gFill = typeof cfg.glass_fill === "number" ? cfg.glass_fill : 0.045;
+      const gBlur = typeof cfg.glass_blur === "number" ? cfg.glass_blur : 6;
+      const gRim  = typeof cfg.glass_rim === "number" ? cfg.glass_rim : 0.07;
+
+      if (mmLyrOpenChk) mmLyrOpenChk.checked = !!cfg.lyrics_pinned_open;
+      if (mmFill) mmFill.value = (gFill * 100).toFixed(1);
+      if (mmBlur) mmBlur.value = Math.round(gBlur);
+      if (mmRim)  mmRim.value  = (gRim * 100).toFixed(1);
+      applyGlassVars(gFill, gBlur, gRim);
+      renderLgSliders();
+      audioVisChk.checked = cfg.enable_audio_visualizer !== false;
+      const ambVol = cfg.ambient_volume || 55;
+      ambientVolRange.value = ambVol;
+      const optSlider = document.getElementById("ambientOpticalSlider");
+      if (optSlider && optSlider._render) optSlider._render();
+
+      peekChk.checked = cfg.enable_peeks !== false;
+      peekDurSelect.value = String(cfg.peek_duration_ms || 2400);
+      peekFlags.vol  = cfg.peek_volume !== false;
+      peekFlags.br   = cfg.peek_brightness !== false;
+      peekFlags.mic  = cfg.peek_mic !== false;
+      peekFlags.bat  = cfg.peek_charging !== false;
+      peekFlags.bt   = cfg.peek_bluetooth !== false;
+      peekFlags.caps = cfg.peek_capslock !== false;
+      syncPeekTilesUI();
+
+      pomoAutoBreakChk.checked = !!cfg.pomo_auto_break;
       soundChk.checked = cfg.enable_sound !== false;
       waterRemindEnableChk.checked = cfg.water_reminder_enabled !== false;
       waterInterval.disabled = !waterRemindEnableChk.checked;
       waterTapSoundChk.checked = cfg.water_tap_sound !== false;
       waterRemSoundChk.checked = cfg.water_reminder_sound !== false;
-      restSelect.value = cfg.resting_mode;
-      waterGoal.value = cfg.water_goal_ml;
-      waterCup.value = cfg.water_cup_ml;
+      restSelect.value = cfg.resting_mode || "pet";
+      waterGoal.value = cfg.water_goal_ml || 1500;
+      waterCup.value = cfg.water_cup_ml || 250;
       waterInterval.value = cfg.water_interval_min || 45;
       pomoMin.value = cfg.pomo_minutes || 25;
       pomoBreakMin.value = cfg.pomo_break_minutes || 5;
 
       document.querySelectorAll("#pomoChips .chip").forEach(ch => {
-        ch.classList.toggle("active", parseInt(ch.textContent) === cfg.pomo_minutes);
+        ch.classList.toggle("active", parseInt(ch.textContent, 10) === cfg.pomo_minutes);
       });
       document.querySelectorAll("#mascotCards .m-card").forEach(c => {
         c.classList.toggle("active", c.dataset.m === cfg.mascot_style);
@@ -1227,38 +2092,46 @@
         s.classList.toggle("active", s.dataset.t === cfg.theme_preset);
       });
 
+      const activeNav = document.querySelector(".nav-item.active span:last-child");
+      if (activeNav) document.getElementById("activePaneTitle").textContent = activeNav.textContent;
+
       refreshAllCustomSelects();
       renderCtrlTodos();
       updateNotchPreview(cfg);
     }
 
-    function setPomoPreset(mins) {
-      pomoMin.value = mins;
-      saveAll();
-    }
+    function setPomoPreset(mins) { pomoMin.value = mins; saveAll(); }
+    function selectMascot(m) { if (!currentCfg) return; currentCfg.mascot_style = m; populateUI(currentCfg); saveAll(); }
+    function selectTheme(t) { if (!currentCfg) return; currentCfg.theme_preset = t; populateUI(currentCfg); saveAll(); }
+    function openConfigDir() { invoke("open_config_folder"); }
+    function clearShelfFromCtrl() { if (!currentCfg) return; currentCfg.shelf = []; saveAll(); }
 
-    function selectMascot(m) {
+    function resetDefaultConfig() {
       if (!currentCfg) return;
-      currentCfg.mascot_style = m;
+      const keepTodos = currentCfg.todos || [];
+      const keepShelf = currentCfg.shelf || [];
+      currentCfg = {
+        ...currentCfg,
+        use_primary_monitor: true, selected_monitor_index: 0, hide_on_fullscreen: true, smart_proximity: true,
+        interaction_mode: "hover", hover_close_speed: "normal", enable_hotkey: true, todo_style: "horizontal",
+        resting_mode: "pet", mascot_style: "neko", theme_preset: "dusk", album_art_glow: true,
+        lyrics_pinned_open: false, glass_fill: 0.045, glass_blur: 6, glass_rim: 0.07,
+        enable_audio_visualizer: true, ambient_volume: 55, enable_peeks: true, peek_duration_ms: 2400,
+        peek_volume: true, peek_brightness: true, peek_mic: true, peek_charging: true, peek_bluetooth: true, peek_capslock: true,
+        enable_sound: true, pomo_auto_break: false, water_reminder_enabled: true, water_tap_sound: true, water_reminder_sound: true,
+        water_goal_ml: 1500, water_cup_ml: 250, water_interval_min: 45, pomo_minutes: 25, pomo_break_minutes: 5,
+        todos: keepTodos, shelf: keepShelf
+      };
       populateUI(currentCfg);
       saveAll();
-    }
-
-    function selectTheme(t) {
-      if (!currentCfg) return;
-      currentCfg.theme_preset = t;
-      populateUI(currentCfg);
-      saveAll();
-    }
-
-    function openConfigDir() {
-      invoke("open_config_folder");
     }
 
     function renderCtrlTodos() {
       const box = document.getElementById("ctrlTodoList");
-      if (!currentCfg.todos.length) {
-        box.innerHTML = `<div style="font-size:12px;color:var(--mist);padding:6px 0">Belum ada tugas hari ini.</div>`;
+      const emptyMsg = appLanguage === "en" ? "No tasks for today yet." : "Belum ada tugas hari ini.";
+      const delTitle = appLanguage === "en" ? "Delete Task" : "Hapus Tugas";
+      if (!currentCfg.todos || !currentCfg.todos.length) {
+        box.innerHTML = `<div style="font-size:11.5px;color:var(--mist);padding:6px 0">${emptyMsg}</div>`;
         return;
       }
       box.innerHTML = currentCfg.todos.map((t, i) => `
@@ -1269,7 +2142,7 @@
             </span>
             <span class="t-txt">${esc(t.text)}</span>
           </div>
-          <button class="icon-btn" onclick="deleteCtrlTodo(${i})" title="Hapus Tugas">
+          <button class="icon-btn" onclick="deleteCtrlTodo(${i})" title="${delTitle}">
             <svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>
           </button>
         </div>
@@ -1283,13 +2156,34 @@
 
       currentCfg.language = languageSelect.value === "en" ? "en" : "id";
       currentCfg.interaction_mode = interactionSelect.value;
+      currentCfg.hover_close_speed = closeSpeedSelect.value;
+      currentCfg.enable_hotkey = hotkeyChk.checked;
       currentCfg.todo_style = todoStyleSelect.value;
       currentCfg.start_with_windows = startWinChk.checked;
       currentCfg.use_primary_monitor = primaryChk.checked;
       currentCfg.selected_monitor_index = parseInt(monSelect.value || "0", 10);
       currentCfg.hide_on_fullscreen = fsChk.checked;
       currentCfg.smart_proximity = proxChk.checked;
+
+      currentCfg.album_art_glow = albumGlowChk.checked;
+      currentCfg.album_art_glow = albumGlowChk.checked;
+      currentCfg.lyrics_pinned_open = !!(mmLyrOpenChk && mmLyrOpenChk.checked);
+      currentCfg.glass_fill = mmFill ? parseFloat(mmFill.value) / 100 : 0.045;
+      currentCfg.glass_blur = mmBlur ? parseFloat(mmBlur.value) : 6;
+      currentCfg.glass_rim  = mmRim  ? parseFloat(mmRim.value) / 100 : 0.07;
+      currentCfg.enable_audio_visualizer = audioVisChk.checked;
+      currentCfg.ambient_volume = parseInt(ambientVolRange.value || "55", 10);
+
       currentCfg.enable_peeks = peekChk.checked;
+      currentCfg.peek_duration_ms = parseInt(peekDurSelect.value || "2400", 10);
+      currentCfg.peek_volume = peekFlags.vol;
+      currentCfg.peek_brightness = peekFlags.br;
+      currentCfg.peek_mic = peekFlags.mic;
+      currentCfg.peek_charging = peekFlags.bat;
+      currentCfg.peek_bluetooth = peekFlags.bt;
+      currentCfg.peek_capslock = peekFlags.caps;
+
+      currentCfg.pomo_auto_break = pomoAutoBreakChk.checked;
       currentCfg.enable_sound = soundChk.checked;
       currentCfg.water_reminder_enabled = waterRemindEnableChk.checked;
       currentCfg.water_tap_sound = waterTapSoundChk.checked;
@@ -1315,16 +2209,8 @@
     }
     newTodoInput.addEventListener("keydown", (e) => { if (e.key === "Enter") addTodo(); });
 
-    function toggleCtrlTodo(i) {
-      currentCfg.todos[i].done = !currentCfg.todos[i].done;
-      renderCtrlTodos();
-      saveAll();
-    }
-    function deleteCtrlTodo(i) {
-      currentCfg.todos.splice(i, 1);
-      renderCtrlTodos();
-      saveAll();
-    }
+    function toggleCtrlTodo(i) { currentCfg.todos[i].done = !currentCfg.todos[i].done; renderCtrlTodos(); saveAll(); }
+    function deleteCtrlTodo(i) { currentCfg.todos.splice(i, 1); renderCtrlTodos(); saveAll(); }
 
     function compareSemver(v1, v2) {
       const a = String(v1).split(".").map(Number);
@@ -1346,64 +2232,236 @@
         const targetUrl = channel === "msix"
           ? (data.store_url || "ms-windows-store://pdp/?ProductId=9PNWT253Z5RL")
           : (data.github_download_url || "https://github.com/MANG-CODER/MangNotch/releases/latest");
-
-        const minVer = channel === "msix"
-          ? (data.store_min_supported_version || "1.0.0")
-          : (data.min_supported_version || "1.0.0");
-
-        const latestVer = channel === "msix"
-          ? (data.store_latest_version || APP_VERSION)
-          : (data.latest_version || APP_VERSION);
+        const minVer = channel === "msix" ? (data.store_min_supported_version || "1.0.0") : (data.min_supported_version || "1.0.0");
+        const latestVer = channel === "msix" ? (data.store_latest_version || APP_VERSION) : (data.latest_version || APP_VERSION);
+        const isEn = appLanguage === "en";
 
         if (minVer && compareSemver(APP_VERSION, minVer) < 0) {
           const modal = document.getElementById("forcedUpdateModal");
-          document.getElementById("forcedUpdateNotes").textContent =
-            data.release_notes || `Versi v${APP_VERSION} wajib diperbarui ke v${latestVer}.`;
-          document.getElementById("forcedUpdateBtn").onclick = () => {
-            invoke("launch_update_and_exit", { url: targetUrl });
-          };
+          document.getElementById("forcedUpdateNotes").textContent = data.release_notes || (isEn ? `Version v${APP_VERSION} must be updated to v${latestVer}.` : `Versi v${APP_VERSION} wajib diperbarui ke v${latestVer}.`);
+          document.getElementById("forcedUpdateBtn").onclick = () => invoke("launch_update_and_exit", { url: targetUrl });
           modal.style.display = "grid";
           invoke("trigger_update_window", { isForced: true });
           return;
         }
-
         if (latestVer && compareSemver(APP_VERSION, latestVer) < 0) {
           const banner = document.getElementById("updateBanner");
-          document.getElementById("updateBannerTitle").textContent =
-            `Update MangNotch v${latestVer} Tersedia!`;
-          document.getElementById("updateBannerSub").textContent =
-            data.release_notes || (channel === "msix" ? "Klik untuk update via Microsoft Store" : "Klik untuk unduh installer terbaru di GitHub");
-          document.getElementById("updateBannerBtn").onclick = () => {
-            invoke("launch_update_and_exit", { url: targetUrl });
-          };
+          document.getElementById("updateBannerTitle").textContent = isEn ? `MangNotch v${latestVer} Update Available!` : `Update MangNotch v${latestVer} Tersedia!`;
+          document.getElementById("updateBannerSub").textContent = data.release_notes || (channel === "msix" ? (isEn ? "Click to update via Microsoft Store" : "Klik untuk update via Microsoft Store") : (isEn ? "Click to download the latest installer on GitHub" : "Klik untuk unduh installer terbaru di GitHub"));
+          document.getElementById("updateBannerBtn").onclick = () => invoke("launch_update_and_exit", { url: targetUrl });
           banner.style.display = "flex";
         } else {
           document.getElementById("updateBanner").style.display = "none";
         }
-      } catch (err) {
-        // Abaikan jika user sedang offline
-      }
+      } catch {}
     }
 
     [
-      languageSelect, interactionSelect, todoStyleSelect, startWinChk, primaryChk, monSelect, fsChk, proxChk, peekChk,
-      soundChk, waterRemindEnableChk, waterTapSoundChk, waterRemSoundChk, restSelect,
+      languageSelect, closeSpeedSelect, hotkeyChk,
+      startWinChk, primaryChk, monSelect, fsChk, proxChk,
+      albumGlowChk, audioVisChk,
+      peekChk, peekDurSelect,
+      pomoAutoBreakChk, soundChk, waterRemindEnableChk, waterTapSoundChk, waterRemSoundChk, restSelect
     ].forEach(el => {
-      el.addEventListener("change", () => { if (el === languageSelect) applyLanguage(languageSelect.value); saveAll(); });
-      el.addEventListener("input", saveAll);
+      el.addEventListener("change", () => {
+        if (el === languageSelect) applyLanguage(languageSelect.value);
+        saveAll();
+      });
     });
+
     [waterGoal, waterCup, waterInterval, pomoMin, pomoBreakMin].forEach(el => {
       el.addEventListener("change", saveAll);
     });
 
+    if (mmLyrOpenChk) mmLyrOpenChk.addEventListener("change", saveAll);
+
+    [mmFill, mmBlur, mmRim].forEach(el => {
+      if (!el) return;
+      el.addEventListener("input", () => {
+        if (!currentCfg) return;
+        const fill = mmFill ? parseFloat(mmFill.value) / 100 : 0.045;
+        const blur = mmBlur ? parseFloat(mmBlur.value) : 6;
+        const rim  = mmRim  ? parseFloat(mmRim.value) / 100 : 0.07;
+        applyGlassVars(fill, blur, rim);
+        currentCfg.glass_fill = fill;
+        currentCfg.glass_blur = blur;
+        currentCfg.glass_rim  = rim;
+        invoke("save_full_config", { newCfg: currentCfg }).catch(() => {});
+      });
+      el.addEventListener("change", saveAll);
+    });
+
+    if (mmGlassReset) {
+      mmGlassReset.addEventListener("click", () => {
+        if (!currentCfg) return;
+        if (mmFill) mmFill.value = 4.5;
+        if (mmBlur) mmBlur.value = 6;
+        if (mmRim)  mmRim.value  = 7;
+        renderLgSliders();
+        saveAll();
+      });
+    }
+
     listen("config-updated", (ev) => populateUI(ev.payload));
     initControl();
-        const appWin = window.__TAURI__.window.getCurrentWindow();
-    document.getElementById("hdr").addEventListener("mousedown", (e) => {
-      if (e.buttons !== 1 || e.target.closest("button")) return;
+
+    const appWin = window.__TAURI__.window.getCurrentWindow();
+    const startDragWindow = (e) => {
+      if (e.buttons !== 1 || e.target.closest("button, input, select, .csel-wrap, .nav-item, .seg-pill-bar, .tahoe-pill-tile, .lg-slider-wrap")) return;
       appWin.startDragging();
-    });
+    };
+    document.getElementById("hdr").addEventListener("mousedown", startDragWindow);
+    document.getElementById("sidebarDragArea").addEventListener("mousedown", startDragWindow);
     document.getElementById("closeBtn").addEventListener("click", () => appWin.hide());
   </script>
+
+  <script>
+  /* ---- Apple iOS 26 2D Flat Liquid Glass Runtime (Pointer-Reactive Specular & Acrylic) ---- */
+  (function () {
+    const root = document.documentElement;
+    root.dataset.glass = "solid";
+    try {
+      const forced = localStorage.getItem("mn-glass");
+      if (forced === "acrylic" || forced === "solid") root.dataset.glass = forced;
+      else if (navigator.userAgentData && navigator.userAgentData.getHighEntropyValues) {
+        navigator.userAgentData.getHighEntropyValues(["platformVersion"]).then(v => {
+          const major = parseInt(String(v.platformVersion).split(".")[0], 10);
+          if (major >= 14) root.dataset.glass = "acrylic";
+        }).catch(() => {});
+      }
+    } catch (e) {}
+
+    /* Pointer-reactive specular & edge refraction highlight */
+    document.addEventListener("pointermove", (e) => {
+      const el = e.target.closest(".lg-control, .btn, .seg-pill-bar, .tahoe-nav, .lg-slider-wrap");
+      if (!el) return;
+      const target = el.classList.contains("seg-pill-bar")
+        ? el.querySelector(".seg-pill-thumb")
+        : (el.classList.contains("tahoe-nav")
+          ? el.querySelector(".nav-lens-pill")
+          : (el.classList.contains("lg-slider-wrap") ? el.querySelector(".lg-slider-thumb") : el));
+      if (!target) return;
+      window.__mmSpec(target, e);
+    }, { passive: true });
+  })();
+  </script>
+<script>
+/* ---- Soft Light Glass v5: arah transisi tab & morph halus indikator nav ---- */
+(function () {
+  "use strict";
+  function patchNav() {
+    const orig = window.switchTab, pill = document.getElementById("navLensPill");
+    if (typeof orig !== "function" || !pill || !pill.animate) return;
+    let last = 0;
+    window.switchTab = function (id, btn) {
+      const idx = parseInt((btn && btn.dataset.idx) || "0", 10);
+      const content = document.querySelector(".tahoe-content");
+      if (content) content.dataset.dir = idx >= last ? "down" : "up";
+      orig.apply(this, arguments);
+      const dist = Math.abs(idx - last);
+      last = idx;
+      if (!dist || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+      const sy = 1 + Math.min(.14, .045 * dist), sx = 1 - Math.min(.03, .01 * dist);
+      pill.animate(
+        [
+          { scale: "1 1" },
+          { scale: `${sx} ${sy}`, offset: .38 },
+          { scale: "1.008 .99", offset: .76 },
+          { scale: "1 1" }
+        ],
+        { duration: 360, easing: "cubic-bezier(.22, 1, .36, 1)" }
+      );
+    };
+  }
+  window.addEventListener("load", patchNav);
+})();
+</script>
+
+<script>
+/* ---- Tooltip kaca: pindahkan atribut title -> data-tip, tampilkan dengan delay ---- */
+(function () {
+  "use strict";
+  if (window.__mnTip) return; window.__mnTip = 1;
+  const tip = document.createElement("div");
+  tip.className = "mn-tip"; tip.setAttribute("role", "tooltip");
+  document.body.appendChild(tip);
+  let cur = null, tShow = 0;
+
+  function place(el) {
+    const r = el.getBoundingClientRect(), t = tip.getBoundingClientRect();
+    let x = r.left + r.width / 2 - t.width / 2;
+    x = Math.max(8, Math.min(innerWidth - t.width - 8, x));
+    let y = r.bottom + 8, side = "b";
+    if (y + t.height > innerHeight - 6) { y = r.top - t.height - 8; side = "t"; }
+    tip.style.left = x + "px"; tip.style.top = Math.max(4, y) + "px"; tip.dataset.side = side;
+  }
+  function show(el, text) {
+    tip.textContent = text; tip.classList.remove("on");
+    tip.style.left = "0px"; tip.style.top = "0px";
+    place(el); void tip.offsetWidth; tip.classList.add("on");
+  }
+  function hide() { clearTimeout(tShow); tip.classList.remove("on"); cur = null; }
+
+  document.addEventListener("pointerover", (e) => {
+    const el = e.target.closest && e.target.closest("[title],[data-tip]");
+    if (el === cur) return;
+    if (!el) { hide(); return; }
+    if (el.hasAttribute("title")) { el.dataset.tip = el.getAttribute("title"); el.removeAttribute("title"); }
+    const text = el.dataset.tip;
+    if (!text) { hide(); return; }
+    const warm = tip.classList.contains("on");
+    cur = el; clearTimeout(tShow);
+    tShow = setTimeout(() => show(el, text), warm ? 60 : 420);
+  }, true);
+  document.addEventListener("pointerdown", hide, true);
+  document.addEventListener("scroll", hide, true);
+  document.addEventListener("pointerout", (e) => { if (!e.relatedTarget) hide(); }, true);
+  window.addEventListener("blur", hide);
+})();
+</script>
+<script>
+/* MM-LAYER: grain + stagger index + pause saat tab/jendela tersembunyi */
+(() => {
+  const host = document.querySelector(".mn") || document.querySelector(".tahoe-window");
+  if (host && !host.querySelector(":scope > .mm-grain")) {
+    const g = document.createElement("div"); g.className = "mm-grain"; g.setAttribute("aria-hidden", "true"); host.appendChild(g);
+  }
+  document.querySelectorAll(".ly").forEach(l => [...l.children].filter(c => c.classList.contains("a"))
+    .forEach((c, i) => c.style.setProperty("--mi", Math.min(i, 9))));
+  document.addEventListener("visibilitychange", () => document.documentElement.classList.toggle("mm-paused", document.hidden));
+})();
+</script>
+<script>
+/* MM-LAYER-2 */
+(() => {
+  document.querySelectorAll(".l-music, .l-lyrics").forEach(l => {
+    const art = l.querySelector(".js-art"); if (!art) return;
+    const bd = document.createElement("div"); bd.className = "mm-bd"; bd.setAttribute("aria-hidden", "true");
+    const amb = l.querySelector(".ambient"); amb ? amb.after(bd) : l.prepend(bd);
+    let last = null;
+    const sync = () => {
+      const u = art.style.backgroundImage; if (u === last) return; last = u;
+      bd.classList.remove("on");
+      if (u && u !== "none") {
+        void bd.offsetWidth;
+        bd.style.backgroundImage = `linear-gradient(rgba(12,9,20,.28), rgba(12,9,20,.5)), ${u}`;
+        bd.classList.add("on");
+      }
+    };
+    new MutationObserver(sync).observe(art, { attributes: true, attributeFilter: ["style"] }); sync();
+  });
+  const ol = document.getElementById("lyrList"), box = ol && ol.closest(".lyr");
+  if (box) new MutationObserver(() => box.classList.toggle("mm-skel",
+    /Mencari lirik|Searching for lyrics/i.test((ol.lastElementChild || {}).textContent || ""))).observe(ol, { childList: true });
+  let p = null;
+  window.__mmSpec = (el, e) => {
+    if (!p) requestAnimationFrame(() => {
+      const { el, x, y } = p; p = null; const r = el.getBoundingClientRect();
+      el.style.setProperty("--mx", (x - r.left).toFixed(0) + "px"); el.style.setProperty("--my", (y - r.top).toFixed(0) + "px");
+    });
+    p = { el, x: e.clientX, y: e.clientY };
+  };
+})();
+</script>
 </body>
 </html>
