@@ -283,8 +283,15 @@ unsafe extern "system" fn notch_wnd_proc(
 
     match msg {
         // Izinkan Microsoft Store / Windows Restart Manager mematikan app saat proses update
-        WM_QUERYENDSESSION => return 1,
+        WM_QUERYENDSESSION => {
+            debug_log(&format!("[wndproc] WM_QUERYENDSESSION lparam={:#x}", lparam));
+            return 1;
+        }
         WM_ENDSESSION => {
+            debug_log(&format!(
+                "[wndproc] WM_ENDSESSION wparam={} lparam={:#x}",
+                wparam, lparam
+            ));
             if wparam != 0 {
                 std::process::exit(0);
             }
@@ -868,6 +875,18 @@ fn run_key_set() {
     }
 }
 
+/// Log sederhana ke %APPDATA%\\MangNotch\\debug.log (buat nyari crash di build Store).
+fn debug_log(msg: &str) {
+    use std::io::Write;
+    if let Ok(mut f) = fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(get_config_dir().join("debug.log"))
+    {
+        let _ = writeln!(f, "{}", msg);
+    }
+}
+
 /// MSIX: autostart HARUS lewat StartupTask (sesuai Package.appxmanifest).
 /// Registry HKCU\...\Run dari dalam MSIX itu di-virtualisasi, jadi nggak dibaca Windows
 /// saat boot dan nggak bisa menghapus entry "asli" yang ditulis versi non-MSIX.
@@ -878,20 +897,44 @@ fn set_packaged_startup(enable: bool) {
     std::thread::spawn(move || unsafe {
         use windows::core::HSTRING;
         use windows::ApplicationModel::{StartupTask, StartupTaskState};
-        let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
-        let Ok(task) = StartupTask::GetAsync(&HSTRING::from(STARTUP_TASK_ID)).and_then(|op| op.get())
-        else {
-            return;
+        debug_log(&format!("[startup] begin enable={}", enable));
+        let hr = CoInitializeEx(None, COINIT_MULTITHREADED);
+        debug_log(&format!("[startup] CoInitializeEx -> {:?}", hr));
+        debug_log("[startup] calling GetAsync");
+        let op = match StartupTask::GetAsync(&HSTRING::from(STARTUP_TASK_ID)) {
+            Ok(op) => op,
+            Err(e) => {
+                debug_log(&format!("[startup] GetAsync failed: {:?}", e));
+                return;
+            }
         };
+        debug_log("[startup] GetAsync returned, waiting for result");
+        let task = match op.get() {
+            Ok(t) => t,
+            Err(e) => {
+                debug_log(&format!("[startup] GetAsync result failed: {:?}", e));
+                return;
+            }
+        };
+        debug_log("[startup] got task");
+        let state = task.State().ok();
+        debug_log(&format!("[startup] state before = {:?}", state));
         if enable {
-            if task.State().map(|s| s == StartupTaskState::Disabled).unwrap_or(false) {
-                let _ = task.RequestEnableAsync().and_then(|op| op.get());
+            if state == Some(StartupTaskState::Disabled) {
+                debug_log("[startup] calling RequestEnableAsync");
+                let r = task.RequestEnableAsync().and_then(|op| op.get());
+                debug_log(&format!("[startup] RequestEnableAsync -> {:?}", r));
             }
             // DisabledByUser / DisabledByPolicy: cuma user yang bisa nyalain lewat
             // Settings > Apps > Startup. Nggak bisa dipaksa dari kode.
-        } else {
+        } else if matches!(
+            state,
+            Some(StartupTaskState::Enabled) | Some(StartupTaskState::EnabledByPolicy)
+        ) {
             let _ = task.Disable();
+            debug_log("[startup] Disable() done");
         }
+        debug_log("[startup] end");
     });
 }
 
@@ -1593,6 +1636,7 @@ fn launch_update_and_exit(app: AppHandle, url: String) {
     open_external_url(url);
     thread::spawn(move || {
         thread::sleep(Duration::from_millis(400));
+        debug_log("[exit] launch_update_and_exit");
         app.exit(0);
     });
 }
@@ -1614,12 +1658,16 @@ fn save_full_config(app: AppHandle, state: State<'_, SharedState>, new_cfg: AppC
     let active_h = cfg.active_height;
     let resting_w = cfg.resting_width;
 
+    let prev_autostart = cfg.start_with_windows;
     *cfg = new_cfg;
     cfg.active_width = active_w;
     cfg.active_height = active_h;
     cfg.resting_width = resting_w;
 
-    apply_autostart(cfg.start_with_windows);
+    // jangan panggil tiap save (slider glass nge-save di tiap event input)
+    if cfg.start_with_windows != prev_autostart {
+        apply_autostart(cfg.start_with_windows);
+    }
     apply_tray_language(&app, &cfg.language);
     save_config_to_disk(&cfg);
 
@@ -2100,6 +2148,23 @@ async fn lyrics_http_get(url: String) -> Result<LyricsHttpResp, String> {
 }
 
 pub fn run() {
+    std::panic::set_hook(Box::new(|info| {
+        debug_log(&format!(
+            "[panic] {}\n{}",
+            info,
+            std::backtrace::Backtrace::force_capture()
+        ));
+    }));
+    // Jaga MTA tetap hidup selama proses jalan. Tanpa ini, MTA bisa hancur begitu thread
+    // MTA terakhir (mis. thread query_packaged_startup di bawah) selesai, dan pointer
+    // factory WinRT yang di-cache windows-rs jadi dangling -> access violation di combase.dll
+    // pas StartupTask dipanggil lagi dari thread lain (toggle Start with Windows).
+    #[cfg(windows)]
+    let _mta_cookie = unsafe {
+        let r = windows::Win32::System::Com::CoIncrementMTAUsage();
+        debug_log(&format!("[com] CoIncrementMTAUsage ok={}", r.is_ok()));
+        r
+    };
     let mut show_ctrl_event: isize = 0;
     #[cfg(windows)]
     unsafe {
@@ -2118,6 +2183,7 @@ pub fn run() {
                     let _ = SetEvent(show_ctrl_event);
                 }
                 let _ = CloseHandle(handle);
+                debug_log("[exit] second instance, exiting");
                 std::process::exit(0);
             }
             let _ = std::mem::ManuallyDrop::new(handle);
@@ -2203,6 +2269,7 @@ pub fn run() {
                         show_control_center_safe(app);
                     }
                     "quit" => {
+                        debug_log("[exit] tray quit");
                         app.exit(0);
                     }
                     _ => {}
