@@ -16,7 +16,7 @@ const VERSION_MANIFEST_URL =
 
 let currentCfg = null;
 let monitors = [];
-let appVersion = "2.1.0";
+let appVersion = "2.1.1";
 let logoDataUrl = "";
 let selfSaveTimer = null;
 let ignoreNextExternal = 0;

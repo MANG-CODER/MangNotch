@@ -14,6 +14,7 @@ use config::{
 use media::MediaPayload;
 use serde::Serialize;
 use state::{LyricsSyncState, SharedState};
+use std::sync::atomic::Ordering;
 use std::time::Duration;
 use tauri::{
     menu::{Menu, MenuItem, PredefinedMenuItem},
@@ -22,13 +23,16 @@ use tauri::{
 };
 use window_manager::{
     enumerate_monitors, reconcile_notch_windows, set_text_input_for_window,
-    show_control_center_safe, NOTCH_REVEAL_DELAY_MS,
+    show_control_center_safe, CONTROL_HWND, NOTCH_REVEAL_DELAY_MS,
 };
 
 #[cfg(windows)]
 use config::{is_packaged_app, query_packaged_startup, wide};
 #[cfg(windows)]
-use window_manager::{apply_control_backdrop, get_hwnd, position_notch_on_monitor};
+use window_manager::{
+    apply_control_backdrop, get_hwnd, get_window_dpi_scale, position_notch_on_monitor,
+    restore_all_notch_wndprocs, set_hwnd_click_through,
+};
 #[cfg(windows)]
 use windows::{
     core::PCWSTR,
@@ -183,15 +187,32 @@ fn save_full_config(app: AppHandle, state: State<'_, SharedState>, mut new_cfg: 
         });
     }
 
-    if snapshot.monitor_mode != prev_mon_mode || snapshot.selected_monitors != prev_mon_list {
+    // WAJIB di background thread (bukan run_on_main_thread) agar WebView2 tidak deadlock
+    let active_notch_count = app
+        .webview_windows()
+        .keys()
+        .filter(|k| k.starts_with("notch-"))
+        .count();
+    if snapshot.monitor_mode != prev_mon_mode
+        || snapshot.selected_monitors != prev_mon_list
+        || (snapshot.monitor_mode == "primary" && active_notch_count > 1)
+    {
         let app_r = app.clone();
         let st_r = state.inner().clone();
-        let _ = app.run_on_main_thread(move || {
+        std::thread::spawn(move || {
             reconcile_notch_windows(&app_r, &st_r);
         });
     }
 
     let _ = app.emit("config-updated", snapshot);
+}
+
+#[tauri::command]
+fn close_control_center(app: AppHandle) {
+    CONTROL_HWND.store(0, Ordering::SeqCst);
+    if let Some(win) = app.get_webview_window("control") {
+        let _ = win.destroy();
+    }
 }
 
 #[tauri::command]
@@ -251,9 +272,13 @@ fn launch_update_and_exit(app: AppHandle, url: String) {
 fn trigger_update_window(app: AppHandle, state: State<'_, SharedState>, is_forced: bool) {
     show_control_center_safe(&app, state.inner());
     if is_forced {
-        if let Some(w) = app.get_webview_window("control") {
-            let _ = w.set_always_on_top(true);
-        }
+        let app_c = app.clone();
+        std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(250));
+            if let Some(w) = app_c.get_webview_window("control") {
+                let _ = w.set_always_on_top(true);
+            }
+        });
     }
 }
 
@@ -280,24 +305,76 @@ fn notch_ready(app: AppHandle, window: WebviewWindow, state: State<'_, SharedSta
     let st_c = state.inner().clone();
     std::thread::spawn(move || {
         std::thread::sleep(Duration::from_millis(NOTCH_REVEAL_DELAY_MS));
+
+        // Tahap 1: Posisikan & tampilkan Notch di monitor target (cek masih aktif di state)
         let app_m = app_c.clone();
+        let st_m = st_c.clone();
+        let label_m = label.clone();
         let _ = app_c.run_on_main_thread(move || {
+            let still_active = st_m
+                .0
+                .notches
+                .lock()
+                .map(|m| m.contains_key(&label_m))
+                .unwrap_or(false);
+            if !still_active {
+                return;
+            }
             let monitors = enumerate_monitors();
             let mon_opt = monitors
                 .iter()
                 .find(|m| m.index == mon_index)
                 .or_else(|| monitors.first());
-            if let (Some(mon), Some(win)) = (mon_opt, app_m.get_webview_window(&label)) {
+            if let (Some(mon), Some(win)) = (mon_opt, app_m.get_webview_window(&label_m)) {
                 #[cfg(windows)]
                 if let Some(hwnd) = get_hwnd(&win) {
                     position_notch_on_monitor(hwnd, mon);
                 }
-                if let Ok(mut map) = st_c.0.notches.lock() {
-                    if let Some(inst) = map.get_mut(&label) {
-                        inst.positioned = true;
+                let _ = app_m.emit_to(&label_m, "notch-revealed", ());
+            }
+        });
+
+        // Tahap 2: Setelah WM_DPICHANGED monitor target selesai, re-center ulang,
+        // pastikan click-through aktif, simpan DPI asli, lalu aktifkan polling.
+        std::thread::sleep(Duration::from_millis(80));
+        let app_m2 = app_c.clone();
+        let st_m2 = st_c.clone();
+        let label_m2 = label.clone();
+        let _ = app_c.run_on_main_thread(move || {
+            let still_active = st_m2
+                .0
+                .notches
+                .lock()
+                .map(|m| m.contains_key(&label_m2))
+                .unwrap_or(false);
+            if !still_active {
+                return;
+            }
+            let mut scale_opt: Option<f64> = None;
+            let monitors = enumerate_monitors();
+            let mon_opt = monitors
+                .iter()
+                .find(|m| m.index == mon_index)
+                .or_else(|| monitors.first());
+            if let Some(win) = app_m2.get_webview_window(&label_m2) {
+                #[cfg(windows)]
+                if let Some(hwnd) = get_hwnd(&win) {
+                    if let Some(mon) = mon_opt {
+                        position_notch_on_monitor(hwnd, mon);
                     }
+                    scale_opt = Some(get_window_dpi_scale(hwnd));
+                    set_hwnd_click_through(hwnd, true);
                 }
-                let _ = app_m.emit_to(&label, "notch-revealed", ());
+                #[cfg(not(windows))]
+                let _ = (win, mon_opt);
+            }
+            if let Ok(mut map) = st_m2.0.notches.lock() {
+                if let Some(inst) = map.get_mut(&label_m2) {
+                    if let Some(sc) = scale_opt {
+                        inst.fallback_dpi = sc;
+                    }
+                    inst.positioned = true;
+                }
             }
         });
     });
@@ -391,7 +468,9 @@ fn get_system_volume() -> VolumeResponse {
     #[cfg(windows)]
     unsafe {
         let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
-        if let Ok(en) = CoCreateInstance::<_, IMMDeviceEnumerator>(&MMDeviceEnumerator, None, CLSCTX_ALL) {
+        if let Ok(en) =
+            CoCreateInstance::<_, IMMDeviceEnumerator>(&MMDeviceEnumerator, None, CLSCTX_ALL)
+        {
             if let Ok(dev) = en.GetDefaultAudioEndpoint(eRender, eConsole) {
                 if let Ok(vol) = dev.Activate::<IAudioEndpointVolume>(CLSCTX_ALL, None) {
                     let v = vol.GetMasterVolumeLevelScalar().unwrap_or(0.5);
@@ -415,7 +494,9 @@ fn set_system_volume(volume: Option<u32>, mute: Option<bool>) -> VolumeResponse 
     #[cfg(windows)]
     unsafe {
         let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
-        if let Ok(en) = CoCreateInstance::<_, IMMDeviceEnumerator>(&MMDeviceEnumerator, None, CLSCTX_ALL) {
+        if let Ok(en) =
+            CoCreateInstance::<_, IMMDeviceEnumerator>(&MMDeviceEnumerator, None, CLSCTX_ALL)
+        {
             if let Ok(dev) = en.GetDefaultAudioEndpoint(eRender, eConsole) {
                 if let Ok(vol) = dev.Activate::<IAudioEndpointVolume>(CLSCTX_ALL, None) {
                     if let Some(v) = volume {
@@ -457,7 +538,7 @@ async fn lyrics_http_get(url: String) -> HttpResponse {
             const HTTP_QUERY_STATUS_CODE: u32 = 19;
             const HTTP_QUERY_FLAG_NUMBER: u32 = 0x2000_0000;
 
-            let agent = wide("MangNotch/2.0 (Windows)");
+            let agent = wide("MangNotch/2.1 (Windows)");
             let h_net = InternetOpenW(
                 agent.as_ptr(),
                 INTERNET_OPEN_TYPE_PRECONFIG,
@@ -677,6 +758,14 @@ fn start_file_drag(app: AppHandle, window: WebviewWindow, paths: Vec<String>) {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    #[cfg(windows)]
+    if std::env::var("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS").is_err() {
+        std::env::set_var(
+            "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS",
+            "--disable-background-networking --disable-component-update --disable-sync --disable-extensions --disable-default-apps --disable-features=Translate,OptimizationHints,MediaRouter --js-flags=--max-old-space-size=64",
+        );
+    }
+
     tauri::Builder::default()
         .setup(|app| {
             let mut cfg = load_config_from_disk();
@@ -702,7 +791,16 @@ pub fn run() {
                         show_control_center_safe(app, st.inner());
                     }
                     "quit" => {
-                        app.exit(0);
+                        #[cfg(windows)]
+                        restore_all_notch_wndprocs();
+                        for (_, win) in app.webview_windows() {
+                            let _ = win.destroy();
+                        }
+                        let app_c = app.clone();
+                        std::thread::spawn(move || {
+                            std::thread::sleep(Duration::from_millis(120));
+                            app_c.exit(0);
+                        });
                     }
                     _ => {}
                 })
@@ -732,13 +830,18 @@ pub fn run() {
         })
         .on_window_event(|window, event| {
             let label = window.label().to_string();
+
+            if label == "control" {
+                if let WindowEvent::Destroyed = event {
+                    CONTROL_HWND.store(0, Ordering::SeqCst);
+                }
+                return;
+            }
+
             if !label.starts_with("notch-") {
                 return;
             }
             if let WindowEvent::DragDrop(drag_ev) = event {
-                #[cfg(debug_assertions)]
-                eprintln!("[shelf-drag] {:?} -> {}", drag_ev, label);
-
                 let app = window.app_handle();
                 let state = app.state::<SharedState>();
                 match drag_ev {
@@ -790,6 +893,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             get_config,
             save_full_config,
+            close_control_center,
             get_monitors,
             get_app_version,
             get_app_logo,

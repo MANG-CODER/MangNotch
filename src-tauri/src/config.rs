@@ -293,6 +293,7 @@ pub fn get_config_path() -> PathBuf {
     get_config_dir().join("config.json")
 }
 
+#[allow(dead_code)]
 pub fn debug_log(msg: &str) {
     use std::io::Write;
     if let Ok(mut f) = fs::OpenOptions::new()

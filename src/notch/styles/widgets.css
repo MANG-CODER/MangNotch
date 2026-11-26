@@ -746,3 +746,20 @@ svg.ctl.js-play-icon.pop { animation: mmPop .38s var(--spring-pop); }
 .cx-pm { display: grid; grid-template-columns: repeat(4, 1fr); grid-auto-rows: 1fr; gap: 4px; flex: 1; }
 .cx-m { display: grid; place-items: center; border-radius: 8px; font-size: 11px; cursor: pointer; text-transform: capitalize; background: var(--btn-surface); }
 .cx-m.on { background: var(--hy-milk); color: var(--hy-ink); font-weight: 700; }
+/* ==========================================================================
+   IDLE GPU OPTIMIZATION — Hentikan animasi & repaint saat page tidak aktif
+   ========================================================================== */
+.mn:not([data-s="water"]) .wwave {
+  animation-play-state: paused !important;
+}
+.mn:not([data-s="shelf"]) .nd-nebula,
+.mn:not([data-s="shelf"]) .nd-rays,
+.mn:not([data-s="shelf"]) .nd-wave,
+.mn:not([data-s="shelf"]) .nd-corona,
+.mn:not([data-s="shelf"]) .nd-star,
+.mn:not([data-s="shelf"]) .nd-lens {
+  animation-play-state: paused !important;
+}
+.mn:not([data-s="lyrics"]) .lyr.mm-skel::before {
+  animation-play-state: paused !important;
+}

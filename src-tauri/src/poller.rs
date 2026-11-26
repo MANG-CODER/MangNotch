@@ -36,6 +36,7 @@ struct VolumeSyncPayload {
 
 #[derive(Default)]
 struct MonitorPollState {
+    hwnd: isize,
     is_hovered: bool,
     outside_ticks: u32,
     is_obstructed: bool,
@@ -619,6 +620,10 @@ pub fn start_poller(app: AppHandle, state: SharedState) {
                 Ok(g) => g.values().cloned().collect::<Vec<_>>(),
                 Err(_) => continue,
             };
+
+            // Buang state per_mon milik jendela monitor yang sudah ditutup
+            per_mon.retain(|lbl, _| notches_snap.iter().any(|n| n.label == *lbl));
+
             let shelf_drag_label = state
                 .0
                 .shelf_drag_label
@@ -655,8 +660,15 @@ pub fn start_poller(app: AppHandle, state: SharedState) {
                     && IsWindowVisible(ctrl_raw) != 0
                     && GetWindowRect(ctrl_raw, &mut ctrl_rect) != 0;
 
+                // Paksa scan segera jika ada jendela monitor baru saja selesai reveal
+                let any_new_hwnd = notches_snap.iter().any(|n| {
+                    n.positioned
+                        && n.hwnd != 0
+                        && per_mon.get(&n.label).map_or(true, |p| p.hwnd != n.hwnd)
+                });
+
                 // Scan semua window aktif berurutan Z-order (~160ms)
-                let scan_windows = tick == 1 || tick % 4 == 0;
+                let scan_windows = tick == 1 || tick % 4 == 0 || any_new_hwnd;
                 if scan_windows && (rt.hide_on_fullscreen || rt.smart_proximity) {
                     let notch_hwnds: Vec<isize> = notches_snap.iter().map(|n| n.hwnd).collect();
                     visible_wins = collect_visible_app_windows(ctrl_raw, &notch_hwnds);
@@ -682,7 +694,18 @@ pub fn start_poller(app: AppHandle, state: SharedState) {
                     let scale_px = |v: i32| ((v as f64) * dpi_scale).round() as i32;
                     let notch_center_x = (win_rect.left + win_rect.right) / 2;
 
+                    // Reset state jika HWND berubah (jendela baru dibuat ulang)
                     let poll = per_mon.entry(inst.label.clone()).or_default();
+                    if poll.hwnd != inst.hwnd {
+                        *poll = MonitorPollState {
+                            hwnd: inst.hwnd,
+                            ..Default::default()
+                        };
+                    }
+
+                    if !cached_monitors.iter().any(|m| m.index == inst.monitor_index) {
+                        cached_monitors = enumerate_monitor_bounds();
+                    }
                     let mon_opt = cached_monitors.iter().find(|m| m.index == inst.monitor_index);
 
                     // 1 & 2. Evaluasi Fullscreen & Smart Proximity INDEPENDEN per monitor
@@ -712,10 +735,8 @@ pub fn start_poller(app: AppHandle, state: SharedState) {
                                     // Cek True Fullscreen DULU (Chrome F11, YouTube FS, Game)
                                     if covers_full_mon && center_on_mon {
                                         let is_fs = if has_visible_taskbar {
-                                            // Di monitor bertaskbar, menutupi taskbar = 100% True Fullscreen
                                             true
                                         } else {
-                                            // Di monitor tanpa taskbar, bedakan dari maximize ber-frame biasa
                                             !w.is_zoomed || !w.has_caption || !w.has_thickframe
                                         };
                                         if is_fs {
