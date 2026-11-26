@@ -1,0 +1,142 @@
+/* ==========================================================================
+   MangNotch Shared — HyperOS 4 Soft Light Glass + Spring Physics Tokens
+   ========================================================================== */
+@property --spec { syntax: "<number>"; inherits: false; initial-value: 0; }
+
+:root {
+  color-scheme: dark;
+
+  --c1: #FFB7C5;
+  --c2: #E2D1F9;
+  --c3: #A2E4F5;
+  --glow: linear-gradient(90deg, var(--c1), var(--c2) 55%, var(--c3));
+
+  --ink: #f7f5fa;
+  --mist: rgba(247, 245, 250, .64);
+  --mist-2: rgba(247, 245, 250, .42);
+  --on-accent: #140d1c;
+  --ok: #33e07a;
+  --danger: #ff7b8b;
+
+  --hy-ink: #1a1222;
+  --hy-ink-soft: rgba(26, 18, 34, .62);
+  --hy-ink-accent: color-mix(in srgb, var(--c1) 46%, #4a1430);
+  --hy-milk: linear-gradient(
+    160deg,
+    color-mix(in srgb, var(--c1) 11%, rgba(255, 255, 255, .96)) 0%,
+    color-mix(in srgb, var(--c2) 15%, rgba(255, 255, 255, .89)) 100%
+  );
+  --hy-milk-c3: linear-gradient(
+    160deg,
+    color-mix(in srgb, var(--c3) 14%, rgba(255, 255, 255, .96)) 0%,
+    color-mix(in srgb, var(--c2) 12%, rgba(255, 255, 255, .89)) 100%
+  );
+
+  --ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --ui-display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+
+  /* Fisika Spring CSS linear() — alami, bouncy halus */
+  --ease-fluid: cubic-bezier(.22, 1, .36, 1);
+  --ease-inout: cubic-bezier(.65, 0, .35, 1);
+  --spring: linear(0, .015, .053, .11, .179, .256, .336, .418, .497, .574, .645, .71, .769, .822, .868, .907, .941, .968, .991, 1.009, 1.022, 1.032, 1.039, 1.043, 1.046, 1.046, 1.045, 1.043, 1.04, 1.037, 1.033, 1.03, 1.026, 1.022, 1.019, 1.016, 1.013, 1.01, 1.008, 1.006, 1);
+  --spring-soft: linear(0, .016, .057, .115, .185, .262, .34, .419, .494, .565, .631, .691, .744, .792, .833, .869, .9, .925, .946, .964, .978, .989, .997, 1.004, 1.008, 1.012, 1.014, 1.015, 1.015, 1.015, 1.014, 1.014, 1.012, 1.011, 1.01, 1.009, 1.008, 1.007, 1.006, 1.005, 1);
+  --spring-pop: linear(0, .025, .092, .187, .299, .42, .542, .658, .764, .857, .936, 1, 1.05, 1.086, 1.109, 1.122, 1.126, 1.123, 1.115, 1.103, 1.089, 1.074, 1.059, 1.044, 1.03, 1.019, 1.009, 1, .994, .989, .986, .985, .984, .984, .985, .987, .989, .991, .993, .994, 1);
+
+  /* Parameter Kustom Soft Light Glass */
+  --bg-opacity: 0.42;
+  --notch-bg-opacity: 0.94;
+  --comp-opacity: 0.06;
+  --comp-blur: 14px;
+  --btn-opacity: 0.09;
+  --btn-blur: 12px;
+  --glass-rim: 0.16;
+
+  --well-bg: rgba(10, 8, 16, .28);
+  --well-border: rgba(255, 255, 255, calc(var(--glass-rim) * .55));
+  --divider: rgba(255, 255, 255, .07);
+
+  --comp-surface: rgba(255, 255, 255, var(--comp-opacity));
+  --comp-sheen: linear-gradient(
+    168deg,
+    rgba(255, 255, 255, calc(var(--comp-opacity) * .85)) 0%,
+    rgba(255, 255, 255, calc(var(--comp-opacity) * .18)) 46%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  --comp-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, calc(var(--glass-rim) * 1.15)),
+    inset 0 0 0 1px rgba(255, 255, 255, calc(var(--glass-rim) * .72)),
+    0 8px 24px -12px rgba(0, 0, 0, .34);
+
+  --btn-surface: rgba(255, 255, 255, var(--btn-opacity));
+  --btn-surface-hover: rgba(255, 255, 255, calc(var(--btn-opacity) + .055));
+  --btn-surface-active: rgba(255, 255, 255, calc(var(--btn-opacity) + .025));
+  --btn-sheen: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, calc(var(--glass-rim) * .45)) 0%,
+    rgba(255, 255, 255, 0) 68%
+  );
+  --btn-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, calc(var(--glass-rim) * 1.25)),
+    inset 0 0 0 1px rgba(255, 255, 255, var(--glass-rim)),
+    0 4px 12px -6px rgba(0, 0, 0, .28);
+}
+
+@supports (color: rgb(from red r g b)) {
+  :root {
+    --comp-surface: rgb(from var(--c2) r g b / var(--comp-opacity));
+    --btn-surface: rgb(from var(--c2) r g b / var(--btn-opacity));
+    --btn-surface-hover: rgb(from var(--c2) r g b / calc(var(--btn-opacity) + .065));
+    --btn-surface-active: rgb(from var(--c2) r g b / calc(var(--btn-opacity) + .03));
+  }
+}
+
+/* Micro-interaction Shared Keyframes */
+.mm-shake { animation: mmShake .34s var(--ease-fluid); }
+@keyframes mmShake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-5px); }
+  45% { transform: translateX(4px); }
+  70% { transform: translateX(-3px); }
+}
+
+.mm-ripple {
+  position: absolute; border-radius: 50%; pointer-events: none;
+  background: radial-gradient(circle, rgba(255, 255, 255, .38) 0%, color-mix(in srgb, var(--c1) 24%, transparent) 55%, transparent 100%);
+  transform: translate(-50%, -50%) scale(0);
+  animation: mmBtnRipple .55s var(--ease-fluid) forwards;
+}
+@keyframes mmBtnRipple {
+  0% { transform: translate(-50%, -50%) scale(.1); opacity: .9; }
+  100% { transform: translate(-50%, -50%) scale(2.6); opacity: 0; }
+}
+
+/* Utilitas Animasi Maskot */
+.neko-stage { position: relative; width: 76px; height: 28px; display: flex; justify-content: center; align-items: center; gap: 16px; animation: nekoFloat 3.2s ease-in-out infinite; }
+.neko-ear { position: absolute; top: 2px; width: 10px; height: 9px; background: var(--c1); clip-path: polygon(50% 0%, 0% 100%, 100% 100%); opacity: .88; filter: drop-shadow(0 0 5px var(--c1)); }
+.neko-ear.left { left: 6px; transform-origin: bottom center; animation: earTwitchL 5s ease-in-out infinite; }
+.neko-ear.right { right: 6px; transform-origin: bottom center; animation: earTwitchR 5s ease-in-out infinite; }
+.neko-eye-wrap { display: flex; gap: 15px; align-items: center; animation: nekoLookAround 7s ease-in-out infinite; }
+.neko-eye { width: 11px; height: 11px; background: #fff; border-radius: 3px 10px 3px 10px; box-shadow: 0 0 8px var(--c1), 0 0 14px var(--c2); animation: nekoBlinkLive 4.2s infinite; }
+.neko-eye.right { border-radius: 10px 3px 10px 3px; }
+
+.mochi-stage { position: relative; width: 44px; height: 25px; display: flex; align-items: flex-end; justify-content: center; transform-origin: 50% 100%; animation: mochiHop 2.9s ease-in-out infinite; }
+.mochi-body { position: relative; width: 34px; height: 21px; border-radius: 52% 52% 44% 44% / 62% 62% 38% 38%; background: radial-gradient(circle at 34% 28%, #fff 0%, var(--c2) 58%, var(--c1) 135%); box-shadow: 0 0 12px color-mix(in srgb, var(--c1) 52%, transparent), inset 0 -3px 5px rgba(255, 140, 175, .28); }
+.mochi-face { position: absolute; inset: 0; animation: mochiLook 7s ease-in-out infinite; }
+.mochi-eye { position: absolute; top: 7px; width: 4px; height: 6px; border-radius: 50%; background: #2a1c33; animation: nekoBlinkLive 4.4s infinite; }
+.mochi-eye.l { left: 9px; }
+.mochi-eye.r { right: 9px; }
+.mochi-blush { position: absolute; top: 12px; width: 6px; height: 3px; border-radius: 50%; background: #ff8fb0; opacity: .6; }
+.mochi-blush.l { left: 3px; }
+.mochi-blush.r { right: 3px; }
+.mochi-mouth { position: absolute; left: 50%; top: 12px; width: 5px; height: 3px; margin-left: -2.5px; border-bottom: 1.5px solid #2a1c33; border-radius: 0 0 5px 5px; }
+
+.kitsune-wrap { position: relative; display: flex; gap: 18px; align-items: center; animation: nekoLookAround 6s ease-in-out infinite; }
+.kit-eye { width: 9px; height: 12px; background: #fff; clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%); filter: drop-shadow(0 0 6px var(--c1)); animation: nekoBlinkLive 4s infinite; }
+
+@keyframes nekoFloat { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-1.8px); } }
+@keyframes nekoLookAround { 0%, 18%, 100% { transform: translate(0, 0); } 24%, 38% { transform: translate(-4.5px, -.5px); } 44%, 56% { transform: translate(0, 0); } 62%, 78% { transform: translate(4.5px, -.5px); } }
+@keyframes nekoBlinkLive { 0%, 44%, 48%, 90%, 94%, 98%, 100% { transform: scaleY(1); } 46%, 92%, 96% { transform: scaleY(.08); } }
+@keyframes earTwitchL { 0%, 82%, 90%, 100% { transform: rotate(-20deg); } 85% { transform: rotate(-36deg) scale(1.08); } }
+@keyframes earTwitchR { 0%, 36%, 44%, 100% { transform: rotate(20deg); } 39% { transform: rotate(36deg) scale(1.08); } }
+@keyframes mochiHop { 0%, 100% { transform: translateY(0) scale(1.04, .94); } 45% { transform: translateY(-2.5px) scale(.96, 1.05); } }
+@keyframes mochiLook { 0%, 20%, 100% { transform: translateX(0); } 30%, 42% { transform: translateX(-2.5px); } 74%, 86% { transform: translateX(2.5px); } }

@@ -1,44 +1,14 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "MangNotch",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "identifier": "com.mangnotch.app",
   "build": {
     "frontendDist": "../src"
   },
   "app": {
     "withGlobalTauri": true,
-    "windows": [
-      {
-        "label": "notch",
-        "title": "",
-        "url": "notch.html",
-        "width": 1100,
-        "height": 180,
-        "decorations": false,
-        "transparent": true,
-        "alwaysOnTop": true,
-        "skipTaskbar": true,
-        "resizable": false,
-        "shadow": false,
-        "focus": false,
-        "visible": true,
-        "dragDropEnabled": true
-      },
-      {
-        "label": "control",
-        "title": "MangNotch Control Center",
-        "url": "control.html",
-        "width": 720,
-        "height": 560,
-        "decorations": false,
-        "transparent": true,
-        "resizable": false,
-        "center": true,
-        "theme": "Dark",
-        "visible": false
-      }
-    ],
+    "windows": [],
     "security": {
       "csp": null
     }

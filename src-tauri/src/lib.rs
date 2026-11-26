@@ -1,1859 +1,99 @@
-use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
-use serde::{Deserialize, Serialize};
-use std::fs;
-use std::path::PathBuf;
-use std::sync::{
-    atomic::{AtomicBool, AtomicIsize, Ordering},
-    Arc, Mutex,
-};
-use std::thread;
-use std::time::Duration;
+mod config;
+mod extra_peeks;
+mod media;
+mod poller;
+mod shelf;
+mod state;
+mod window_manager;
 
-static SHELF_FILE_DRAG_ACTIVE: AtomicBool = AtomicBool::new(false);
+use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
+use config::{
+    apply_autostart, get_config_dir, load_config_from_disk, resolve_language, save_config_to_disk,
+    AppConfig, MonitorItem, ShelfItem, TodoItem,
+};
+use media::MediaPayload;
+use serde::Serialize;
+use state::{LyricsSyncState, SharedState};
+use std::time::Duration;
 use tauri::{
-    menu::{Menu, MenuItem},
+    menu::{Menu, MenuItem, PredefinedMenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     AppHandle, DragDropEvent, Emitter, Manager, State, WebviewWindow, WindowEvent,
 };
+use window_manager::{
+    enumerate_monitors, reconcile_notch_windows, set_text_input_for_window,
+    show_control_center_safe, NOTCH_REVEAL_DELAY_MS,
+};
 
 #[cfg(windows)]
+use config::{is_packaged_app, query_packaged_startup, wide};
+#[cfg(windows)]
+use window_manager::{apply_control_backdrop, get_hwnd, position_notch_on_monitor};
+#[cfg(windows)]
 use windows::{
-    core::{Interface, PCWSTR},
-    Media::Control::{
-        GlobalSystemMediaTransportControlsSessionManager,
-        GlobalSystemMediaTransportControlsSessionPlaybackStatus,
-    },
-    Storage::Streams::DataReader,
+    core::PCWSTR,
     Win32::{
-        Foundation::{
-            CloseHandle, GetLastError, BOOL, ERROR_ALREADY_EXISTS, HANDLE, HWND, LPARAM, POINT,
-            RECT, WPARAM,
-        },
-        Graphics::Gdi::{
-            EnumDisplayMonitors, GetMonitorInfoW, MonitorFromWindow, HDC, HMONITOR, MONITORINFO,
-            MONITORINFOEXW, MONITOR_DEFAULTTONEAREST,
-        },
+        Foundation::HWND,
         Media::Audio::{
-            eCapture, eConsole, eRender,
-            Endpoints::{IAudioEndpointVolume, IAudioMeterInformation},
-            IMMDeviceEnumerator, MMDeviceEnumerator,
+            eConsole, eRender, Endpoints::IAudioEndpointVolume, IMMDeviceEnumerator,
+            MMDeviceEnumerator,
         },
-        System::{
-            Com::{
-                CoCreateInstance, CoInitializeEx, CoTaskMemFree, IBindCtx, IDataObject, CLSCTX_ALL,
-                COINIT_MULTITHREADED,
-            },
-            Ole::{IDropSource, OleInitialize, DROPEFFECT_COPY, DROPEFFECT_LINK},
-            Power::{GetSystemPowerStatus, SYSTEM_POWER_STATUS},
-            Threading::CreateMutexW,
-        },
-                UI::{
-            Input::KeyboardAndMouse::{
-                keybd_event, GetAsyncKeyState, GetKeyState, ReleaseCapture, KEYEVENTF_KEYUP,
-                VK_MEDIA_NEXT_TRACK, VK_MEDIA_PLAY_PAUSE, VK_MEDIA_PREV_TRACK,
-            },
-            Shell::{
-                BHID_DataObject, FileOpenDialog, IFileOpenDialog, IShellItemArray, SHDoDragDrop,
-                ShellExecuteW, FOS_ALLOWMULTISELECT, FOS_FILEMUSTEXIST, FOS_FORCEFILESYSTEM,
-                SIGDN_FILESYSPATH,
-            },
-            WindowsAndMessaging::{
-                GetClassNameW, GetCursorPos, GetForegroundWindow, GetWindowLongPtrW, GetWindowRect,
-                IsIconic, SendMessageTimeoutW, SetForegroundWindow, SetWindowLongPtrW,
-                SetWindowPos, SetWindowTextW, ShowWindow, GWL_EXSTYLE, GWL_STYLE, HWND_TOPMOST,
-                SMTO_ABORTIFHUNG, SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_SHOWWINDOW, SW_HIDE,
-                SW_SHOWNOACTIVATE, SW_SHOWNORMAL, WINDOW_LONG_PTR_INDEX, WM_NCHITTEST,
-                WS_EX_LAYERED, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TRANSPARENT,
-            },
-        },
+        System::Com::{CoCreateInstance, CoInitializeEx, CLSCTX_ALL, COINIT_MULTITHREADED},
+        UI::{Shell::ShellExecuteW, WindowsAndMessaging::SW_SHOWNORMAL},
     },
 };
 
-const WINDOW_WIDTH: i32 = 1100;
-const HKEY_CURRENT_USER: isize = -2147483647i32 as isize;
-const REG_SZ: u32 = 1;
-const WAIT_OBJECT_0: u32 = 0;
-const ASFW_ANY: u32 = 0xFFFFFFFF;
-const DWMWA_TRANSITIONS_FORCEDISABLED: u32 = 3;
-const DWMWA_CLOAK: u32 = 13;
-const DWMWA_WINDOW_CORNER_PREFERENCE: u32 = 33;
-const DWMWCP_DONOTROUND: u32 = 1;
-const DWMWA_BORDER_COLOR: u32 = 34;
-const DWMWA_COLOR_NONE: u32 = 0xFFFFFFFE;
-const NOTCH_REVEAL_DELAY_MS: u64 = 250;
+#[derive(Clone, Serialize)]
+struct VolumeResponse {
+    volume: u32,
+    muted: bool,
+}
 
-static NOTCH_READY_CALLED: AtomicBool = AtomicBool::new(false);
-static NOTCH_POSITIONED: AtomicBool = AtomicBool::new(false);
-static ORIG_NOTCH_WNDPROC: AtomicIsize = AtomicIsize::new(0);
-// true selama user mengetik di notch (Add Task) -> window boleh di-activate & menerima keyboard
-static NOTCH_TEXT_INPUT: AtomicBool = AtomicBool::new(false);
-static NOTCH_PREV_FG: AtomicIsize = AtomicIsize::new(0);
-
-#[cfg(windows)]
-#[repr(C)]
-struct StyleStruct {
-    style_old: u32,
-    style_new: u32,
+#[derive(Clone, Serialize)]
+struct HttpResponse {
+    status: u32,
+    body: String,
 }
 
 #[cfg(windows)]
-#[repr(C)]
-#[derive(Default)]
-struct DisplayBrightness {
-    uc_display_policy: u8,
-    uc_ac_brightness: u8,
-    uc_dc_brightness: u8,
-}
-
-#[cfg(windows)]
-#[repr(C)]
-struct BluetoothFindRadioParams {
-    dw_size: u32,
-}
-
-#[cfg(windows)]
-#[repr(C)]
-struct BluetoothDeviceSearchParams {
-    dw_size: u32,
-    f_return_authenticated: i32,
-    f_return_remembered: i32,
-    f_return_unknown: i32,
-    f_return_connected: i32,
-    f_issue_inquiry: i32,
-    c_timeout_multiplier: u8,
-    h_radio: isize,
-}
-
-#[cfg(windows)]
-#[repr(C)]
-struct SystemTime {
-    w_year: u16,
-    w_month: u16,
-    w_day_of_week: u16,
-    w_day: u16,
-    w_hour: u16,
-    w_minute: u16,
-    w_second: u16,
-    w_milliseconds: u16,
-}
-
-#[cfg(windows)]
-#[repr(C)]
-struct BluetoothDeviceInfo {
-    dw_size: u32,
-    address: u64,
-    ul_class_of_device: u32,
-    f_connected: i32,
-    f_remembered: i32,
-    f_authenticated: i32,
-    st_last_seen: SystemTime,
-    st_last_used: SystemTime,
-    sz_name: [u16; 248],
-}
-
-#[cfg(windows)]
+#[link(name = "wininet")]
 extern "system" {
-    fn CreateFileW(
-        lp_file_name: *const u16,
-        dw_desired_access: u32,
-        dw_share_mode: u32,
-        lp_security_attributes: *const std::ffi::c_void,
-        dw_creation_disposition: u32,
-        dw_flags_and_attributes: u32,
-        h_template_file: isize,
+    fn InternetOpenW(
+        lpsz_agent: *const u16,
+        dw_access_type: u32,
+        lpsz_proxy: *const u16,
+        lpsz_proxy_bypass: *const u16,
+        dw_flags: u32,
     ) -> isize;
-    fn DeviceIoControl(
-        h_device: isize,
-        dw_io_control_code: u32,
-        lp_in_buffer: *const std::ffi::c_void,
-        n_in_buffer_size: u32,
-        lp_out_buffer: *mut std::ffi::c_void,
-        n_out_buffer_size: u32,
-        lp_bytes_returned: *mut u32,
-        lp_overlapped: *mut std::ffi::c_void,
-    ) -> i32;
-    fn LoadLibraryW(lp_lib_file_name: *const u16) -> isize;
-    fn GetProcAddress(h_module: isize, lp_proc_name: *const u8) -> *const std::ffi::c_void;
-
-    fn CreateEventW(
-        lp_event_attributes: *const std::ffi::c_void,
-        b_manual_reset: i32,
-        b_initial_state: i32,
-        lp_name: *const u16,
+    fn InternetOpenUrlW(
+        h_internet: isize,
+        lpsz_url: *const u16,
+        lpsz_headers: *const u16,
+        dw_headers_length: u32,
+        dw_flags: u32,
+        dw_context: usize,
     ) -> isize;
-    fn SetEvent(h_event: isize) -> i32;
-    fn ResetEvent(h_event: isize) -> i32;
-    fn WaitForSingleObject(h_handle: isize, dw_milliseconds: u32) -> u32;
-    fn AllowSetForegroundWindow(dw_process_id: u32) -> i32;
-    fn IsWindowVisible(hwnd: isize) -> i32;
-    fn GetDpiForWindow(hwnd: isize) -> u32;
-    fn CallWindowProcW(
-        lp_prev_wnd_func: isize,
-        hwnd: isize,
-        msg: u32,
-        wparam: usize,
-        lparam: isize,
-    ) -> isize;
-}
-
-#[cfg(windows)]
-#[link(name = "advapi32")]
-extern "system" {
-    fn RegSetKeyValueW(
-        hkey: isize,
-        lp_sub_key: *const u16,
-        lp_value_name: *const u16,
-        dw_type: u32,
-        lp_data: *const std::ffi::c_void,
-        cb_data: u32,
+    fn HttpQueryInfoW(
+        h_request: isize,
+        dw_info_level: u32,
+        lpv_buffer: *mut std::ffi::c_void,
+        lpdw_buffer_length: *mut u32,
+        lpdw_index: *mut u32,
     ) -> i32;
-    fn RegDeleteKeyValueW(
-        hkey: isize,
-        lp_sub_key: *const u16,
-        lp_value_name: *const u16,
+    fn InternetReadFile(
+        h_file: isize,
+        lp_buffer: *mut u8,
+        dw_number_of_bytes_to_read: u32,
+        lpdw_number_of_bytes_read: *mut u32,
     ) -> i32;
+    fn InternetCloseHandle(h_internet: isize) -> i32;
 }
 
 #[cfg(windows)]
-#[repr(C)]
-struct DwmMargins {
-    cx_left_width: i32,
-    cx_right_width: i32,
-    cy_top_height: i32,
-    cy_bottom_height: i32,
-}
-
-#[cfg(windows)]
-#[link(name = "dwmapi")]
-extern "system" {
-    fn DwmSetWindowAttribute(
-        hwnd: isize,
-        dw_attribute: u32,
-        pv_attribute: *const std::ffi::c_void,
-        cb_attribute: u32,
-    ) -> i32;
-    fn DwmExtendFrameIntoClientArea(hwnd: isize, p_mar_inset: *const DwmMargins) -> i32;
-}
-
-#[cfg(windows)]
-#[link(name = "user32")]
-extern "system" {
-    fn OpenClipboard(h_wnd_new_owner: isize) -> i32;
-    fn CloseClipboard() -> i32;
-    fn IsClipboardFormatAvailable(format: u32) -> i32;
-    fn GetClipboardData(u_format: u32) -> isize;
-}
-
-#[cfg(windows)]
-#[link(name = "kernel32")]
-extern "system" {
-    fn GlobalLock(h_mem: isize) -> *const u8;
-    fn GlobalUnlock(h_mem: isize) -> i32;
-    fn GlobalSize(h_mem: isize) -> usize;
-}
-
-#[cfg(windows)]
-#[link(name = "shell32")]
-extern "system" {
-    fn DragQueryFileW(hdrop: isize, i_file: u32, lpsz_file: *mut u16, cch: u32) -> u32;
-    fn ILCreateFromPathW(psz_path: *const u16) -> *mut std::ffi::c_void;
-    fn ILFree(pidl: *mut std::ffi::c_void);
-    fn SHCreateShellItemArrayFromIDLists(
-        cidl: u32,
-        rgpidl: *const *const std::ffi::c_void,
-        ppsia: *mut *mut std::ffi::c_void,
-    ) -> i32;
-}
-
-#[cfg(windows)]
-unsafe extern "system" fn notch_wnd_proc(
-    hwnd: isize,
-    msg: u32,
-    wparam: usize,
-    lparam: isize,
-) -> isize {
-    const WM_NCCALCSIZE: u32 = 0x0083;
-    const WM_NCPAINT: u32 = 0x0085;
-    const WM_NCACTIVATE: u32 = 0x0086;
-    const WM_MOUSEACTIVATE: u32 = 0x0021;
-    const WM_STYLECHANGING: u32 = 0x007C;
-    const MA_NOACTIVATE: isize = 3;
-    const WM_QUERYENDSESSION: u32 = 0x0011;
-    const WM_ENDSESSION: u32 = 0x0016;
-
-    match msg {
-        // Izinkan Microsoft Store / Windows Restart Manager mematikan app saat proses update
-        WM_QUERYENDSESSION => {
-            debug_log(&format!("[wndproc] WM_QUERYENDSESSION lparam={:#x}", lparam));
-            return 1;
-        }
-        WM_ENDSESSION => {
-            debug_log(&format!(
-                "[wndproc] WM_ENDSESSION wparam={} lparam={:#x}",
-                wparam, lparam
-            ));
-            if wparam != 0 {
-                std::process::exit(0);
-            }
-            return 0;
-        }
-        // Paksa non-client area = 0px secara mutlak
-        WM_NCCALCSIZE => return 0,
-        // Cegah Windows menggambar frame atau bar putih non-client
-        WM_NCPAINT => return 0,
-        // Cegah DefWindowProcW menggambar title bar putih saat pindah fokus / klik tray
-        WM_NCACTIVATE => return 1,
-        // Klik di dalam notch tidak boleh mencuri fokus dari aplikasi lain
-        WM_MOUSEACTIVATE => {
-            if !NOTCH_TEXT_INPUT.load(Ordering::SeqCst) {
-                return MA_NOACTIVATE;
-            }
-        }
-        // Cegah tao/Windows mengembalikan WS_CAPTION / WS_THICKFRAME secara diam-diam
-        WM_STYLECHANGING => {
-            if lparam != 0 {
-                let ss = &mut *(lparam as *mut StyleStruct);
-                if wparam as i32 == -16 {
-                    ss.style_new &=
-                        !(0x00C00000 | 0x00040000 | 0x00800000 | 0x00400000 | 0x00080000);
-                } else if wparam as i32 == -20 {
-                    ss.style_new |= 0x00000080;
-                    if NOTCH_TEXT_INPUT.load(Ordering::SeqCst) {
-                        ss.style_new &= !0x08000000;
-                    } else {
-                        ss.style_new |= 0x08000000;
-                    }
-                }
-            }
-            return 0;
-        }
-        _ => {}
-    }
-
-    let prev = ORIG_NOTCH_WNDPROC.load(Ordering::SeqCst);
-    if prev != 0 {
-        CallWindowProcW(prev, hwnd, msg, wparam, lparam)
-    } else {
-        0
-    }
-}
-
-#[cfg(windows)]
-fn install_notch_wndproc(hwnd: HWND) {
+fn shell_open(target: &str) {
     unsafe {
-        let prev = GetWindowLongPtrW(hwnd, WINDOW_LONG_PTR_INDEX(-4));
-        let hook_fn = notch_wnd_proc as *const () as usize as isize;
-        if prev != 0 && prev != hook_fn {
-            ORIG_NOTCH_WNDPROC.store(prev, Ordering::SeqCst);
-            SetWindowLongPtrW(hwnd, WINDOW_LONG_PTR_INDEX(-4), hook_fn);
-        }
-    }
-}
-
-#[cfg(windows)]
-fn disable_window_transitions(hwnd: HWND) {
-    unsafe {
-        let val: u32 = 1;
-        let _ = DwmSetWindowAttribute(
-            hwnd.0 as isize,
-            DWMWA_TRANSITIONS_FORCEDISABLED,
-            &val as *const _ as *const std::ffi::c_void,
-            std::mem::size_of::<u32>() as u32,
-        );
-        let no_border: u32 = DWMWA_COLOR_NONE;
-        let _ = DwmSetWindowAttribute(
-            hwnd.0 as isize,
-            DWMWA_BORDER_COLOR,
-            &no_border as *const _ as *const std::ffi::c_void,
-            std::mem::size_of::<u32>() as u32,
-        );
-        let corner: u32 = DWMWCP_DONOTROUND;
-        let _ = DwmSetWindowAttribute(
-            hwnd.0 as isize,
-            DWMWA_WINDOW_CORNER_PREFERENCE,
-            &corner as *const _ as *const std::ffi::c_void,
-            std::mem::size_of::<u32>() as u32,
-        );
-    }
-}
-
-#[cfg(windows)]
-fn set_window_cloak(hwnd: HWND, cloak: bool) {
-    unsafe {
-        let val: u32 = if cloak { 1 } else { 0 };
-        let _ = DwmSetWindowAttribute(
-            hwnd.0 as isize,
-            DWMWA_CLOAK,
-            &val as *const _ as *const std::ffi::c_void,
-            std::mem::size_of::<u32>() as u32,
-        );
-    }
-}
-
-#[cfg(windows)]
-fn strip_window_borders(hwnd: HWND) {
-    unsafe {
-        install_notch_wndproc(hwnd);
-
-        let empty_title: [u16; 1] = [0];
-        let _ = SetWindowTextW(hwnd, PCWSTR(empty_title.as_ptr()));
-
-        let style = GetWindowLongPtrW(hwnd, GWL_STYLE);
-        let clean_style = style
-            & !(0x00C00000isize
-                | 0x00040000isize
-                | 0x00800000isize
-                | 0x00400000isize
-                | 0x00080000isize
-                | 0x00020000isize
-                | 0x00010000isize);
-        SetWindowLongPtrW(hwnd, GWL_STYLE, clean_style);
-
-        let ex_style = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
-        SetWindowLongPtrW(
-            hwnd,
-            GWL_EXSTYLE,
-            ex_style
-                | (WS_EX_LAYERED.0 as isize)
-                | (WS_EX_NOACTIVATE.0 as isize)
-                | (WS_EX_TOOLWINDOW.0 as isize),
-        );
-
-        disable_window_transitions(hwnd);
-    }
-}
-
-#[cfg(windows)]
-fn set_hwnd_click_through(hwnd: HWND, ignore: bool) {
-    unsafe {
-        let ex_style = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
-        let typing = NOTCH_TEXT_INPUT.load(Ordering::SeqCst);
-        let mut base_ex = ex_style | (WS_EX_LAYERED.0 as isize) | (WS_EX_TOOLWINDOW.0 as isize);
-        if typing {
-            base_ex &= !(WS_EX_NOACTIVATE.0 as isize);
-        } else {
-            base_ex |= WS_EX_NOACTIVATE.0 as isize;
-        }
-        let ignore = ignore && !typing;
-        let new_ex = if ignore {
-            base_ex | (WS_EX_TRANSPARENT.0 as isize)
-        } else {
-            base_ex & !(WS_EX_TRANSPARENT.0 as isize)
-        };
-        if new_ex != ex_style {
-            SetWindowLongPtrW(hwnd, GWL_EXSTYLE, new_ex);
-        }
-    }
-}
-
-#[cfg(windows)]
-fn read_screen_brightness() -> Option<u8> {
-    unsafe {
-        let path: Vec<u16> = "\\\\.\\LCD\0".encode_utf16().collect();
-        let h_dev = CreateFileW(
-            path.as_ptr(),
-            0x80000000 | 0x40000000,
-            3,
-            std::ptr::null(),
-            3,
-            0,
-            0,
-        );
-        if h_dev == -1 || h_dev == 0 {
-            return None;
-        }
-        let mut brightness = DisplayBrightness::default();
-        let mut bytes_ret: u32 = 0;
-        let ok = DeviceIoControl(
-            h_dev,
-            0x00230498,
-            std::ptr::null(),
-            0,
-            &mut brightness as *mut _ as *mut std::ffi::c_void,
-            std::mem::size_of::<DisplayBrightness>() as u32,
-            &mut bytes_ret,
-            std::ptr::null_mut(),
-        );
-        let _ = CloseHandle(HANDLE(h_dev as *mut _));
-        if ok != 0 {
-            let val = if brightness.uc_display_policy == 1 {
-                brightness.uc_ac_brightness
-            } else {
-                brightness.uc_dc_brightness
-            };
-            Some(val.min(100))
-        } else {
-            None
-        }
-    }
-}
-
-#[cfg(windows)]
-struct BtState {
-    radio_on: bool,
-    connected_count: u32,
-    device_name: String,
-}
-
-#[cfg(windows)]
-fn read_bluetooth_state(bth_mod: isize) -> Option<BtState> {
-    if bth_mod == 0 {
-        return None;
-    }
-    unsafe {
-        type FnFindFirstRadio =
-            unsafe extern "system" fn(*const BluetoothFindRadioParams, *mut isize) -> isize;
-        type FnFindRadioClose = unsafe extern "system" fn(isize) -> i32;
-        type FnFindFirstDevice = unsafe extern "system" fn(
-            *const BluetoothDeviceSearchParams,
-            *mut BluetoothDeviceInfo,
-        ) -> isize;
-        type FnFindNextDevice =
-            unsafe extern "system" fn(isize, *mut BluetoothDeviceInfo) -> i32;
-        type FnFindDeviceClose = unsafe extern "system" fn(isize) -> i32;
-
-        let p_first_radio = GetProcAddress(bth_mod, b"BluetoothFindFirstRadio\0".as_ptr());
-        let p_close_radio = GetProcAddress(bth_mod, b"BluetoothFindRadioClose\0".as_ptr());
-        let p_first_dev = GetProcAddress(bth_mod, b"BluetoothFindFirstDevice\0".as_ptr());
-        let p_next_dev = GetProcAddress(bth_mod, b"BluetoothFindNextDevice\0".as_ptr());
-        let p_close_dev = GetProcAddress(bth_mod, b"BluetoothFindDeviceClose\0".as_ptr());
-
-        if p_first_radio.is_null() || p_close_radio.is_null() {
-            return None;
-        }
-
-        let find_first_radio: FnFindFirstRadio = std::mem::transmute(p_first_radio);
-        let find_radio_close: FnFindRadioClose = std::mem::transmute(p_close_radio);
-
-        let radio_params = BluetoothFindRadioParams {
-            dw_size: std::mem::size_of::<BluetoothFindRadioParams>() as u32,
-        };
-        let mut h_radio: isize = 0;
-        let h_find_radio = find_first_radio(&radio_params, &mut h_radio);
-
-        if h_find_radio == 0 || h_radio == 0 {
-            return Some(BtState {
-                radio_on: false,
-                connected_count: 0,
-                device_name: String::new(),
-            });
-        }
-
-        let mut connected_count = 0;
-        let mut first_dev_name = String::new();
-
-        if !p_first_dev.is_null() && !p_next_dev.is_null() && !p_close_dev.is_null() {
-            let find_first_dev: FnFindFirstDevice = std::mem::transmute(p_first_dev);
-            let find_next_dev: FnFindNextDevice = std::mem::transmute(p_next_dev);
-            let find_dev_close: FnFindDeviceClose = std::mem::transmute(p_close_dev);
-
-            let search_params = BluetoothDeviceSearchParams {
-                dw_size: std::mem::size_of::<BluetoothDeviceSearchParams>() as u32,
-                f_return_authenticated: 1,
-                f_return_remembered: 1,
-                f_return_unknown: 0,
-                f_return_connected: 1,
-                f_issue_inquiry: 0,
-                c_timeout_multiplier: 0,
-                h_radio,
-            };
-
-            let mut dev_info: BluetoothDeviceInfo = std::mem::zeroed();
-            dev_info.dw_size = std::mem::size_of::<BluetoothDeviceInfo>() as u32;
-
-            let h_find_dev = find_first_dev(&search_params, &mut dev_info);
-            if h_find_dev != 0 {
-                loop {
-                    if dev_info.f_connected != 0 {
-                        connected_count += 1;
-                        if first_dev_name.is_empty() {
-                            let len = dev_info
-                                .sz_name
-                                .iter()
-                                .position(|&c| c == 0)
-                                .unwrap_or(dev_info.sz_name.len());
-                            first_dev_name = String::from_utf16_lossy(&dev_info.sz_name[..len])
-                                .trim()
-                                .to_string();
-                        }
-                    }
-                    if find_next_dev(h_find_dev, &mut dev_info) == 0 {
-                        break;
-                    }
-                }
-                let _ = find_dev_close(h_find_dev);
-            }
-        }
-
-        let _ = CloseHandle(HANDLE(h_radio as *mut _));
-        let _ = find_radio_close(h_find_radio);
-
-        Some(BtState {
-            radio_on: true,
-            connected_count,
-            device_name: first_dev_name,
-        })
-    }
-}
-
-#[derive(Clone, Serialize, Deserialize, Debug)]
-pub struct MonitorItem {
-    pub index: usize,
-    pub name: String,
-    pub is_primary: bool,
-    pub x: i32,
-    pub y: i32,
-    pub width: i32,
-    pub height: i32,
-}
-
-#[derive(Clone, Serialize, Deserialize, Debug)]
-pub struct TodoItem {
-    pub text: String,
-    pub done: bool,
-}
-
-#[derive(Clone, Serialize, Deserialize, Debug, Default)]
-#[serde(default)]
-pub struct ShelfItem {
-    pub name: String,
-    pub path: String,
-    pub ext: String,
-    pub size_str: String,
-    pub thumb_b64: String,
-}
-
-#[derive(Clone, Serialize, Deserialize, Debug)]
-pub struct VolumePayload {
-    pub volume: u32,
-    pub muted: bool,
-}
-
-#[derive(Clone, Serialize, Deserialize, Debug)]
-#[serde(default)]
-pub struct AppConfig {
-    pub language: String,
-    pub use_primary_monitor: bool,
-    pub selected_monitor_index: usize,
-    pub hide_on_fullscreen: bool,
-    pub smart_proximity: bool,
-    pub start_with_windows: bool,
-    pub interaction_mode: String,
-    pub hover_close_speed: String,
-    pub enable_hotkey: bool,
-    pub todo_style: String,
-    pub resting_mode: String,
-    pub mascot_style: String,
-    pub theme_preset: String,
-    pub album_art_glow: bool,
-    pub lyrics_pinned_open: bool,
-    pub glass_fill: f32,
-    pub glass_blur: f32,
-    pub glass_rim: f32,
-    pub enable_audio_visualizer: bool,
-    pub ambient_volume: u32,
-    pub enable_peeks: bool,
-    pub peek_duration_ms: u32,
-    pub peek_volume: bool,
-    pub peek_brightness: bool,
-    pub peek_mic: bool,
-    pub peek_charging: bool,
-    pub peek_bluetooth: bool,
-    pub peek_capslock: bool,
-    pub enable_sound: bool,
-    pub pomo_auto_break: bool,
-    pub water_reminder_enabled: bool,
-    pub water_tap_sound: bool,
-    pub water_reminder_sound: bool,
-    pub water_goal_ml: u32,
-    pub water_cup_ml: u32,
-    pub water_current_ml: u32,
-    pub water_interval_min: u32,
-    pub last_water_date: String,
-    pub pomo_minutes: u32,
-    pub pomo_break_minutes: u32,
-    pub todos: Vec<TodoItem>,
-    pub shelf: Vec<ShelfItem>,
-    pub active_width: i32,
-    pub active_height: i32,
-    pub resting_width: i32,
-}
-
-impl Default for AppConfig {
-    fn default() -> Self {
-        Self {
-            language: "id".to_string(),
-            use_primary_monitor: true,
-            selected_monitor_index: 0,
-            hide_on_fullscreen: true,
-            smart_proximity: true,
-            start_with_windows: false,
-            interaction_mode: "hover".to_string(),
-            hover_close_speed: "normal".to_string(),
-            enable_hotkey: true,
-            todo_style: "horizontal".to_string(),
-            resting_mode: "pet".to_string(),
-            mascot_style: "neko".to_string(),
-            theme_preset: "dusk".to_string(),
-            album_art_glow: true,
-            lyrics_pinned_open: false,
-            glass_fill: 0.045,
-            glass_blur: 6.0,
-            glass_rim: 0.07,
-            enable_audio_visualizer: true,
-            ambient_volume: 55,
-            enable_peeks: true,
-            peek_duration_ms: 2400,
-            peek_volume: true,
-            peek_brightness: true,
-            peek_mic: true,
-            peek_charging: true,
-            peek_bluetooth: true,
-            peek_capslock: true,
-            enable_sound: true,
-            pomo_auto_break: false,
-            water_reminder_enabled: true,
-            water_tap_sound: true,
-            water_reminder_sound: true,
-            water_goal_ml: 1500,
-            water_cup_ml: 250,
-            water_current_ml: 0,
-            water_interval_min: 45,
-            last_water_date: String::new(),
-            pomo_minutes: 25,
-            pomo_break_minutes: 5,
-            todos: Vec::new(),
-            shelf: Vec::new(),
-            active_width: 155,
-            active_height: 32,
-            resting_width: 155,
-        }
-    }
-}
-
-#[derive(Clone, Serialize, Deserialize, Debug, Default)]
-pub struct MediaPayload {
-    pub has_media: bool,
-    pub is_playing: bool,
-    pub title: String,
-    pub artist: String,
-    pub position_sec: f64,
-    pub duration_sec: f64,
-    pub thumbnail_b64: String,
-}
-
-#[derive(Clone, Serialize, Deserialize, Debug)]
-pub struct SystemPeekPayload {
-    pub kind: String,
-    pub active: bool,
-    pub percent: u8,
-    pub label: String,
-}
-
-pub struct SharedState(pub Arc<Mutex<AppConfig>>);
-
-fn get_config_dir() -> PathBuf {
-    let base = std::env::var("APPDATA").unwrap_or_else(|_| ".".to_string());
-    let dir = PathBuf::from(base).join("MangNotch");
-    let _ = fs::create_dir_all(&dir);
-    dir
-}
-
-pub struct TrayMenuState {
-    pub show_item: MenuItem<tauri::Wry>,
-    pub quit_item: MenuItem<tauri::Wry>,
-    pub tray_icon: tauri::tray::TrayIcon<tauri::Wry>,
-}
-
-fn apply_tray_language(app: &AppHandle, lang: &str) {
-    if let Some(tray_state) = app.try_state::<TrayMenuState>() {
-        let is_en = lang == "en";
-        let show_txt = if is_en {
-            "Open MangNotch Control"
-        } else {
-            "Buka MangNotch Control"
-        };
-        let quit_txt = if is_en {
-            "Quit MangNotch"
-        } else {
-            "Keluar dari MangNotch"
-        };
-        let tooltip_txt = if is_en {
-            "MangNotch - Click to open Control Center"
-        } else {
-            "MangNotch - Klik untuk membuka Control Center"
-        };
-
-        let _ = tray_state.show_item.set_text(show_txt);
-        let _ = tray_state.quit_item.set_text(quit_txt);
-        let _ = tray_state.tray_icon.set_tooltip(Some(tooltip_txt));
-    }
-}
-
-fn get_config_path() -> PathBuf {
-    get_config_dir().join("config.json")
-}
-
-fn load_config_from_disk() -> AppConfig {
-    let path = get_config_path();
-    if let Ok(data) = fs::read_to_string(path) {
-        if let Ok(mut cfg) = serde_json::from_str::<AppConfig>(&data) {
-            cfg.active_width = 155;
-            cfg.active_height = 32;
-            cfg.resting_width = 155;
-            if cfg.language != "id" && cfg.language != "en" {
-                cfg.language = "id".to_string();
-            }
-            if cfg.interaction_mode != "click" && cfg.interaction_mode != "hover" {
-                cfg.interaction_mode = "hover".to_string();
-            }
-            if cfg.todo_style != "horizontal" && cfg.todo_style != "vertical" {
-                cfg.todo_style = "horizontal".to_string();
-            }
-            cfg.glass_fill = cfg.glass_fill.clamp(0.0, 0.20);
-            cfg.glass_blur = cfg.glass_blur.clamp(0.0, 24.0);
-            cfg.glass_rim = cfg.glass_rim.clamp(0.0, 0.20);
-            return cfg;
-        }
-    }
-    AppConfig::default()
-}
-
-fn save_config_to_disk(cfg: &AppConfig) {
-    let path = get_config_path();
-    if let Ok(json) = serde_json::to_string_pretty(cfg) {
-        let _ = fs::write(path, json);
-    }
-}
-
-fn unblock_file_motw(path: &str) {
-    let ads_path = format!("{}:Zone.Identifier", path);
-    let _ = fs::remove_file(ads_path);
-}
-
-const RUN_SUBKEY: &str = "Software\\Microsoft\\Windows\\CurrentVersion\\Run";
-const RUN_VALUE: &str = "MangNotch";
-const STARTUP_TASK_ID: &str = "MangNotchStartup";
-
-#[cfg(windows)]
-fn wide(s: &str) -> Vec<u16> {
-    s.encode_utf16().chain(std::iter::once(0)).collect()
-}
-
-/// True kalau app jalan sebagai MSIX/Store (path-nya di dalam WindowsApps).
-#[cfg(windows)]
-fn is_packaged_app() -> bool {
-    std::env::current_exe()
-        .map(|p| p.to_string_lossy().contains("WindowsApps"))
-        .unwrap_or(false)
-}
-
-#[cfg(windows)]
-fn run_key_delete() {
-    let (k, v) = (wide(RUN_SUBKEY), wide(RUN_VALUE));
-    unsafe {
-        let _ = RegDeleteKeyValueW(HKEY_CURRENT_USER, k.as_ptr(), v.as_ptr());
-    }
-}
-
-#[cfg(windows)]
-fn run_key_set() {
-    let Ok(exe_path) = std::env::current_exe() else {
-        return;
-    };
-    let cmd = wide(&format!("\"{}\"", exe_path.to_string_lossy()));
-    let (k, v) = (wide(RUN_SUBKEY), wide(RUN_VALUE));
-    unsafe {
-        let _ = RegSetKeyValueW(
-            HKEY_CURRENT_USER,
-            k.as_ptr(),
-            v.as_ptr(),
-            REG_SZ,
-            cmd.as_ptr() as *const std::ffi::c_void,
-            (cmd.len() * 2) as u32,
-        );
-    }
-}
-
-/// Log sederhana ke %APPDATA%\\MangNotch\\debug.log (buat nyari crash di build Store).
-fn debug_log(msg: &str) {
-    use std::io::Write;
-    if let Ok(mut f) = fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(get_config_dir().join("debug.log"))
-    {
-        let _ = writeln!(f, "{}", msg);
-    }
-}
-
-/// MSIX: autostart HARUS lewat StartupTask (sesuai Package.appxmanifest).
-/// Registry HKCU\...\Run dari dalam MSIX itu di-virtualisasi, jadi nggak dibaca Windows
-/// saat boot dan nggak bisa menghapus entry "asli" yang ditulis versi non-MSIX.
-#[cfg(windows)]
-fn set_packaged_startup(enable: bool) {
-    // thread terpisah: RequestEnableAsync bisa memunculkan dialog persetujuan,
-    // jangan sampai nge-freeze main thread.
-    std::thread::spawn(move || unsafe {
-        use windows::core::HSTRING;
-        use windows::ApplicationModel::{StartupTask, StartupTaskState};
-        debug_log(&format!("[startup] begin enable={}", enable));
-        let hr = CoInitializeEx(None, COINIT_MULTITHREADED);
-        debug_log(&format!("[startup] CoInitializeEx -> {:?}", hr));
-        debug_log("[startup] calling GetAsync");
-        let op = match StartupTask::GetAsync(&HSTRING::from(STARTUP_TASK_ID)) {
-            Ok(op) => op,
-            Err(e) => {
-                debug_log(&format!("[startup] GetAsync failed: {:?}", e));
-                return;
-            }
-        };
-        debug_log("[startup] GetAsync returned, waiting for result");
-        let task = match op.get() {
-            Ok(t) => t,
-            Err(e) => {
-                debug_log(&format!("[startup] GetAsync result failed: {:?}", e));
-                return;
-            }
-        };
-        debug_log("[startup] got task");
-        let state = task.State().ok();
-        debug_log(&format!("[startup] state before = {:?}", state));
-        if enable {
-            if state == Some(StartupTaskState::Disabled) {
-                debug_log("[startup] calling RequestEnableAsync");
-                let r = task.RequestEnableAsync().and_then(|op| op.get());
-                debug_log(&format!("[startup] RequestEnableAsync -> {:?}", r));
-            }
-            // DisabledByUser / DisabledByPolicy: cuma user yang bisa nyalain lewat
-            // Settings > Apps > Startup. Nggak bisa dipaksa dari kode.
-        } else if matches!(
-            state,
-            Some(StartupTaskState::Enabled) | Some(StartupTaskState::EnabledByPolicy)
-        ) {
-            let _ = task.Disable();
-            debug_log("[startup] Disable() done");
-        }
-        debug_log("[startup] end");
-    });
-}
-
-/// Status startup MSIX yang sebenarnya menurut Windows (source of truth).
-#[cfg(windows)]
-fn query_packaged_startup() -> Option<bool> {
-    std::thread::spawn(|| unsafe {
-        use windows::core::HSTRING;
-        use windows::ApplicationModel::{StartupTask, StartupTaskState};
-        let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
-        let task = StartupTask::GetAsync(&HSTRING::from(STARTUP_TASK_ID))
-            .and_then(|op| op.get())
-            .ok()?;
-        let st = task.State().ok()?;
-        Some(st == StartupTaskState::Enabled || st == StartupTaskState::EnabledByPolicy)
-    })
-    .join()
-    .ok()
-    .flatten()
-}
-
-fn apply_autostart(enable: bool) {
-    #[cfg(windows)]
-    {
-        if is_packaged_app() {
-            run_key_delete(); // bersihin sisa lama kalau bisa (best effort)
-            set_packaged_startup(enable);
-        } else if enable {
-            // build debug jangan daftarin exe dev ke autostart
-            if !cfg!(debug_assertions) {
-                run_key_set();
-            }
-        } else {
-            // BUG LAMA: dulu `return` di debug build, jadi toggle OFF nggak pernah
-            // menghapus entry. Sekarang hapus selalu jalan.
-            run_key_delete();
-        }
-    }
-    #[cfg(not(windows))]
-    let _ = enable;
-}
-
-fn show_control_center_safe(app: &AppHandle) {
-    let app_clone = app.clone();
-    let _ = app.run_on_main_thread(move || {
-        if let Some(notch_win) = app_clone.get_webview_window("notch") {
-            #[cfg(windows)]
-            if let Some(hwnd) = get_hwnd(&notch_win) {
-                set_hwnd_click_through(hwnd, true);
-            }
-        }
-        let _ = app_clone.emit("notch-hover", false);
-
-        if let Some(ctrl_win) = app_clone.get_webview_window("control") {
-            let _ = ctrl_win.show();
-            let _ = ctrl_win.unminimize();
-            let _ = ctrl_win.set_always_on_top(true);
-            let _ = ctrl_win.set_focus();
-            let _ = ctrl_win.set_always_on_top(false);
-
-            #[cfg(windows)]
-            if let Some(hwnd) = get_hwnd(&ctrl_win) {
-                unsafe {
-                    let _ = SetForegroundWindow(hwnd);
-                }
-            }
-        }
-    });
-}
-
-#[cfg(windows)]
-fn read_master_volume() -> VolumePayload {
-    unsafe {
-        let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
-        if let Ok(enumerator) =
-            CoCreateInstance::<_, IMMDeviceEnumerator>(&MMDeviceEnumerator, None, CLSCTX_ALL)
-        {
-            if let Ok(device) = enumerator.GetDefaultAudioEndpoint(eRender, eConsole) {
-                if let Ok(endpoint) = device.Activate::<IAudioEndpointVolume>(CLSCTX_ALL, None) {
-                    let level = endpoint.GetMasterVolumeLevelScalar().unwrap_or(0.5);
-                    let muted = endpoint.GetMute().map(|b| b.as_bool()).unwrap_or(false);
-                    return VolumePayload {
-                        volume: (level * 100.0).round().clamp(0.0, 100.0) as u32,
-                        muted,
-                    };
-                }
-            }
-        }
-    }
-    VolumePayload {
-        volume: 50,
-        muted: false,
-    }
-}
-
-#[cfg(windows)]
-fn write_master_volume(volume: Option<u32>, mute: Option<bool>) -> VolumePayload {
-    unsafe {
-        let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
-        if let Ok(enumerator) =
-            CoCreateInstance::<_, IMMDeviceEnumerator>(&MMDeviceEnumerator, None, CLSCTX_ALL)
-        {
-            if let Ok(device) = enumerator.GetDefaultAudioEndpoint(eRender, eConsole) {
-                if let Ok(endpoint) = device.Activate::<IAudioEndpointVolume>(CLSCTX_ALL, None) {
-                    if let Some(v) = volume {
-                        let clamped = v.min(100);
-                        let scalar = (clamped as f32) / 100.0;
-                        let _ = endpoint.SetMasterVolumeLevelScalar(scalar, std::ptr::null());
-                        if clamped == 0 {
-                            let _ = endpoint.SetMute(BOOL(1), std::ptr::null());
-                        } else {
-                            let _ = endpoint.SetMute(BOOL(0), std::ptr::null());
-                        }
-                    }
-                    if let Some(m) = mute {
-                        let _ = endpoint.SetMute(BOOL(if m { 1 } else { 0 }), std::ptr::null());
-                    }
-                }
-            }
-        }
-    }
-    read_master_volume()
-}
-
-#[cfg(windows)]
-fn read_audio_peak() -> f32 {
-    unsafe {
-        let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
-        if let Ok(enumerator) =
-            CoCreateInstance::<_, IMMDeviceEnumerator>(&MMDeviceEnumerator, None, CLSCTX_ALL)
-        {
-            if let Ok(device) = enumerator.GetDefaultAudioEndpoint(eRender, eConsole) {
-                if let Ok(meter) = device.Activate::<IAudioMeterInformation>(CLSCTX_ALL, None) {
-                    if let Ok(peak) = meter.GetPeakValue() {
-                        return peak.clamp(0.0, 1.0);
-                    }
-                }
-            }
-        }
-    }
-    0.0
-}
-
-#[cfg(windows)]
-fn read_mic_muted() -> Option<bool> {
-    unsafe {
-        let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
-        if let Ok(enumerator) =
-            CoCreateInstance::<_, IMMDeviceEnumerator>(&MMDeviceEnumerator, None, CLSCTX_ALL)
-        {
-            if let Ok(device) = enumerator.GetDefaultAudioEndpoint(eCapture, eConsole) {
-                if let Ok(endpoint) = device.Activate::<IAudioEndpointVolume>(CLSCTX_ALL, None) {
-                    if let Ok(muted) = endpoint.GetMute() {
-                        return Some(muted.as_bool());
-                    }
-                }
-            }
-        }
-    }
-    None
-}
-
-#[cfg(windows)]
-fn toggle_mic_muted_state() -> Option<bool> {
-    unsafe {
-        let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
-        if let Ok(enumerator) =
-            CoCreateInstance::<_, IMMDeviceEnumerator>(&MMDeviceEnumerator, None, CLSCTX_ALL)
-        {
-            if let Ok(device) = enumerator.GetDefaultAudioEndpoint(eCapture, eConsole) {
-                if let Ok(endpoint) = device.Activate::<IAudioEndpointVolume>(CLSCTX_ALL, None) {
-                    let cur = endpoint.GetMute().map(|b| b.as_bool()).unwrap_or(false);
-                    let next = !cur;
-                    let _ = endpoint.SetMute(BOOL(if next { 1 } else { 0 }), std::ptr::null());
-                    return Some(next);
-                }
-            }
-        }
-    }
-    None
-}
-
-fn format_file_size(bytes: u64) -> String {
-    if bytes < 1024 {
-        format!("{} B", bytes)
-    } else if bytes < 1024 * 1024 {
-        format!("{:.1} KB", (bytes as f64) / 1024.0)
-    } else {
-        format!("{:.1} MB", (bytes as f64) / (1024.0 * 1024.0))
-    }
-}
-
-fn enrich_shelf_item(full_path: &str) -> Option<ShelfItem> {
-    let p = PathBuf::from(full_path);
-    if !p.exists() {
-        return None;
-    }
-    unblock_file_motw(full_path);
-    let name = p
-        .file_name()
-        .map(|s| s.to_string_lossy().to_string())
-        .unwrap_or_else(|| full_path.to_string());
-    let ext = p
-        .extension()
-        .map(|s| s.to_string_lossy().to_uppercase())
-        .unwrap_or_else(|| "FILE".to_string());
-    let meta = fs::metadata(&p).ok();
-    let file_len = meta.as_ref().map(|m| m.len()).unwrap_or(0);
-    let size_str = if meta.as_ref().map(|m| m.is_dir()).unwrap_or(false) {
-        "FOLDER".to_string()
-    } else {
-        format_file_size(file_len)
-    };
-
-    let mut thumb_b64 = String::new();
-    let ext_low = ext.to_lowercase();
-    if matches!(
-        ext_low.as_str(),
-        "png" | "jpg" | "jpeg" | "webp" | "gif" | "bmp" | "ico"
-    ) && file_len > 0
-        && file_len <= 4_500_000
-    {
-        if let Ok(bytes) = fs::read(&p) {
-            let mime = match ext_low.as_str() {
-                "jpg" | "jpeg" => "image/jpeg",
-                "webp" => "image/webp",
-                "gif" => "image/gif",
-                "bmp" => "image/bmp",
-                "ico" => "image/x-icon",
-                _ => "image/png",
-            };
-            thumb_b64 = format!("data:{};base64,{}", mime, BASE64.encode(&bytes));
-        }
-    }
-
-    Some(ShelfItem {
-        name,
-        path: full_path.to_string(),
-        ext: ext.chars().take(5).collect(),
-        size_str,
-        thumb_b64,
-    })
-}
-
-#[cfg(windows)]
-fn read_clipboard_to_shelf_paths() -> Vec<String> {
-    let mut paths = Vec::new();
-    unsafe {
-        if OpenClipboard(0) == 0 {
-            return paths;
-        }
-
-        // 1. Cek apakah ada file yang di-copy dari File Explorer (CF_HDROP = 15)
-        if IsClipboardFormatAvailable(15) != 0 {
-            let hdrop = GetClipboardData(15);
-            if hdrop != 0 {
-                let count = DragQueryFileW(hdrop, 0xFFFFFFFF, std::ptr::null_mut(), 0);
-                for i in 0..count {
-                    let len = DragQueryFileW(hdrop, i, std::ptr::null_mut(), 0);
-                    if len > 0 {
-                        let mut buf = vec![0u16; (len + 1) as usize];
-                        DragQueryFileW(hdrop, i, buf.as_mut_ptr(), len + 1);
-                        let path_str = String::from_utf16_lossy(&buf[..len as usize]);
-                        if !path_str.is_empty() {
-                            paths.push(path_str);
-                        }
-                    }
-                }
-            }
-        }
-        // 2. Cek apakah ada gambar/screenshot di Clipboard (CF_DIB = 8)
-        else if IsClipboardFormatAvailable(8) != 0 {
-            let hdib = GetClipboardData(8);
-            if hdib != 0 {
-                let ptr = GlobalLock(hdib);
-                let size = GlobalSize(hdib);
-                if !ptr.is_null() && size > 40 {
-                    let dib_slice = std::slice::from_raw_parts(ptr, size);
-                    let bi_size = u32::from_le_bytes([
-                        dib_slice[0],
-                        dib_slice[1],
-                        dib_slice[2],
-                        dib_slice[3],
-                    ]);
-                    let bi_bit_count = u16::from_le_bytes([dib_slice[14], dib_slice[15]]);
-                    let bi_compression = u32::from_le_bytes([
-                        dib_slice[16],
-                        dib_slice[17],
-                        dib_slice[18],
-                        dib_slice[19],
-                    ]);
-                    let bi_clr_used = u32::from_le_bytes([
-                        dib_slice[32],
-                        dib_slice[33],
-                        dib_slice[34],
-                        dib_slice[35],
-                    ]);
-                    let mask_bytes = if bi_compression == 3 && bi_size == 40 { 12 } else { 0 };
-                    let palette_size = if bi_clr_used > 0 {
-                        bi_clr_used * 4
-                    } else if bi_bit_count <= 8 {
-                        (1u32 << bi_bit_count) * 4
-                    } else {
-                        0
-                    };
-                    let bf_off_bits = 14 + bi_size + mask_bytes + palette_size;
-                    let file_size = (14 + size) as u32;
-
-                    let mut bmp_bytes = Vec::with_capacity(14 + size);
-                    bmp_bytes.extend_from_slice(b"BM");
-                    bmp_bytes.extend_from_slice(&file_size.to_le_bytes());
-                    bmp_bytes.extend_from_slice(&[0u8; 4]);
-                    bmp_bytes.extend_from_slice(&bf_off_bits.to_le_bytes());
-                    bmp_bytes.extend_from_slice(dib_slice);
-
-                    let _ = GlobalUnlock(hdib);
-
-                    let drops_dir = get_config_dir().join("ShelfDrops");
-                    let _ = fs::create_dir_all(&drops_dir);
-                    let ts = std::time::SystemTime::now()
-                        .duration_since(std::time::UNIX_EPOCH)
-                        .map(|d| d.as_millis())
-                        .unwrap_or(0);
-                    let file_path = drops_dir.join(format!("screenshot_{}.bmp", ts));
-                    if fs::write(&file_path, bmp_bytes).is_ok() {
-                        paths.push(file_path.to_string_lossy().to_string());
-                    }
-                } else if !ptr.is_null() {
-                    let _ = GlobalUnlock(hdib);
-                }
-            }
-        }
-        // 3. Cek apakah ada teks di Clipboard (CF_UNICODETEXT = 13)
-        else if IsClipboardFormatAvailable(13) != 0 {
-            let htext = GetClipboardData(13);
-            if htext != 0 {
-                let ptr = GlobalLock(htext) as *const u16;
-                if !ptr.is_null() {
-                    let mut len = 0usize;
-                    while *ptr.add(len) != 0 && len < 100_000 {
-                        len += 1;
-                    }
-                    let slice = std::slice::from_raw_parts(ptr, len);
-                    let text_str = String::from_utf16_lossy(slice).trim().to_string();
-                    let _ = GlobalUnlock(htext);
-
-                    if !text_str.is_empty() {
-                        let drops_dir = get_config_dir().join("ShelfDrops");
-                        let _ = fs::create_dir_all(&drops_dir);
-                        let ts = std::time::SystemTime::now()
-                            .duration_since(std::time::UNIX_EPOCH)
-                            .map(|d| d.as_millis())
-                            .unwrap_or(0);
-                        let file_path = drops_dir.join(format!("note_{}.txt", ts));
-                        if fs::write(&file_path, text_str.as_bytes()).is_ok() {
-                            paths.push(file_path.to_string_lossy().to_string());
-                        }
-                    }
-                }
-            }
-        }
-
-        let _ = CloseClipboard();
-    }
-    paths
-}
-
-#[cfg(windows)]
-fn get_hwnd(win: &WebviewWindow) -> Option<HWND> {
-    win.hwnd().ok().map(|h| HWND(h.0 as *mut _))
-}
-
-#[cfg(windows)]
-fn enumerate_monitors() -> Vec<MonitorItem> {
-    let mut monitors: Vec<MonitorItem> = Vec::new();
-    unsafe {
-        unsafe extern "system" fn callback(
-            hmonitor: HMONITOR,
-            _hdc: HDC,
-            _lprc: *mut RECT,
-            dwdata: LPARAM,
-        ) -> BOOL {
-            let list = &mut *(dwdata.0 as *mut Vec<MonitorItem>);
-            let mut mi = MONITORINFOEXW::default();
-            mi.monitorInfo.cbSize = std::mem::size_of::<MONITORINFOEXW>() as u32;
-
-            if GetMonitorInfoW(hmonitor, &mut mi.monitorInfo).as_bool() {
-                let r = mi.monitorInfo.rcMonitor;
-                let is_primary = (mi.monitorInfo.dwFlags & 1) != 0;
-                let raw_name = String::from_utf16_lossy(&mi.szDevice)
-                    .trim_matches(char::from(0))
-                    .to_string();
-                let idx = list.len();
-                list.push(MonitorItem {
-                    index: idx,
-                    name: if is_primary {
-                        format!("Monitor {} ({}) - Primary", idx + 1, raw_name)
-                    } else {
-                        format!("Monitor {} ({})", idx + 1, raw_name)
-                    },
-                    is_primary,
-                    x: r.left,
-                    y: r.top,
-                    width: r.right - r.left,
-                    height: r.bottom - r.top,
-                });
-            }
-            BOOL(1)
-        }
-
-        let _ = EnumDisplayMonitors(
-            HDC::default(),
-            None,
-            Some(callback),
-            LPARAM(&mut monitors as *mut _ as isize),
-        );
-    }
-    monitors
-}
-
-#[cfg(windows)]
-fn get_scaled_notch_size(notch_hwnd: HWND) -> (i32, i32) {
-    let dpi = unsafe { GetDpiForWindow(notch_hwnd.0 as isize) };
-    let scale = if dpi > 0 { (dpi as f64) / 96.0 } else { 1.0 };
-    let phys_w = ((WINDOW_WIDTH as f64) * scale).round() as i32;
-    let phys_h = (180.0 * scale).round() as i32;
-    (phys_w, phys_h)
-}
-
-#[cfg(windows)]
-fn place_notch_boot_peeking(notch_hwnd: HWND, cfg: &AppConfig) {
-    let monitors = enumerate_monitors();
-    let target = if cfg.use_primary_monitor {
-        monitors.iter().find(|m| m.is_primary).or(monitors.first())
-    } else {
-        monitors.get(cfg.selected_monitor_index).or(monitors.first())
-    };
-
-    if let Some(mon) = target {
-        strip_window_borders(notch_hwnd);
-        let (phys_w, phys_h) = get_scaled_notch_size(notch_hwnd);
-        let x = mon.x + (mon.width - phys_w) / 2;
-        let y = mon.y - phys_h + 2;
-        unsafe {
-            let _ = SetWindowPos(
-                notch_hwnd,
-                HWND_TOPMOST,
-                x,
-                y,
-                phys_w,
-                phys_h,
-                SWP_NOACTIVATE | SWP_FRAMECHANGED,
-            );
-        }
-    }
-}
-
-#[cfg(windows)]
-fn position_notch_window(notch_hwnd: HWND, cfg: &AppConfig) {
-    let monitors = enumerate_monitors();
-    let target = if cfg.use_primary_monitor {
-        monitors.iter().find(|m| m.is_primary).or(monitors.first())
-    } else {
-        monitors.get(cfg.selected_monitor_index).or(monitors.first())
-    };
-
-    if let Some(mon) = target {
-        strip_window_borders(notch_hwnd);
-        let (phys_w, phys_h) = get_scaled_notch_size(notch_hwnd);
-        let x = mon.x + (mon.width - phys_w) / 2;
-        let y = mon.y;
-        unsafe {
-            let _ = ShowWindow(notch_hwnd, SW_SHOWNOACTIVATE);
-            let _ = SetWindowPos(
-                notch_hwnd,
-                HWND_TOPMOST,
-                x,
-                y,
-                phys_w,
-                phys_h,
-                SWP_NOACTIVATE | SWP_SHOWWINDOW,
-            );
-        }
-    }
-}
-
-#[cfg(windows)]
-unsafe fn check_window_obstruction(
-    fg: HWND,
-    class_name: &str,
-    fg_rect: &RECT,
-    mon_rect: &RECT,
-    notch_center_x: i32,
-    resting_width: i32,
-) -> bool {
-    if IsIconic(fg).as_bool() {
-        return false;
-    }
-
-    let notch_half_w = (resting_width.max(155) / 2) + 22;
-    let n_left = notch_center_x - notch_half_w;
-    let n_right = notch_center_x + notch_half_w;
-    let n_bottom = mon_rect.top + 36;
-
-    let horiz_overlap = fg_rect.left < n_right && fg_rect.right > n_left;
-    let vert_overlap = fg_rect.top < n_bottom && fg_rect.bottom > mon_rect.top;
-    if !horiz_overlap || !vert_overlap {
-        return false;
-    }
-
-    let is_maximized_like = fg_rect.top <= mon_rect.top + 2
-        && fg_rect.left <= mon_rect.left + 12
-        && fg_rect.right >= mon_rect.right - 12;
-
-    if !is_maximized_like {
-        return true;
-    }
-
-    let is_browser = class_name.contains("Chrome_WidgetWin") || class_name.contains("Mozilla");
-    if !is_browser {
-        // Semua aplikasi non-browser (Video Player, Media Player, dll.) yang di-maximize
-        // langsung memicu Smart Proximity agar Notch mengecil menjadi garis minimalis
-        return true;
-    }
-
-    let sample_ys = [mon_rect.top + 14, mon_rect.top + 22, mon_rect.top + 28];
-    let mut sx = n_left;
-    while sx <= n_right {
-        for &sy in &sample_ys {
-            let lparam = LPARAM(((sy & 0xFFFF) << 16 | (sx & 0xFFFF)) as isize);
-            let mut hit_res: usize = 0;
-            let ok = SendMessageTimeoutW(
-                fg,
-                WM_NCHITTEST,
-                WPARAM(0),
-                lparam,
-                SMTO_ABORTIFHUNG,
-                25,
-                Some(&mut hit_res as *mut usize),
-            );
-            if ok.0 != 0 && hit_res as u32 == 1 {
-                return true;
-            }
-        }
-        sx += 20;
-    }
-
-    false
-}
-
-#[cfg(windows)]
-fn fetch_windows_media(last_key: &mut String, last_thumb: &mut String) -> MediaPayload {
-    let Ok(manager) = GlobalSystemMediaTransportControlsSessionManager::RequestAsync()
-        .and_then(|op| op.get())
-    else {
-        return MediaPayload::default();
-    };
-
-    let Ok(session) = manager.GetCurrentSession() else {
-        return MediaPayload::default();
-    };
-
-    let is_playing = session
-        .GetPlaybackInfo()
-        .and_then(|info| info.PlaybackStatus())
-        .map(|st| st == GlobalSystemMediaTransportControlsSessionPlaybackStatus::Playing)
-        .unwrap_or(false);
-
-    let (title, artist, props_opt) =
-        match session.TryGetMediaPropertiesAsync().and_then(|op| op.get()) {
-            Ok(props) => {
-                let t = props.Title().map(|s| s.to_string()).unwrap_or_default();
-                let a = props.Artist().map(|s| s.to_string()).unwrap_or_default();
-                (t, a, Some(props))
-            }
-            Err(_) => (String::new(), String::new(), None),
-        };
-
-    if title.is_empty() {
-        return MediaPayload::default();
-    }
-
-    let (position_sec, duration_sec) = match session.GetTimelineProperties() {
-        Ok(tl) => {
-            let pos = tl.Position().map(|t| t.Duration as f64 / 10_000_000.0).unwrap_or(0.0);
-            let end = tl.EndTime().map(|t| t.Duration as f64 / 10_000_000.0).unwrap_or(0.0);
-            (pos.max(0.0), end.max(0.0))
-        }
-        Err(_) => (0.0, 0.0),
-    };
-
-    let current_key = format!("{}::{}", title, artist);
-    if *last_key != current_key {
-        *last_key = current_key;
-        *last_thumb = String::new();
-
-        if let Some(props) = props_opt {
-            if let Ok(thumb_ref) = props.Thumbnail() {
-                if let Ok(stream) = thumb_ref.OpenReadAsync().and_then(|op| op.get()) {
-                    let size = stream.Size().unwrap_or(0) as u32;
-                    if size > 0 && size < 4_000_000 {
-                        if let Ok(reader) = DataReader::CreateDataReader(&stream) {
-                            if reader.LoadAsync(size).and_then(|op| op.get()).is_ok() {
-                                let mut buf = vec![0u8; size as usize];
-                                if reader.ReadBytes(&mut buf).is_ok() {
-                                    *last_thumb =
-                                        format!("data:image/png;base64,{}", BASE64.encode(&buf));
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    MediaPayload {
-        has_media: true,
-        is_playing,
-        title,
-        artist,
-        position_sec,
-        duration_sec,
-        thumbnail_b64: last_thumb.clone(),
-    }
-}
-
-#[tauri::command]
-fn get_app_logo() -> String {
-    let bytes = include_bytes!("../icons/logo.png");
-    format!("data:image/png;base64,{}", BASE64.encode(bytes))
-}
-
-#[tauri::command]
-fn get_app_version() -> String {
-    env!("CARGO_PKG_VERSION").to_string()
-}
-
-#[tauri::command]
-fn get_install_channel() -> String {
-    if let Ok(exe_path) = std::env::current_exe() {
-        if exe_path.to_string_lossy().contains("WindowsApps") {
-            return "msix".to_string();
-        }
-    }
-    "standalone".to_string()
-}
-
-#[tauri::command]
-fn trigger_update_window(app: AppHandle, is_forced: bool) {
-    if is_forced {
-        let app_clone = app.clone();
-        let _ = app.run_on_main_thread(move || {
-            if let Some(notch_win) = app_clone.get_webview_window("notch") {
-                let _ = notch_win.hide();
-            }
-        });
-    }
-    show_control_center_safe(&app);
-}
-
-#[tauri::command]
-fn open_config_folder() {
-    let dir = get_config_dir().to_string_lossy().to_string();
-    #[cfg(windows)]
-    unsafe {
-        let op: Vec<u16> = "open\0".encode_utf16().collect();
-        let target: Vec<u16> = dir.encode_utf16().chain(std::iter::once(0)).collect();
-        let _ = ShellExecuteW(
-            HWND::default(),
-            PCWSTR(op.as_ptr()),
-            PCWSTR(target.as_ptr()),
-            PCWSTR::null(),
-            PCWSTR::null(),
-            SW_SHOWNORMAL,
-        );
-    }
-}
-
-#[tauri::command]
-fn open_external_url(url: String) {
-    #[cfg(windows)]
-    unsafe {
-        let op: Vec<u16> = "open\0".encode_utf16().collect();
-        let target: Vec<u16> = url.encode_utf16().chain(std::iter::once(0)).collect();
-        let _ = ShellExecuteW(
-            HWND::default(),
-            PCWSTR(op.as_ptr()),
-            PCWSTR(target.as_ptr()),
-            PCWSTR::null(),
-            PCWSTR::null(),
-            SW_SHOWNORMAL,
-        );
-    }
-}
-
-#[tauri::command]
-fn launch_update_and_exit(app: AppHandle, url: String) {
-    open_external_url(url);
-    thread::spawn(move || {
-        thread::sleep(Duration::from_millis(400));
-        debug_log("[exit] launch_update_and_exit");
-        app.exit(0);
-    });
-}
-
-#[tauri::command]
-fn get_monitors() -> Vec<MonitorItem> {
-    enumerate_monitors()
-}
-
-#[tauri::command]
-fn get_config(state: State<'_, SharedState>) -> AppConfig {
-    state.0.lock().unwrap().clone()
-}
-
-#[tauri::command]
-fn save_full_config(app: AppHandle, state: State<'_, SharedState>, new_cfg: AppConfig) {
-    let mut cfg = state.0.lock().unwrap();
-    let active_w = cfg.active_width;
-    let active_h = cfg.active_height;
-    let resting_w = cfg.resting_width;
-
-    let prev_autostart = cfg.start_with_windows;
-    *cfg = new_cfg;
-    cfg.active_width = active_w;
-    cfg.active_height = active_h;
-    cfg.resting_width = resting_w;
-
-    // jangan panggil tiap save (slider glass nge-save di tiap event input)
-    if cfg.start_with_windows != prev_autostart {
-        apply_autostart(cfg.start_with_windows);
-    }
-    apply_tray_language(&app, &cfg.language);
-    save_config_to_disk(&cfg);
-
-    if NOTCH_POSITIONED.load(Ordering::SeqCst) {
-        if let Some(notch_win) = app.get_webview_window("notch") {
-            if let Some(hwnd) = get_hwnd(&notch_win) {
-                position_notch_window(hwnd, &cfg);
-            }
-        }
-    }
-
-    let _ = app.emit("config-updated", cfg.clone());
-}
-
-#[tauri::command]
-fn sync_widget_data(
-    app: AppHandle,
-    state: State<'_, SharedState>,
-    todos: Vec<TodoItem>,
-    water_current_ml: u32,
-    last_water_date: Option<String>,
-    shelf: Vec<ShelfItem>,
-) {
-    for item in &shelf {
-        unblock_file_motw(&item.path);
-    }
-    let mut cfg = state.0.lock().unwrap();
-    cfg.todos = todos;
-    cfg.water_current_ml = water_current_ml;
-    if let Some(d) = last_water_date {
-        if !d.is_empty() {
-            cfg.last_water_date = d;
-        }
-    }
-    cfg.shelf = shelf;
-    save_config_to_disk(&cfg);
-    let _ = app.emit("config-updated", cfg.clone());
-}
-
-#[tauri::command]
-fn set_lyrics_pinned(app: AppHandle, state: State<'_, SharedState>, pinned: bool) {
-    let mut cfg = state.0.lock().unwrap();
-    cfg.lyrics_pinned_open = pinned;
-    save_config_to_disk(&cfg);
-    let _ = app.emit("config-updated", cfg.clone());
-}
-
-#[tauri::command]
-fn get_system_volume() -> VolumePayload {
-    #[cfg(windows)]
-    {
-        read_master_volume()
-    }
-    #[cfg(not(windows))]
-    {
-        VolumePayload {
-            volume: 50,
-            muted: false,
-        }
-    }
-}
-
-#[tauri::command]
-fn set_system_volume(volume: Option<u32>, mute: Option<bool>) -> VolumePayload {
-    #[cfg(windows)]
-    {
-        write_master_volume(volume, mute)
-    }
-    #[cfg(not(windows))]
-    {
-        VolumePayload {
-            volume: volume.unwrap_or(50),
-            muted: mute.unwrap_or(false),
-        }
-    }
-}
-
-#[tauri::command]
-fn prepare_shelf_files(paths: Vec<String>) -> Vec<ShelfItem> {
-    paths
-        .iter()
-        .filter_map(|p| enrich_shelf_item(p))
-        .collect()
-}
-
-#[tauri::command]
-fn pick_shelf_files() -> Vec<ShelfItem> {
-    let mut out = Vec::new();
-    #[cfg(windows)]
-    unsafe {
-        let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
-        if let Ok(dialog) = CoCreateInstance::<_, IFileOpenDialog>(&FileOpenDialog, None, CLSCTX_ALL)
-        {
-            if let Ok(opts) = dialog.GetOptions() {
-                let _ = dialog.SetOptions(
-                    opts | FOS_ALLOWMULTISELECT | FOS_FILEMUSTEXIST | FOS_FORCEFILESYSTEM,
-                );
-            }
-            if dialog.Show(HWND::default()).is_ok() {
-                if let Ok(results) = dialog.GetResults() {
-                    let count = results.GetCount().unwrap_or(0);
-                    for i in 0..count {
-                        if let Ok(item) = results.GetItemAt(i) {
-                            if let Ok(pwstr) = item.GetDisplayName(SIGDN_FILESYSPATH) {
-                                let path_str = pwstr.to_string().unwrap_or_default();
-                                CoTaskMemFree(Some(pwstr.0 as *const _));
-                                if let Some(enriched) = enrich_shelf_item(&path_str) {
-                                    out.push(enriched);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-    out
-}
-
-#[tauri::command]
-fn save_clipboard_to_shelf(
-    image_b64: Option<String>,
-    text_content: Option<String>,
-) -> Option<ShelfItem> {
-    let drops_dir = get_config_dir().join("ShelfDrops");
-    let _ = fs::create_dir_all(&drops_dir);
-    let ts = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_secs())
-        .unwrap_or(0);
-
-    if let Some(b64_raw) = image_b64 {
-        let clean = b64_raw.split(',').nth(1).unwrap_or(&b64_raw);
-        if let Ok(bytes) = BASE64.decode(clean) {
-            let file_path = drops_dir.join(format!("clip_{}.png", ts));
-            if fs::write(&file_path, bytes).is_ok() {
-                return enrich_shelf_item(&file_path.to_string_lossy());
-            }
-        }
-    }
-
-    if let Some(txt) = text_content {
-        let trimmed = txt.trim();
-        if !trimmed.is_empty() {
-            let file_path = drops_dir.join(format!("note_{}.txt", ts));
-            if fs::write(&file_path, trimmed.as_bytes()).is_ok() {
-                return enrich_shelf_item(&file_path.to_string_lossy());
-            }
-        }
-    }
-    None
-}
-
-#[tauri::command]
-fn toggle_system_mic(app: AppHandle) -> bool {
-    #[cfg(windows)]
-    {
-        if let Some(muted) = toggle_mic_muted_state() {
-            let _ = app.emit("mic-sync", muted);
-            return muted;
-        }
-    }
-    false
-}
-
-#[tauri::command]
-fn get_system_mic() -> bool {
-    #[cfg(windows)]
-    {
-        read_mic_muted().unwrap_or(false)
-    }
-    #[cfg(not(windows))]
-    {
-        false
-    }
-}
-
-#[tauri::command]
-fn open_shelf_file(path: String) {
-    unblock_file_motw(&path);
-    std::env::set_var("SEE_MASK_NOZONECHECKS", "1");
-
-    #[cfg(windows)]
-    unsafe {
-        let op: Vec<u16> = "open\0".encode_utf16().collect();
-        let file: Vec<u16> = path.encode_utf16().chain(std::iter::once(0)).collect();
+        let op = wide("open");
+        let file = wide(target);
         let _ = ShellExecuteW(
             HWND::default(),
             PCWSTR(op.as_ptr()),
@@ -1865,411 +105,603 @@ fn open_shelf_file(path: String) {
     }
 }
 
-#[tauri::command]
-fn reveal_shelf_file(path: String) {
-    #[cfg(windows)]
-    unsafe {
-        let op: Vec<u16> = "open\0".encode_utf16().collect();
-        let explorer: Vec<u16> = "explorer.exe\0".encode_utf16().collect();
-        let params: Vec<u16> = format!("/select,\"{}\"", path)
-            .encode_utf16()
-            .chain(std::iter::once(0))
-            .collect();
-        let _ = ShellExecuteW(
-            HWND::default(),
-            PCWSTR(op.as_ptr()),
-            PCWSTR(explorer.as_ptr()),
-            PCWSTR(params.as_ptr()),
-            PCWSTR::null(),
-            SW_SHOWNORMAL,
-        );
+fn tray_labels(lang: &str) -> (&'static str, &'static str) {
+    match resolve_language(lang).as_str() {
+        "id" => ("Buka Control Center", "Keluar MangNotch"),
+        "ja" => ("コントロールセンターを開く", "MangNotch を終了"),
+        "ko" => ("제어 센터 열기", "MangNotch 종료"),
+        "zh-CN" => ("打开控制中心", "退出 MangNotch"),
+        "zh-TW" => ("開啟控制中心", "結束 MangNotch"),
+        "ms" => ("Buka Pusat Kawalan", "Keluar MangNotch"),
+        "es" => ("Abrir Centro de control", "Salir de MangNotch"),
+        "de" => ("Kontrollzentrum öffnen", "MangNotch beenden"),
+        "nl" => ("Bedieningspaneel openen", "MangNotch afsluiten"),
+        "fr" => ("Ouvrir le Centre de contrôle", "Quitter MangNotch"),
+        "ru" => ("Открыть Центр управления", "Выход из MangNotch"),
+        _ => ("Open Control Center", "Quit MangNotch"),
     }
 }
 
-#[tauri::command]
-fn start_file_drag(app: AppHandle, paths: Vec<String>) {
-    for p in &paths {
-        unblock_file_motw(p);
+fn build_tray_menu(app: &AppHandle, lang: &str) -> tauri::Result<Menu<tauri::Wry>> {
+    let (lbl_open, lbl_quit) = tray_labels(lang);
+    let open_item = MenuItem::with_id(app, "open_ctrl", lbl_open, true, None::<&str>)?;
+    let sep = PredefinedMenuItem::separator(app)?;
+    let quit_item = MenuItem::with_id(app, "quit", lbl_quit, true, None::<&str>)?;
+    Menu::with_items(app, &[&open_item, &sep, &quit_item])
+}
+
+fn apply_tray_language(app: &AppHandle, lang: &str) {
+    if let Some(tray) = app.tray_by_id("main-tray") {
+        if let Ok(menu) = build_tray_menu(app, lang) {
+            let _ = tray.set_menu(Some(menu));
+        }
     }
-    let app_clone = app.clone();
-    let _ = app.run_on_main_thread(move || {
-        #[cfg(windows)]
-        unsafe {
-            let _ = OleInitialize(None);
-            let _ = ReleaseCapture();
+}
 
-            let hwnd = app_clone
-                .get_webview_window("notch")
-                .and_then(|w| get_hwnd(&w))
-                .unwrap_or_default();
+// === CONFIG & SYSTEM COMMANDS ===
 
-            let mut pidls: Vec<*const std::ffi::c_void> = Vec::new();
-            for p in &paths {
-                let wide_path: Vec<u16> = p.encode_utf16().chain(std::iter::once(0)).collect();
-                let pidl = ILCreateFromPathW(wide_path.as_ptr());
-                if !pidl.is_null() {
-                    pidls.push(pidl as *const _);
+#[tauri::command]
+fn get_config(state: State<'_, SharedState>) -> AppConfig {
+    state.0.config.lock().unwrap().clone()
+}
+
+#[tauri::command]
+fn save_full_config(app: AppHandle, state: State<'_, SharedState>, mut new_cfg: AppConfig) {
+    new_cfg.sanitize();
+    let (prev_autostart, prev_mon_mode, prev_mon_list, prev_backdrop) = {
+        let mut cfg = state.0.config.lock().unwrap();
+        let calendar_json = std::mem::take(&mut cfg.calendar_json);
+        let prev_auto = cfg.start_with_windows;
+        let prev_mode = cfg.monitor_mode.clone();
+        let prev_list = cfg.selected_monitors.clone();
+        let prev_bd = cfg.bg_backdrop.clone();
+
+        *cfg = new_cfg;
+        cfg.calendar_json = calendar_json;
+        save_config_to_disk(&cfg);
+        (prev_auto, prev_mode, prev_list, prev_bd)
+    };
+
+    let snapshot = state.0.config.lock().unwrap().clone();
+    state.sync_runtime(&snapshot);
+
+    if snapshot.start_with_windows != prev_autostart {
+        apply_autostart(snapshot.start_with_windows);
+    }
+    apply_tray_language(&app, &snapshot.language);
+
+    if snapshot.bg_backdrop != prev_backdrop {
+        let app_c = app.clone();
+        let mode = snapshot.bg_backdrop.clone();
+        let _ = app.run_on_main_thread(move || {
+            #[cfg(windows)]
+            if let Some(ctrl) = app_c.get_webview_window("control") {
+                if let Some(hwnd) = get_hwnd(&ctrl) {
+                    apply_control_backdrop(hwnd, &mode);
                 }
             }
+        });
+    }
 
-            if !pidls.is_empty() {
-                let mut raw_array: *mut std::ffi::c_void = std::ptr::null_mut();
-                let hr = SHCreateShellItemArrayFromIDLists(
-                    pidls.len() as u32,
-                    pidls.as_ptr(),
-                    &mut raw_array,
-                );
-                if hr >= 0 && !raw_array.is_null() {
-                    let shell_array = IShellItemArray::from_raw(raw_array);
-                    if let Ok(data_obj) = shell_array
-                        .BindToHandler::<_, IDataObject>(None::<&IBindCtx>, &BHID_DataObject)
-                    {
-                        let _ = SHDoDragDrop(
-                            hwnd,
-                            &data_obj,
-                            None::<&IDropSource>,
-                            DROPEFFECT_COPY | DROPEFFECT_LINK,
-                        );
+    if snapshot.monitor_mode != prev_mon_mode || snapshot.selected_monitors != prev_mon_list {
+        let app_r = app.clone();
+        let st_r = state.inner().clone();
+        let _ = app.run_on_main_thread(move || {
+            reconcile_notch_windows(&app_r, &st_r);
+        });
+    }
+
+    let _ = app.emit("config-updated", snapshot);
+}
+
+#[tauri::command]
+fn get_monitors() -> Vec<MonitorItem> {
+    enumerate_monitors()
+}
+
+#[tauri::command]
+fn get_app_version() -> String {
+    env!("CARGO_PKG_VERSION").to_string()
+}
+
+#[tauri::command]
+fn get_app_logo() -> String {
+    let bytes = include_bytes!("../icons/128x128.png");
+    format!("data:image/png;base64,{}", BASE64.encode(bytes))
+}
+
+#[tauri::command]
+fn get_install_channel() -> String {
+    #[cfg(windows)]
+    {
+        if is_packaged_app() {
+            return "msix".to_string();
+        }
+    }
+    "exe".to_string()
+}
+
+#[tauri::command]
+fn open_external_url(url: String) {
+    #[cfg(windows)]
+    shell_open(&url);
+    #[cfg(not(windows))]
+    let _ = url;
+}
+
+#[tauri::command]
+fn open_config_folder() {
+    let dir = get_config_dir();
+    #[cfg(windows)]
+    shell_open(&dir.to_string_lossy());
+    #[cfg(not(windows))]
+    let _ = dir;
+}
+
+#[tauri::command]
+fn launch_update_and_exit(app: AppHandle, url: String) {
+    #[cfg(windows)]
+    shell_open(&url);
+    #[cfg(not(windows))]
+    let _ = url;
+    app.exit(0);
+}
+
+#[tauri::command]
+fn trigger_update_window(app: AppHandle, state: State<'_, SharedState>, is_forced: bool) {
+    show_control_center_safe(&app, state.inner());
+    if is_forced {
+        if let Some(w) = app.get_webview_window("control") {
+            let _ = w.set_always_on_top(true);
+        }
+    }
+}
+
+// === NOTCH WINDOW & WIDGET SYNC COMMANDS ===
+
+#[tauri::command]
+fn notch_ready(app: AppHandle, window: WebviewWindow, state: State<'_, SharedState>) {
+    let label = window.label().to_string();
+    let mon_index = {
+        let Ok(mut map) = state.0.notches.lock() else {
+            return;
+        };
+        let Some(inst) = map.get_mut(&label) else {
+            return;
+        };
+        if inst.ready_called {
+            return;
+        }
+        inst.ready_called = true;
+        inst.monitor_index
+    };
+
+    let app_c = app.clone();
+    let st_c = state.inner().clone();
+    std::thread::spawn(move || {
+        std::thread::sleep(Duration::from_millis(NOTCH_REVEAL_DELAY_MS));
+        let app_m = app_c.clone();
+        let _ = app_c.run_on_main_thread(move || {
+            let monitors = enumerate_monitors();
+            let mon_opt = monitors
+                .iter()
+                .find(|m| m.index == mon_index)
+                .or_else(|| monitors.first());
+            if let (Some(mon), Some(win)) = (mon_opt, app_m.get_webview_window(&label)) {
+                #[cfg(windows)]
+                if let Some(hwnd) = get_hwnd(&win) {
+                    position_notch_on_monitor(hwnd, mon);
+                }
+                if let Ok(mut map) = st_c.0.notches.lock() {
+                    if let Some(inst) = map.get_mut(&label) {
+                        inst.positioned = true;
                     }
                 }
-                for &pidl in &pidls {
-                    ILFree(pidl as *mut _);
-                }
+                let _ = app_m.emit_to(&label, "notch-revealed", ());
             }
-        }
+        });
     });
 }
 
 #[tauri::command]
 fn update_notch_hitbox(
+    window: WebviewWindow,
     state: State<'_, SharedState>,
     width: i32,
     height: i32,
     resting_width: i32,
 ) {
-    let mut cfg = state.0.lock().unwrap();
-    cfg.active_width = width;
-    cfg.active_height = height;
-    cfg.resting_width = resting_width;
-}
-
-#[tauri::command]
-fn set_notch_text_input(app: AppHandle, active: bool) {
-    #[cfg(windows)]
-    {
-        let was = NOTCH_TEXT_INPUT.swap(active, Ordering::SeqCst);
-        if was == active {
-            return;
+    let label = window.label();
+    if let Ok(mut map) = state.0.notches.lock() {
+        if let Some(inst) = map.get_mut(label) {
+            inst.hitbox.active_width = width;
+            inst.hitbox.active_height = height;
+            inst.hitbox.resting_width = resting_width;
         }
-        let app2 = app.clone();
-        let _ = app.run_on_main_thread(move || {
-            if let Some(w) = app2.get_webview_window("notch") {
-                if let Some(hwnd) = get_hwnd(&w) {
-                    unsafe {
-                        let ex = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
-                        if active {
-                            let prev = GetForegroundWindow();
-                            if prev.0 as isize != hwnd.0 as isize {
-                                NOTCH_PREV_FG.store(prev.0 as isize, Ordering::SeqCst);
-                            }
-                            SetWindowLongPtrW(
-                                hwnd,
-                                GWL_EXSTYLE,
-                                ex & !(WS_EX_NOACTIVATE.0 as isize) & !(WS_EX_TRANSPARENT.0 as isize),
-                            );
-                            let _ = AllowSetForegroundWindow(ASFW_ANY);
-                            let _ = SetForegroundWindow(hwnd);
-                            let _ = w.set_focus();
-                        } else {
-                            SetWindowLongPtrW(hwnd, GWL_EXSTYLE, ex | (WS_EX_NOACTIVATE.0 as isize));
-                            let prev = NOTCH_PREV_FG.swap(0, Ordering::SeqCst);
-                            if prev != 0 && GetForegroundWindow().0 as isize == hwnd.0 as isize {
-                                let _ = SetForegroundWindow(HWND(prev as *mut _));
-                            }
-                        }
-                    }
-                }
-            }
-        });
-    }
-    #[cfg(not(windows))]
-    {
-        let _ = (app, active);
     }
 }
 
 #[tauri::command]
-fn notch_ready(app: AppHandle, state: State<'_, SharedState>) {
-    if NOTCH_READY_CALLED.swap(true, Ordering::SeqCst) {
-        return;
+fn set_notch_text_input(app: AppHandle, window: WebviewWindow, active: bool) {
+    set_text_input_for_window(&app, window.label().to_string(), active);
+}
+
+#[tauri::command]
+fn sync_widget_data(
+    app: AppHandle,
+    state: State<'_, SharedState>,
+    todos: Vec<TodoItem>,
+    water_current_ml: u32,
+    last_water_date: String,
+    shelf: Vec<ShelfItem>,
+) {
+    let snapshot = {
+        let mut cfg = state.0.config.lock().unwrap();
+        cfg.todos = todos;
+        cfg.water_current_ml = water_current_ml;
+        cfg.last_water_date = last_water_date;
+        cfg.shelf = shelf;
+        save_config_to_disk(&cfg);
+        cfg.clone()
+    };
+    let _ = app.emit("config-updated", snapshot);
+}
+
+#[tauri::command]
+fn set_lyrics_pinned(app: AppHandle, state: State<'_, SharedState>, pinned: bool) {
+    let snapshot = {
+        let mut cfg = state.0.config.lock().unwrap();
+        cfg.lyrics_pinned_open = pinned;
+        save_config_to_disk(&cfg);
+        cfg.clone()
+    };
+    let _ = app.emit("config-updated", snapshot);
+}
+
+#[tauri::command]
+fn set_calendar_data(app: AppHandle, state: State<'_, SharedState>, json: String) {
+    {
+        let mut cfg = state.0.config.lock().unwrap();
+        cfg.calendar_json = json.clone();
+        save_config_to_disk(&cfg);
     }
-    let cfg = state.0.lock().unwrap().clone();
-    thread::spawn(move || {
-        thread::sleep(Duration::from_millis(NOTCH_REVEAL_DELAY_MS));
-        let app2 = app.clone();
-        let _ = app.run_on_main_thread(move || {
-            if let Some(w) = app2.get_webview_window("notch") {
-                #[cfg(windows)]
-                if let Some(hwnd) = get_hwnd(&w) {
-                    position_notch_window(hwnd, &cfg);
-                    set_hwnd_click_through(hwnd, true);
-                }
-                NOTCH_POSITIONED.store(true, Ordering::SeqCst);
-                let _ = app2.emit("notch-revealed", ());
-            }
-        });
-    });
+    let _ = app.emit("calendar-updated", json);
+}
+
+// === MEDIA & VOLUME COMMANDS ===
+
+#[tauri::command]
+fn get_current_media(state: State<'_, SharedState>) -> MediaPayload {
+    state.0.last_media.lock().unwrap().clone()
 }
 
 #[tauri::command]
 fn media_action(action: String) {
+    media::perform_media_action(&action);
+}
+
+#[tauri::command]
+fn media_seek(app: AppHandle, position_sec: f64) {
+    media::perform_media_seek(position_sec);
+    let _ = app.emit("media-seek-sync", position_sec);
+}
+
+#[tauri::command]
+fn get_system_volume() -> VolumeResponse {
     #[cfg(windows)]
-    {
-        let mut handled = false;
-        if let Ok(manager) = GlobalSystemMediaTransportControlsSessionManager::RequestAsync()
-            .and_then(|op| op.get())
-        {
-            if let Ok(session) = manager.GetCurrentSession() {
-                let res = match action.as_str() {
-                    "play_pause" => session.TryTogglePlayPauseAsync().and_then(|op| op.get()),
-                    "next" => session.TrySkipNextAsync().and_then(|op| op.get()),
-                    "prev" => session.TrySkipPreviousAsync().and_then(|op| op.get()),
-                    _ => Ok(true),
-                };
-                handled = matches!(res, Ok(true));
+    unsafe {
+        let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
+        if let Ok(en) = CoCreateInstance::<_, IMMDeviceEnumerator>(&MMDeviceEnumerator, None, CLSCTX_ALL) {
+            if let Ok(dev) = en.GetDefaultAudioEndpoint(eRender, eConsole) {
+                if let Ok(vol) = dev.Activate::<IAudioEndpointVolume>(CLSCTX_ALL, None) {
+                    let v = vol.GetMasterVolumeLevelScalar().unwrap_or(0.5);
+                    let m = vol.GetMute().map(|b| b.as_bool()).unwrap_or(false);
+                    return VolumeResponse {
+                        volume: (v * 100.0).round() as u32,
+                        muted: m,
+                    };
+                }
             }
         }
-        if !handled {
-            let vk = match action.as_str() {
-                "play_pause" => VK_MEDIA_PLAY_PAUSE,
-                "next" => VK_MEDIA_NEXT_TRACK,
-                "prev" => VK_MEDIA_PREV_TRACK,
-                _ => return,
-            };
-            unsafe {
-                keybd_event(vk.0 as u8, 0, Default::default(), 0);
-                keybd_event(vk.0 as u8, 0, KEYEVENTF_KEYUP, 0);
-            }
-        }
+    }
+    VolumeResponse {
+        volume: 50,
+        muted: false,
     }
 }
 
 #[tauri::command]
-fn media_seek(position_sec: f64) {
+fn set_system_volume(volume: Option<u32>, mute: Option<bool>) -> VolumeResponse {
     #[cfg(windows)]
-    {
-        if let Ok(manager) = GlobalSystemMediaTransportControlsSessionManager::RequestAsync()
-            .and_then(|op| op.get())
-        {
-            if let Ok(session) = manager.GetCurrentSession() {
-                let ticks = (position_sec * 10_000_000.0) as i64;
-                let _ = session.TryChangePlaybackPositionAsync(ticks);
+    unsafe {
+        let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
+        if let Ok(en) = CoCreateInstance::<_, IMMDeviceEnumerator>(&MMDeviceEnumerator, None, CLSCTX_ALL) {
+            if let Ok(dev) = en.GetDefaultAudioEndpoint(eRender, eConsole) {
+                if let Ok(vol) = dev.Activate::<IAudioEndpointVolume>(CLSCTX_ALL, None) {
+                    if let Some(v) = volume {
+                        let clamped = (v.min(100) as f32) / 100.0;
+                        let _ = vol.SetMasterVolumeLevelScalar(clamped, std::ptr::null());
+                    }
+                    if let Some(m) = mute {
+                        let _ = vol.SetMute(m, std::ptr::null());
+                    }
+                    let cur_v = vol.GetMasterVolumeLevelScalar().unwrap_or(0.5);
+                    let cur_m = vol.GetMute().map(|b| b.as_bool()).unwrap_or(false);
+                    return VolumeResponse {
+                        volume: (cur_v * 100.0).round() as u32,
+                        muted: cur_m,
+                    };
+                }
             }
         }
     }
-}
-
-#[cfg_attr(mobile, tauri::mobile_entry_point)]
-#[derive(serde::Serialize)]
-struct LyricsHttpResp {
-    status: u16,
-    body: String,
-}
-
-/// GET https ke penyedia lirik tertentu (allowlist) menggunakan HTTP bawaan Windows (WinRT).
-#[tauri::command]
-async fn lyrics_http_get(url: String) -> Result<LyricsHttpResp, String> {
-    const ALLOWED: [&str; 8] = [
-        "lrclib.net",
-        "lyricsplus.binimum.org",
-        "lyricsplus.prjktla.my.id",
-        "lyrics.paxsenix.org",
-        "lyrics-api.boidu.dev",
-        "api-lyrics.simpmusic.org",
-        "lyrics.kugou.com",
-        "mobileservice.kugou.com",
-    ];
-    let host = url
-        .strip_prefix("https://")
-        .and_then(|rest| rest.split(&['/', '?', '#'][..]).next())
-        .ok_or_else(|| "hanya https yang diizinkan".to_string())?;
-    if !ALLOWED.contains(&host) {
-        return Err(format!("host tidak diizinkan: {host}"));
+    #[cfg(not(windows))]
+    let _ = (volume, mute);
+    VolumeResponse {
+        volume: 50,
+        muted: false,
     }
+}
 
+// === LYRICS HTTP & MULTI-MONITOR SHARED SYNC COMMANDS ===
+
+#[tauri::command]
+async fn lyrics_http_get(url: String) -> HttpResponse {
     tauri::async_runtime::spawn_blocking(move || {
         #[cfg(windows)]
         unsafe {
-            use windows::{
-                core::HSTRING,
-                Foundation::Uri,
-                Web::Http::HttpClient,
-            };
+            const INTERNET_OPEN_TYPE_PRECONFIG: u32 = 0;
+            const INTERNET_FLAG_RELOAD: u32 = 0x8000_0000;
+            const INTERNET_FLAG_NO_CACHE_WRITE: u32 = 0x0400_0000;
+            const INTERNET_FLAG_SECURE: u32 = 0x0080_0000;
+            const HTTP_QUERY_STATUS_CODE: u32 = 19;
+            const HTTP_QUERY_FLAG_NUMBER: u32 = 0x2000_0000;
 
-            let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
-            let uri = Uri::CreateUri(&HSTRING::from(url.as_str()))
-                .map_err(|e| e.to_string())?;
-            let client = HttpClient::new().map_err(|e| e.to_string())?;
+            let agent = wide("MangNotch/2.0 (Windows)");
+            let h_net = InternetOpenW(
+                agent.as_ptr(),
+                INTERNET_OPEN_TYPE_PRECONFIG,
+                std::ptr::null(),
+                std::ptr::null(),
+                0,
+            );
+            if h_net == 0 {
+                return HttpResponse {
+                    status: 0,
+                    body: String::new(),
+                };
+            }
 
-            if let Ok(headers) = client.DefaultRequestHeaders() {
-                if let Ok(ua) = headers.UserAgent() {
-                    let _ = ua.TryParseAdd(&HSTRING::from("MangNotch/1.3 (lyrics)"));
+            let url_w = wide(&url);
+            let hdr_w = wide("Accept: application/json\r\n");
+            let mut flags = INTERNET_FLAG_RELOAD | INTERNET_FLAG_NO_CACHE_WRITE;
+            if url.starts_with("https://") {
+                flags |= INTERNET_FLAG_SECURE;
+            }
+            let h_url = InternetOpenUrlW(
+                h_net,
+                url_w.as_ptr(),
+                hdr_w.as_ptr(),
+                (hdr_w.len().saturating_sub(1)) as u32,
+                flags,
+                0,
+            );
+            if h_url == 0 {
+                let _ = InternetCloseHandle(h_net);
+                return HttpResponse {
+                    status: 0,
+                    body: String::new(),
+                };
+            }
+
+            let mut status: u32 = 0;
+            let mut status_len: u32 = std::mem::size_of::<u32>() as u32;
+            let _ = HttpQueryInfoW(
+                h_url,
+                HTTP_QUERY_STATUS_CODE | HTTP_QUERY_FLAG_NUMBER,
+                &mut status as *mut _ as *mut std::ffi::c_void,
+                &mut status_len,
+                std::ptr::null_mut(),
+            );
+
+            let mut data = Vec::new();
+            let mut buf = [0u8; 8192];
+            loop {
+                let mut read: u32 = 0;
+                if InternetReadFile(h_url, buf.as_mut_ptr(), buf.len() as u32, &mut read) == 0
+                    || read == 0
+                {
+                    break;
                 }
-                if let Ok(acc) = headers.Accept() {
-                    let _ = acc.TryParseAdd(&HSTRING::from("application/json"));
+                data.extend_from_slice(&buf[..read as usize]);
+                if data.len() > 2_000_000 {
+                    break;
                 }
             }
 
-            let resp = client
-                .GetAsync(&uri)
-                .map_err(|e| e.to_string())?
-                .get()
-                .map_err(|e| e.to_string())?;
+            let _ = InternetCloseHandle(h_url);
+            let _ = InternetCloseHandle(h_net);
 
-            let status = resp.StatusCode().map(|s| s.0 as u16).unwrap_or(500);
-            let body = match resp.Content() {
-                Ok(content) => content
-                    .ReadAsStringAsync()
-                    .and_then(|op| op.get())
-                    .map(|s| s.to_string())
-                    .unwrap_or_default(),
-                Err(_) => String::new(),
-            };
-
-            Ok(LyricsHttpResp { status, body })
+            HttpResponse {
+                status,
+                body: String::from_utf8_lossy(&data).to_string(),
+            }
         }
         #[cfg(not(windows))]
         {
-            Err("hanya didukung di Windows".to_string())
+            let _ = url;
+            HttpResponse {
+                status: 0,
+                body: String::new(),
+            }
         }
     })
     .await
-    .map_err(|e| e.to_string())?
+    .unwrap_or(HttpResponse {
+        status: 0,
+        body: String::new(),
+    })
 }
 
-pub fn run() {
-    std::panic::set_hook(Box::new(|info| {
-        debug_log(&format!(
-            "[panic] {}\n{}",
-            info,
-            std::backtrace::Backtrace::force_capture()
-        ));
-    }));
-    // Jaga MTA tetap hidup selama proses jalan. Tanpa ini, MTA bisa hancur begitu thread
-    // MTA terakhir (mis. thread query_packaged_startup di bawah) selesai, dan pointer
-    // factory WinRT yang di-cache windows-rs jadi dangling -> access violation di combase.dll
-    // pas StartupTask dipanggil lagi dari thread lain (toggle Start with Windows).
-    #[cfg(windows)]
-    let _mta_cookie = unsafe {
-        let r = windows::Win32::System::Com::CoIncrementMTAUsage();
-        debug_log(&format!("[com] CoIncrementMTAUsage ok={}", r.is_ok()));
-        r
+#[tauri::command]
+fn get_shared_lyrics(state: State<'_, SharedState>) -> LyricsSyncState {
+    state.0.lyrics.lock().unwrap().clone()
+}
+
+#[tauri::command]
+fn claim_lyrics_fetch(state: State<'_, SharedState>, track_key: String) -> String {
+    let Ok(mut lyr) = state.0.lyrics.lock() else {
+        return "fetch".to_string();
     };
-    let mut show_ctrl_event: isize = 0;
-    #[cfg(windows)]
-    unsafe {
-        let event_name: Vec<u16> = "Local\\MangNotchShowControlEvent\0"
-            .encode_utf16()
-            .collect();
-        show_ctrl_event = CreateEventW(std::ptr::null(), 1, 0, event_name.as_ptr());
-
-        let mutex_name: Vec<u16> = "Local\\MangNotchSingleInstanceMutex\0"
-            .encode_utf16()
-            .collect();
-        if let Ok(handle) = CreateMutexW(None, true, PCWSTR(mutex_name.as_ptr())) {
-            if GetLastError() == ERROR_ALREADY_EXISTS {
-                let _ = AllowSetForegroundWindow(ASFW_ANY);
-                if show_ctrl_event != 0 {
-                    let _ = SetEvent(show_ctrl_event);
-                }
-                let _ = CloseHandle(handle);
-                debug_log("[exit] second instance, exiting");
-                std::process::exit(0);
-            }
-            let _ = std::mem::ManuallyDrop::new(handle);
+    if lyr.track_key == track_key {
+        if lyr.payload.is_some() {
+            return "cached".to_string();
+        }
+        if lyr.fetching {
+            return "wait".to_string();
         }
     }
+    lyr.track_key = track_key;
+    lyr.fetching = true;
+    lyr.payload = None;
+    "fetch".to_string()
+}
 
-    std::env::set_var("SEE_MASK_NOZONECHECKS", "1");
-    let mut initial_cfg = load_config_from_disk();
-    #[cfg(windows)]
-    {
-        if is_packaged_app() {
-            // MSIX: status asli ada di Windows (user bisa matiin lewat Settings/Task Manager),
-            // jadi config ngikut OS, bukan sebaliknya.
-            if let Some(on) = query_packaged_startup() {
-                if on != initial_cfg.start_with_windows {
-                    initial_cfg.start_with_windows = on;
-                    save_config_to_disk(&initial_cfg);
-                }
-            }
+#[tauri::command]
+fn publish_lyrics_data(
+    app: AppHandle,
+    state: State<'_, SharedState>,
+    track_key: String,
+    payload: Option<serde_json::Value>,
+    done: bool,
+) {
+    let (emit_val, emit_empty) = {
+        let Ok(mut lyr) = state.0.lyrics.lock() else {
+            return;
+        };
+        if lyr.track_key != track_key {
+            return;
+        }
+        if done {
+            lyr.fetching = false;
+        }
+        if let Some(p) = payload {
+            lyr.payload = Some(p.clone());
+            (Some(p), false)
         } else {
-            // non-MSIX: sinkronkan Run key dengan config tiap launch (nyalain ATAU hapus sisa lama)
-            apply_autostart(initial_cfg.start_with_windows);
+            (None, done && lyr.payload.is_none())
         }
+    };
+    if let Some(p) = emit_val {
+        let _ = app.emit("lyrics-data-sync", p);
+    } else if emit_empty {
+        let _ = app.emit(
+            "lyrics-data-sync",
+            serde_json::json!({ "track_key": track_key, "empty": true }),
+        );
     }
+}
 
-    let shared_cfg = Arc::new(Mutex::new(initial_cfg));
-    let bg_cfg = shared_cfg.clone();
+#[tauri::command]
+fn sync_lyrics_ui(
+    app: AppHandle,
+    state: State<'_, SharedState>,
+    is_open: Option<bool>,
+    offset_sec: Option<f64>,
+) {
+    let snapshot = {
+        let Ok(mut lyr) = state.0.lyrics.lock() else {
+            return;
+        };
+        if let Some(open) = is_open {
+            lyr.is_open = open;
+        }
+        if let Some(off) = offset_sec {
+            lyr.offset_sec = off;
+        }
+        serde_json::json!({
+            "is_open": lyr.is_open,
+            "offset_sec": lyr.offset_sec,
+        })
+    };
+    let _ = app.emit("lyrics-ui-sync", snapshot);
+}
 
+// === FILE SHELF COMMANDS ===
+
+#[tauri::command]
+fn prepare_shelf_files(paths: Vec<String>) -> Vec<ShelfItem> {
+    paths
+        .iter()
+        .filter_map(|p| shelf::enrich_shelf_item(p))
+        .collect()
+}
+
+#[tauri::command]
+fn pick_shelf_files() -> Vec<ShelfItem> {
+    shelf::pick_files()
+}
+
+#[tauri::command]
+fn paste_clipboard_to_shelf() -> Vec<ShelfItem> {
+    shelf::read_clipboard_to_shelf_paths()
+        .iter()
+        .filter_map(|p| shelf::enrich_shelf_item(p))
+        .collect()
+}
+
+#[tauri::command]
+fn save_clipboard_to_shelf(
+    image_b64: Option<String>,
+    text_content: Option<String>,
+) -> Option<ShelfItem> {
+    shelf::save_clipboard(image_b64, text_content)
+}
+
+#[tauri::command]
+fn open_shelf_file(path: String) {
+    shelf::open_file(&path);
+}
+
+#[tauri::command]
+fn reveal_shelf_file(path: String) {
+    shelf::reveal_file(&path);
+}
+
+#[tauri::command]
+fn start_file_drag(app: AppHandle, window: WebviewWindow, paths: Vec<String>) {
+    shelf::start_drag_out(app, window.label().to_string(), paths);
+}
+
+// === APP ENTRY POINT ===
+
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
+pub fn run() {
     tauri::Builder::default()
-        .manage(SharedState(shared_cfg))
-        .on_window_event(|window, event| {
-            if window.label() == "control" {
-                if let WindowEvent::CloseRequested { api, .. } = event {
-                    api.prevent_close();
-                    let _ = window.hide();
-                }
-            } else if window.label() == "notch" {
-                if let WindowEvent::DragDrop(drag_ev) = event {
-                    let app = window.app_handle();
-                    let state = app.state::<SharedState>();
-                    match drag_ev {
-                        DragDropEvent::Enter { paths, .. } => {
-                            SHELF_FILE_DRAG_ACTIVE.store(true, Ordering::SeqCst);
-                            if let Ok(mut c) = state.0.lock() {
-                                c.active_width = c.active_width.max(420);
-                                c.active_height = c.active_height.max(140);
-                            }
-                            let str_paths: Vec<String> = paths
-                                .iter()
-                                .map(|p| p.to_string_lossy().to_string())
-                                .collect();
-                            let _ = app.emit("shelf-drag-enter", str_paths);
-                        }
-                        DragDropEvent::Drop { paths, .. } => {
-                            SHELF_FILE_DRAG_ACTIVE.store(false, Ordering::SeqCst);
-                            let str_paths: Vec<String> = paths
-                                .iter()
-                                .map(|p| p.to_string_lossy().to_string())
-                                .collect();
-                            let _ = app.emit("shelf-drag-drop", str_paths);
-                        }
-                        DragDropEvent::Leave => {
-                            SHELF_FILE_DRAG_ACTIVE.store(false, Ordering::SeqCst);
-                            let _ = app.emit("shelf-drag-leave", ());
-                        }
-                        _ => {}
-                    }
+        .setup(|app| {
+            let mut cfg = load_config_from_disk();
+            #[cfg(windows)]
+            if is_packaged_app() {
+                if let Some(enabled) = query_packaged_startup() {
+                    cfg.start_with_windows = enabled;
                 }
             }
-        })
-        .setup(move |app| {
-            let show_item =
-                MenuItem::with_id(app, "show", "Buka MangNotch Control", true, None::<&str>)?;
-            let quit_item =
-                MenuItem::with_id(app, "quit", "Keluar dari MangNotch", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&show_item, &quit_item])?;
+            let lang = cfg.language.clone();
+            let shared_state = SharedState::new(cfg);
+            app.manage(shared_state.clone());
 
-            let mut tray_builder = TrayIconBuilder::new()
+            // System Tray
+            let menu = build_tray_menu(app.handle(), &lang)?;
+            let mut tray_builder = TrayIconBuilder::with_id("main-tray")
                 .menu(&menu)
-                .tooltip("MangNotch - Klik untuk membuka Control Center")
+                .tooltip("MangNotch")
+                .show_menu_on_left_click(false)
                 .on_menu_event(|app, event| match event.id.as_ref() {
-                    "show" => {
-                        show_control_center_safe(app);
+                    "open_ctrl" => {
+                        let st = app.state::<SharedState>();
+                        show_control_center_safe(app, st.inner());
                     }
                     "quit" => {
-                        debug_log("[exit] tray quit");
                         app.exit(0);
                     }
                     _ => {}
@@ -2281,656 +713,114 @@ pub fn run() {
                         ..
                     } = event
                     {
-                        show_control_center_safe(tray.app_handle());
+                        let app = tray.app_handle();
+                        let st = app.state::<SharedState>();
+                        show_control_center_safe(app, st.inner());
                     }
                 });
 
             if let Some(icon) = app.default_window_icon() {
                 tray_builder = tray_builder.icon(icon.clone());
             }
-            let tray_icon = tray_builder.build(app)?;
-            app.manage(TrayMenuState {
-                show_item: show_item.clone(),
-                quit_item: quit_item.clone(),
-                tray_icon,
-            });
+            let _ = tray_builder.build(app)?;
 
-            let init_cfg_snapshot = bg_cfg.lock().unwrap().clone();
-            apply_tray_language(app.handle(), &init_cfg_snapshot.language);
-
-            let notch_win = app.get_webview_window("notch").unwrap();
-            let notch_hwnd = get_hwnd(&notch_win).unwrap();
-
-            let ctrl_hwnd = app
-                .get_webview_window("control")
-                .and_then(|w| get_hwnd(&w))
-                .unwrap_or_default();
-
-            #[cfg(windows)]
-            if !ctrl_hwnd.0.is_null() {
-                unsafe {
-                    // Perluas frame kaca ke seluruh area jendela agar tembus pandang ke wallpaper
-                    let margins = DwmMargins {
-                        cx_left_width: -1,
-                        cx_right_width: -1,
-                        cy_top_height: -1,
-                        cy_bottom_height: -1,
-                    };
-                    let _ = DwmExtendFrameIntoClientArea(ctrl_hwnd.0 as isize, &margins);
-
-                    // Sudut membulat halus native Windows 11 (DWMWCP_ROUND = 2)
-                    let round: u32 = 2;
-                    let _ = DwmSetWindowAttribute(
-                        ctrl_hwnd.0 as isize,
-                        DWMWA_WINDOW_CORNER_PREFERENCE,
-                        &round as *const _ as *const std::ffi::c_void,
-                        4,
-                    );
-
-                    // Efek Acrylic Blur native Windows 11 (DWMWA_SYSTEMBACKDROP_TYPE = 38, Acrylic = 3)
-                    let acrylic: u32 = 3;
-                    let _ = DwmSetWindowAttribute(
-                        ctrl_hwnd.0 as isize,
-                        38,
-                        &acrylic as *const _ as *const std::ffi::c_void,
-                        4,
-                    );
-                }
-            }
-            let init_cfg_snapshot = bg_cfg.lock().unwrap().clone();
-
-            // 1. Pasang WndProc hook + Cloak + matikan border DWM + parkir di atas layar
-            install_notch_wndproc(notch_hwnd);
-            disable_window_transitions(notch_hwnd);
-            set_window_cloak(notch_hwnd, true);
-            strip_window_borders(notch_hwnd);
-            place_notch_boot_peeking(notch_hwnd, &init_cfg_snapshot);
-
-            // 2. Panggil show() sekali saat cloaked agar state internal Tauri tercatat visible
-            let _ = notch_win.show();
-
-            // 3. Kunci WndProc & click-through Win32, lalu uncloak agar WebView2 merender
-            place_notch_boot_peeking(notch_hwnd, &init_cfg_snapshot);
-            set_hwnd_click_through(notch_hwnd, true);
-            set_window_cloak(notch_hwnd, false);
-
-            let app_handle = app.handle().clone();
-            let raw_notch_hwnd = notch_hwnd.0 as isize;
-            let raw_ctrl_hwnd = ctrl_hwnd.0 as isize;
-            let fallback_dpi = notch_win.scale_factor().unwrap_or(1.0);
-
-            thread::spawn(move || {
-                #[cfg(windows)]
-                unsafe {
-                    let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
-                }
-
-                let hwnd = HWND(raw_notch_hwnd as *mut _);
-                let ctrl_win_hwnd = HWND(raw_ctrl_hwnd as *mut _);
-                let mut is_hovered = false;
-                let mut is_hidden_by_fs = false;
-                let mut is_obstructed = false;
-                let mut outside_ticks: u32 = 0;
-
-                let mut last_caps = unsafe { (GetKeyState(0x14) & 1) != 0 };
-                let mut last_ac: u8 = 255;
-
-                let init_vol = read_master_volume();
-                let mut last_vol = init_vol.volume;
-                let mut last_muted = init_vol.muted;
-
-                let mut last_brightness: Option<u8> = read_screen_brightness();
-
-                let bth_dll: Vec<u16> = "BluetoothAPIs.dll\0".encode_utf16().collect();
-                let bth_mod = unsafe { LoadLibraryW(bth_dll.as_ptr()) };
-                let init_bt = read_bluetooth_state(bth_mod);
-                let mut last_bt_radio = init_bt.as_ref().map(|b| b.radio_on);
-                let mut last_bt_connected = init_bt.as_ref().map(|b| b.connected_count);
-
-                let mut tick_counter: u32 = 0;
-
-                let mut last_mic_muted: Option<bool> = read_mic_muted();
-                let mut last_hotkey_down = false;
-                let mut last_paste_down = false;
-                let mut hotkey_pinned_open = false;
-                let mut last_audio_peak: f32 = 0.0;
-                let mut drag_start_pt: Option<POINT> = None;
-
-                loop {
-                    thread::sleep(Duration::from_millis(40));
-                    tick_counter = tick_counter.wrapping_add(1);
-
-                    // Fallback pengaman (~3 detik) kalau frontend tidak mengirim notch_ready
-                    if tick_counter == 75 && !NOTCH_POSITIONED.swap(true, Ordering::SeqCst) {
-                        NOTCH_READY_CALLED.store(true, Ordering::SeqCst);
-                        let cfg = bg_cfg.lock().unwrap().clone();
-                        position_notch_window(hwnd, &cfg);
-                        set_hwnd_click_through(hwnd, true);
-                        let _ = app_handle.emit("notch-revealed", ());
-                    }
-
-                    #[cfg(windows)]
-                    unsafe {
-                        if show_ctrl_event != 0
-                            && WaitForSingleObject(show_ctrl_event, 0) == WAIT_OBJECT_0
-                        {
-                            let _ = ResetEvent(show_ctrl_event);
-                            is_hovered = false;
-                            outside_ticks = 0;
-                            show_control_center_safe(&app_handle);
-                        }
-                    }
-
-                    if !NOTCH_POSITIONED.load(Ordering::SeqCst) {
-                        continue;
-                    }
-
-                    let cfg = bg_cfg.lock().unwrap().clone();
-
-                    unsafe {
-                        let mut win_rect = RECT::default();
-                        let _ = GetWindowRect(hwnd, &mut win_rect);
-                        let notch_center_x = (win_rect.left + win_rect.right) / 2;
-
-                        let measured_w = (win_rect.right - win_rect.left) as f64;
-                        let dpi_scale = if measured_w > 100.0 {
-                            measured_w / (WINDOW_WIDTH as f64)
-                        } else {
-                            fallback_dpi
-                        };
-
-                        let fg = GetForegroundWindow();
-                        let mut fg_is_same_mon = false;
-                        let mut is_desktop = false;
-                        let mut class_name = String::new();
-                        let mut fg_rect = RECT::default();
-                        let mut mi = MONITORINFO {
-                            cbSize: std::mem::size_of::<MONITORINFO>() as u32,
-                            ..Default::default()
-                        };
-
-                        if !fg.0.is_null() && fg != hwnd {
-                            let mut class_buf = [0u16; 128];
-                            let len = GetClassNameW(fg, &mut class_buf);
-                            class_name = String::from_utf16_lossy(&class_buf[..len as usize]);
-
-                            is_desktop = matches!(
-                                class_name.as_str(),
-                                "Progman"
-                                    | "WorkerW"
-                                    | "Shell_TrayWnd"
-                                    | "Shell_SecondaryTrayWnd"
-                            );
-
-                            let notch_mon = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
-                            let fg_mon = MonitorFromWindow(fg, MONITOR_DEFAULTTONEAREST);
-
-                            if notch_mon == fg_mon
-                                && GetWindowRect(fg, &mut fg_rect).is_ok()
-                                && GetMonitorInfoW(fg_mon, &mut mi).as_bool()
-                            {
-                                fg_is_same_mon = true;
-                            }
-                        }
-
-                        // 1. Deteksi Aplikasi Fullscreen Murni & Borderless Video Player
-                        if cfg.hide_on_fullscreen {
-                            if fg_is_same_mon && !is_desktop && fg != ctrl_win_hwnd {
-                                let m = mi.rcMonitor;
-                                let style = GetWindowLongPtrW(fg, GWL_STYLE) as u32;
-                                let has_caption = (style & 0x00C00000) != 0;
-
-                                let exact_fullscreen = (fg_rect.left - m.left).abs() <= 2
-                                    && (fg_rect.top - m.top).abs() <= 2
-                                    && (fg_rect.right - m.right).abs() <= 2
-                                    && (fg_rect.bottom - m.bottom).abs() <= 2;
-
-                                let borderless_fullscreen = !has_caption
-                                    && fg_rect.left <= m.left + 2
-                                    && fg_rect.top <= m.top + 2
-                                    && fg_rect.right >= m.right - 2
-                                    && fg_rect.bottom >= m.bottom - 2;
-
-                                let fullscreen = exact_fullscreen || borderless_fullscreen;
-
-                                if fullscreen && !is_hidden_by_fs {
-                                    let _ = ShowWindow(hwnd, SW_HIDE);
-                                    is_hidden_by_fs = true;
-                                } else if !fullscreen && is_hidden_by_fs {
-                                    let _ = ShowWindow(hwnd, SW_SHOWNOACTIVATE);
-                                    is_hidden_by_fs = false;
-                                }
-                            } else if is_hidden_by_fs {
-                                let _ = ShowWindow(hwnd, SW_SHOWNOACTIVATE);
-                                is_hidden_by_fs = false;
-                            }
-                        } else if is_hidden_by_fs {
-                            let _ = ShowWindow(hwnd, SW_SHOWNOACTIVATE);
-                            is_hidden_by_fs = false;
-                        }
-
-                        // 2. Smart Proximity Auto-Shrink
-                        if tick_counter % 3 == 0 && !is_hovered {
-                            let now_obstructed = if cfg.smart_proximity
-                                && fg_is_same_mon
-                                && !is_desktop
-                                && fg != ctrl_win_hwnd
-                            {
-                                check_window_obstruction(
-                                    fg,
-                                    &class_name,
-                                    &fg_rect,
-                                    &mi.rcMonitor,
-                                    notch_center_x,
-                                    cfg.resting_width,
-                                )
-                            } else {
-                                false
-                            };
-
-                            if now_obstructed != is_obstructed {
-                                is_obstructed = now_obstructed;
-                                let _ = app_handle.emit("notch-proximity", is_obstructed);
-                            }
-                        }
-
-                        // 3A. System Peek: Caps Lock
-                        let caps_now = (GetKeyState(0x14) & 1) != 0;
-                        if caps_now != last_caps {
-                            last_caps = caps_now;
-                            if cfg.enable_peeks && cfg.peek_capslock {
-                                let _ = app_handle.emit(
-                                    "system-peek",
-                                    SystemPeekPayload {
-                                        kind: "capslock".to_string(),
-                                        active: caps_now,
-                                        percent: 0,
-                                        label: if caps_now {
-                                            "Uppercase active".to_string()
-                                        } else {
-                                            "Uppercase off".to_string()
-                                        },
-                                    },
-                                );
-                            }
-                        }
-
-                        // 3B. System Peek: Master Volume & Mute
-                        if tick_counter % 3 == 0 {
-                            let cur_vol = read_master_volume();
-                            if cur_vol.volume != last_vol || cur_vol.muted != last_muted {
-                                last_vol = cur_vol.volume;
-                                last_muted = cur_vol.muted;
-                                let _ = app_handle.emit("volume-sync", cur_vol.clone());
-                                if cfg.enable_peeks && cfg.peek_volume {
-                                    let _ = app_handle.emit(
-                                        "system-peek",
-                                        SystemPeekPayload {
-                                            kind: "volume".to_string(),
-                                            active: !cur_vol.muted && cur_vol.volume > 0,
-                                            percent: if cur_vol.muted {
-                                                0
-                                            } else {
-                                                cur_vol.volume as u8
-                                            },
-                                            label: if cur_vol.muted || cur_vol.volume == 0 {
-                                                "Audio Muted".to_string()
-                                            } else {
-                                                "System Master Audio".to_string()
-                                            },
-                                        },
-                                    );
-                                }
-                            }
-                        }
-
-                        // 3C. System Peek: Screen Brightness
-                        if tick_counter % 5 == 0 {
-                            if let Some(br) = read_screen_brightness() {
-                                if let Some(prev_br) = last_brightness {
-                                    if br != prev_br && cfg.enable_peeks && cfg.peek_brightness {
-                                        let _ = app_handle.emit(
-                                            "system-peek",
-                                            SystemPeekPayload {
-                                                kind: "brightness".to_string(),
-                                                active: true,
-                                                percent: br,
-                                                label: "Display Backlight".to_string(),
-                                            },
-                                        );
-                                    }
-                                }
-                                last_brightness = Some(br);
-                            }
-                        }
-
-                        // 3D. System Peek: Battery & Charging
-                        if tick_counter % 20 == 0 {
-                            let mut sps = SYSTEM_POWER_STATUS::default();
-                            if GetSystemPowerStatus(&mut sps).is_ok() {
-                                let pct = if sps.BatteryLifePercent <= 100 {
-                                    sps.BatteryLifePercent
-                                } else {
-                                    100
-                                };
-                                let ac = sps.ACLineStatus;
-                                if last_ac != 255 && ac != last_ac && cfg.enable_peeks && cfg.peek_charging {
-                                    let _ = app_handle.emit(
-                                        "system-peek",
-                                        SystemPeekPayload {
-                                            kind: "charging".to_string(),
-                                            active: ac == 1,
-                                            percent: pct,
-                                            label: if ac == 1 {
-                                                "Power connected".to_string()
-                                            } else {
-                                                "Power unplugged".to_string()
-                                            },
-                                        },
-                                    );
-                                }
-                                last_ac = ac;
-                                let _ = app_handle.emit(
-                                    "system-peek",
-                                    SystemPeekPayload {
-                                        kind: "battery_sync".to_string(),
-                                        active: ac == 1,
-                                        percent: pct,
-                                        label: String::new(),
-                                    },
-                                );
-                            }
-                        }
-
-                        // 3E. System Peek: Bluetooth
-                        if tick_counter % 30 == 0 {
-                            if let Some(bt) = read_bluetooth_state(bth_mod) {
-                                let radio_changed =
-                                    last_bt_radio.map(|r| r != bt.radio_on).unwrap_or(false);
-                                let conn_changed = last_bt_connected
-                                    .map(|c| c != bt.connected_count)
-                                    .unwrap_or(false);
-
-                                if (radio_changed || conn_changed) && cfg.enable_peeks && cfg.peek_bluetooth {
-                                    let label = if !bt.radio_on {
-                                        "Adapter Turned Off".to_string()
-                                    } else if bt.connected_count > 0 && !bt.device_name.is_empty() {
-                                        bt.device_name.clone()
-                                    } else if bt.connected_count > 0 {
-                                        format!("{} Device Connected", bt.connected_count)
-                                    } else {
-                                        "Bluetooth Ready".to_string()
-                                    };
-
-                                    let _ = app_handle.emit(
-                                        "system-peek",
-                                        SystemPeekPayload {
-                                            kind: "bluetooth".to_string(),
-                                            active: bt.radio_on,
-                                            percent: bt.connected_count as u8,
-                                            label,
-                                        },
-                                    );
-                                }
-
-                                last_bt_radio = Some(bt.radio_on);
-                                last_bt_connected = Some(bt.connected_count);
-                            }
-                        }
-
-                        // 3F. Real-Time Audio Peak Meter
-                        if cfg.enable_audio_visualizer && tick_counter % 2 == 0 {
-                            
-                            let peak = read_audio_peak();
-                            if (peak - last_audio_peak).abs() > 0.025
-                                || (peak == 0.0 && last_audio_peak > 0.0)
-                            {
-                                last_audio_peak = peak;
-                                let _ = app_handle.emit("audio-peak", peak);
-                            }
-                        }
-
-                        // 3G. System Peek: Microphone Mute
-                        if tick_counter % 5 == 0 {
-                            if let Some(mic_muted) = read_mic_muted() {
-                                if let Some(prev_mic) = last_mic_muted {
-                                    if mic_muted != prev_mic {
-                                        let _ = app_handle.emit("mic-sync", mic_muted);
-                                        if cfg.enable_peeks && cfg.peek_mic {
-                                            let _ = app_handle.emit(
-                                                "system-peek",
-                                                SystemPeekPayload {
-                                                    kind: "mic".to_string(),
-                                                    active: !mic_muted,
-                                                    percent: if mic_muted { 0 } else { 100 },
-                                                    label: if mic_muted {
-                                                        "Microphone Muted".to_string()
-                                                    } else {
-                                                        "Microphone Live".to_string()
-                                                    },
-                                                },
-                                            );
-                                        }
-                                    }
-                                }
-                                last_mic_muted = Some(mic_muted);
-                            }
-                        }
-
-                        // 3H. Global Shortcut: Alt + N untuk Buka/Tutup Notch
-                        let alt_down = (GetAsyncKeyState(0x12) as u16 & 0x8000) != 0;
-                        let n_down = (GetAsyncKeyState(0x4E) as u16 & 0x8000) != 0;
-                        let hotkey_now = alt_down && n_down;
-                        if cfg.enable_hotkey && hotkey_now && !last_hotkey_down {
-                            hotkey_pinned_open = !hotkey_pinned_open;
-                            is_hovered = hotkey_pinned_open;
-                            outside_ticks = 0;
-                            if let Ok(mut c) = bg_cfg.lock() {
-                                if hotkey_pinned_open {
-                                    c.active_width = c.active_width.max(420);
-                                    c.active_height = c.active_height.max(140);
-                                } else {
-                                    c.active_width = c.resting_width.max(155);
-                                    c.active_height = 32;
-                                }
-                            }
-                            set_hwnd_click_through(hwnd, !hotkey_pinned_open);
-                            let _ = app_handle.emit("notch-hotkey-toggle", hotkey_pinned_open);
-                        }
-                        last_hotkey_down = hotkey_now;
-
-                        // 3I. Shortcut Ctrl + V saat Notch terbuka -> Paste ke File Shelf
-                        let ctrl_down = (GetAsyncKeyState(0x11) as u16 & 0x8000) != 0;
-                        let v_down = (GetAsyncKeyState(0x56) as u16 & 0x8000) != 0;
-                        let paste_now = is_hovered && ctrl_down && v_down;
-                        if paste_now && !last_paste_down {
-                            let pasted_paths = read_clipboard_to_shelf_paths();
-                            if !pasted_paths.is_empty() {
-                                let _ = app_handle.emit("shelf-drag-drop", pasted_paths);
-                            }
-                        }
-                        last_paste_down = paste_now;
-
-                        // 4. Smart Hover, Safe-Zone Lebar & Proteksi Jendela Control Center
-                        let mut pt = POINT::default();
-                        if GetCursorPos(&mut pt).is_ok() {
-                            if SHELF_FILE_DRAG_ACTIVE.load(Ordering::SeqCst) {
-                                let local_x = ((pt.x - win_rect.left) as f64 / dpi_scale).round();
-                                let local_y = ((pt.y - win_rect.top) as f64 / dpi_scale).round();
-                                let _ = app_handle.emit("shelf-drag-position", serde_json::json!({"x": local_x, "y": local_y}));
-                            }
-                            let lbutton_down = (GetKeyState(0x01) as u16 & 0x8000) != 0;
-                            if lbutton_down {
-                                if drag_start_pt.is_none() {
-                                    drag_start_pt = Some(pt);
-                                }
-                            } else {
-                                drag_start_pt = None;
-                            }
-
-                            let scale_px =
-                                |value: i32| (value as f64 * dpi_scale).round() as i32;
-
-                            // Hanya anggap drag file jika klik dimulai dari bawah area address bar (> 85px)
-                            // dan kursor sudah ditarik minimal 24px
-                            let is_mouse_dragging = drag_start_pt.map_or(false, |start| {
-                                start.y > win_rect.top + scale_px(85)
-                                    && ((pt.x - start.x).abs() + (pt.y - start.y).abs())
-                                        > scale_px(24)
-                            });
-
-                            let effective_w = if is_hovered
-                                && (cfg.interaction_mode != "click"
-                                    || is_mouse_dragging
-                                    || hotkey_pinned_open)
-                            {
-                                cfg.active_width.max(420)
-                            } else {
-                                cfg.active_width
-                            };
-                            let effective_h = if is_hovered
-                                && (cfg.interaction_mode != "click"
-                                    || is_mouse_dragging
-                                    || hotkey_pinned_open)
-                            {
-                                cfg.active_height.max(140)
-                            } else {
-                                cfg.active_height
-                            };
-
-                            let is_expanded = effective_h >= 100;
-                            let is_minimal = is_obstructed || effective_h <= 12;
-
-                            let (half_w, hit_bottom) = if !is_hovered && is_minimal {
-                                let top_zone = if is_mouse_dragging { 10 } else { 6 };
-                                (scale_px(65), win_rect.top + scale_px(top_zone))
-                            } else if is_expanded {
-                                (
-                                    scale_px(effective_w / 2 + 55),
-                                    win_rect.top + scale_px(effective_h + 40),
-                                )
-                            } else {
-                                (
-                                    scale_px(effective_w / 2 + 14),
-                                    win_rect.top + scale_px(effective_h.max(32) + 8),
-                                )
-                            };
-
-                            let hit_left = notch_center_x - half_w;
-                            let hit_right = notch_center_x + half_w;
-                            let hit_top = win_rect.top - scale_px(10);
-
-                            let mut inside = pt.x >= hit_left
-                                && pt.x <= hit_right
-                                && pt.y >= hit_top
-                                && pt.y <= hit_bottom;
-
-                            if !ctrl_win_hwnd.0.is_null()
-                                && IsWindowVisible(ctrl_win_hwnd.0 as isize) != 0
-                                && !IsIconic(ctrl_win_hwnd).as_bool()
-                            {
-                                let mut ctrl_rect = RECT::default();
-                                if GetWindowRect(ctrl_win_hwnd, &mut ctrl_rect).is_ok() {
-                                    let in_ctrl = pt.x >= ctrl_rect.left
-                                        && pt.x <= ctrl_rect.right
-                                        && pt.y >= ctrl_rect.top
-                                        && pt.y <= ctrl_rect.bottom;
-                                    if in_ctrl && pt.y > win_rect.top + scale_px(34) {
-                                        inside = false;
-                                    }
-                                }
-                            }
-
-                            if inside {
-                                outside_ticks = 0;
-                                if !is_hovered {
-                                    is_hovered = true;
-                                    if cfg.interaction_mode != "click" || is_mouse_dragging {
-                                        if let Ok(mut c) = bg_cfg.lock() {
-                                            c.active_width = c.active_width.max(420);
-                                            c.active_height = c.active_height.max(140);
-                                        }
-                                    }
-                                    set_hwnd_click_through(hwnd, false);
-                                    let _ = app_handle.emit("notch-hover", true);
-                                }
-                            } else if is_hovered
-                                && !hotkey_pinned_open
-                                && !NOTCH_TEXT_INPUT.load(Ordering::SeqCst)
-                            {
-                                outside_ticks += 1;
-                                let base_exp_ticks = match cfg.hover_close_speed.as_str() {
-                                    "fast" => 4,
-                                    "relaxed" => 13,
-                                    _ => 7,
-                                };
-                                let required_ticks = if is_expanded { base_exp_ticks } else { 3 };
-                                if outside_ticks >= required_ticks {
-                                    is_hovered = false;
-                                    outside_ticks = 0;
-                                    if let Ok(mut c) = bg_cfg.lock() {
-                                        c.active_width = c.resting_width.max(155);
-                                        c.active_height = 32;
-                                    }
-                                    set_hwnd_click_through(hwnd, true);
-                                    let _ = app_handle.emit("notch-hover", false);
-                                }
-                            }
-                        }
-                    }
-                }
-            });
-
-            let media_app_handle = app.handle().clone();
-            thread::spawn(move || {
-                #[cfg(windows)]
-                unsafe {
-                    let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
-                }
-                let mut last_key = String::new();
-                let mut last_thumb = String::new();
-
-                loop {
-                    thread::sleep(Duration::from_millis(600));
-                    #[cfg(windows)]
-                    {
-                        let payload = fetch_windows_media(&mut last_key, &mut last_thumb);
-                        let _ = media_app_handle.emit("media-update", payload);
-                    }
-                }
-            });
+            reconcile_notch_windows(app.handle(), &shared_state);
+            poller::start_poller(app.handle().clone(), shared_state.clone());
+            media::spawn_media_poller(app.handle().clone(), shared_state.clone());
 
             Ok(())
         })
+        .on_window_event(|window, event| {
+            let label = window.label().to_string();
+            if !label.starts_with("notch-") {
+                return;
+            }
+            if let WindowEvent::DragDrop(drag_ev) = event {
+                #[cfg(debug_assertions)]
+                eprintln!("[shelf-drag] {:?} -> {}", drag_ev, label);
+
+                let app = window.app_handle();
+                let state = app.state::<SharedState>();
+                match drag_ev {
+                    DragDropEvent::Enter { .. } => {
+                        if let Ok(mut d) = state.0.shelf_drag_label.lock() {
+                            *d = Some(label.clone());
+                        }
+                        if let Ok(mut map) = state.0.notches.lock() {
+                            if let Some(inst) = map.get_mut(&label) {
+                                inst.hitbox.active_width = inst.hitbox.active_width.max(420);
+                                inst.hitbox.active_height = inst.hitbox.active_height.max(140);
+                            }
+                        }
+                        let _ = app.emit_to(&label, "shelf-drag-enter", ());
+                    }
+                    DragDropEvent::Over { .. } => {
+                        if let Ok(mut d) = state.0.shelf_drag_label.lock() {
+                            *d = Some(label.clone());
+                        }
+                        if let Ok(mut map) = state.0.notches.lock() {
+                            if let Some(inst) = map.get_mut(&label) {
+                                inst.hitbox.active_width = inst.hitbox.active_width.max(420);
+                                inst.hitbox.active_height = inst.hitbox.active_height.max(140);
+                            }
+                        }
+                    }
+                    DragDropEvent::Drop { paths, .. } => {
+                        if let Ok(mut d) = state.0.shelf_drag_label.lock() {
+                            *d = None;
+                        }
+                        let str_paths: Vec<String> = paths
+                            .iter()
+                            .map(|p| p.to_string_lossy().to_string())
+                            .collect();
+                        let _ = app.emit_to(&label, "shelf-drag-drop", str_paths);
+                    }
+                    DragDropEvent::Leave => {
+                        if let Ok(mut d) = state.0.shelf_drag_label.lock() {
+                            if d.as_deref() == Some(label.as_str()) {
+                                *d = None;
+                            }
+                        }
+                        let _ = app.emit_to(&label, "shelf-drag-leave", ());
+                    }
+                    _ => {}
+                }
+            }
+        })
         .invoke_handler(tauri::generate_handler![
-            get_app_logo,
-            get_app_version,
-            get_install_channel,
-            trigger_update_window,
-            open_config_folder,
-            open_external_url,
-            launch_update_and_exit,
-            get_monitors,
             get_config,
             save_full_config,
+            get_monitors,
+            get_app_version,
+            get_app_logo,
+            get_install_channel,
+            open_external_url,
+            open_config_folder,
+            launch_update_and_exit,
+            trigger_update_window,
+            notch_ready,
+            update_notch_hitbox,
+            set_notch_text_input,
             sync_widget_data,
+            set_lyrics_pinned,
+            set_calendar_data,
+            get_current_media,
+            media_action,
+            media_seek,
             get_system_volume,
             set_system_volume,
-            get_system_mic,
-            toggle_system_mic,
+            lyrics_http_get,
+            get_shared_lyrics,
+            claim_lyrics_fetch,
+            publish_lyrics_data,
+            sync_lyrics_ui,
             prepare_shelf_files,
             pick_shelf_files,
+            paste_clipboard_to_shelf,
             save_clipboard_to_shelf,
             open_shelf_file,
             reveal_shelf_file,
             start_file_drag,
-            update_notch_hitbox,
-            set_notch_text_input,
-            notch_ready,
-            media_action,
-            media_seek,
-            lyrics_http_get,
-            set_lyrics_pinned,
         ])
         .run(tauri::generate_context!())
         .expect("error while running MangNotch");
